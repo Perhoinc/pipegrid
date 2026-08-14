@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>PIPEGRID — Occlusion depth mockups</title>
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12151b; --panel2:#0e1116; --edge:#2c313d;
+    --text:#c7d3e2; --dim:#5f6775; --acc:#e0a14e;
+    --cpipe:#4a5568; --clum:#dfe6f0; --cline:rgba(140,160,185,0.13);
+  }
+  body[data-theme="workshop"]{
+    --bg:#e6dfcf; --panel:#efe9dc; --panel2:#f3eee2; --edge:#c9c0aa;
+    --text:#2a2a28; --dim:#8a8272; --acc:#e0771e;
+    --cpipe:#2a2a28; --clum:#efe9dc; --cline:rgba(90,80,60,0.22);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  body{background:var(--bg);color:var(--text);
+       font-family:ui-monospace,SFMono-Regular,Menlo,monospace;-webkit-text-size-adjust:100%;
+       padding:14px;}
+  .hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:4px;flex-wrap:wrap;}
+  .title{font-size:15px;font-weight:700;letter-spacing:4px;}
+  .sub{font-size:9px;letter-spacing:1.5px;color:var(--dim);}
+  .themebtn{margin-left:auto;font-family:inherit;font-size:10px;letter-spacing:.5px;text-transform:uppercase;
+        padding:7px 9px;border:1px solid var(--edge);border-radius:4px;background:transparent;
+        color:var(--text);cursor:pointer;}
+  #board{display:flex;flex-direction:column;gap:12px;max-width:900px;margin-top:10px;}
+  .panel{border:1px solid var(--edge);border-radius:8px;background:var(--panel);padding:12px;}
+  .plabel{font-size:10px;font-weight:700;letter-spacing:2px;margin-bottom:2px;}
+  .plabel .tag{color:var(--acc);}
+  .note{font-size:9px;color:var(--dim);line-height:1.7;max-width:740px;margin:4px 0 10px;}
+  .note b{color:var(--text);font-weight:700;}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;}
+  .vign{background:var(--panel2);border:1px solid var(--edge);border-radius:8px;padding:10px;
+        display:inline-block;text-align:center;}
+  .cap{font-size:8px;letter-spacing:1px;color:var(--dim);margin-top:6px;max-width:150px;line-height:1.5;}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <span class="title">PIPEGRID</span>
+  <span class="sub">OCCLUSION AS DEPTH · G SEMANTICS + DRAW ORDER · STATIC BOARD</span>
+  <button class="themebtn" id="tt">Theme</button>
+</div>
+<div id="board"></div>
+<script>
+(function(){
+"use strict";
+const C=44, m=22;
+
+const chan=d=>`<path d="${d}" fill="none" stroke="var(--cpipe)" stroke-width="20" stroke-linecap="round"/>`
+             +`<path d="${d}" fill="none" stroke="var(--clum)" stroke-width="8" stroke-linecap="round"/>`;
+const ring=(r,dash)=>`<circle cx="${m}" cy="${m}" r="${r||10}" fill="var(--clum)" stroke="var(--cpipe)" stroke-width="5"${dash?' stroke-dasharray="3 3" fill-opacity="0"':''}/>`;
+const dotm=()=>`<circle cx="${m}" cy="${m}" r="3.2" fill="var(--cpipe)"/>`;
+const crossm=()=>`<path d="M ${m-4.6} ${m-4.6} L ${m+4.6} ${m+4.6} M ${m-4.6} ${m+4.6} L ${m+4.6} ${m-4.6}" stroke="var(--cpipe)" stroke-width="2.6" stroke-linecap="round"/>`;
+const chevm=()=>`<path d="M ${m-4} ${m-1.6} L ${m} ${m-5.6} L ${m+4} ${m-1.6}" fill="none" stroke="var(--cpipe)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`
+             +`<path d="M ${m-4} ${m+1.6} L ${m} ${m+5.6} L ${m+4} ${m+1.6}" fill="none" stroke="var(--cpipe)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`;
+const grid1=()=>`<rect x="0" y="0" width="${C}" height="${C}" fill="none" stroke="var(--cline)"/>`;
+
+function cellSvg(layers,w){       // layers painted in order = depth
+  return `<svg width="${(w||C)+8}" height="${C+8}" viewBox="-4 -4 ${(w||C)+8} ${C+8}">${grid1()}${layers.join("")}</svg>`;
+}
+const SPOKE_W=`M 0 ${m} L ${m} ${m}`, RUN=`M 0 ${m} L ${C} ${m}`, SPOKE_E=`M ${m} ${m} L ${C} ${m}`;
+
+function tile(svg,label){ return `<div class="vign">${svg}<div class="cap">${label}</div></div>`; }
+
+function boardHTML(){
+  let h="";
+
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">BRIEF</span> — DRAW ORDER IS DEPTH</div>
+    <div class="note">Geometry semantics, plus your amendment: an <b>upward</b> opening physically sits
+    on top of its run — the ring paints OVER the channel and interrupts it (vup already does this).
+    A <b>downward</b> opening dives underneath — the ring paints FIRST and the channel covers it, so
+    only what physically peeks out is drawn. Scope: parts WITH a horizontal run. Vertical-run parts
+    keep the chevron; bare vertical ports (Riser \u00d72's floors) have no run to hide under, so the
+    \u2299/\u2297 marks carry them. The plan view stops symbolising depth and starts <b>showing</b> it.</div>
+  </div>`;
+
+  /* elbows */
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">ELBOWS</span> — THE CLEANEST CASE</div>
+    <div class="note">The spoke ends at centre, so the under-ring is only half-covered: Elbow dn reads
+    as a C opening away from its run — unmistakably "dives under the pipe's end". Left pair = marks
+    alone (the G board); right pair = occlusion. Note Elbow up needs no change at all.</div>
+    <div class="row">
+      ${tile(cellSvg([chan(SPOKE_W),ring(),dotm()]),"G MARKS \u00b7 ELBOW UP \u2299")}
+      ${tile(cellSvg([chan(SPOKE_W),ring(),crossm()]),"G MARKS \u00b7 ELBOW DN \u2297")}
+      ${tile(cellSvg([ring(),chan(SPOKE_W)].reverse()),"OCCLUSION \u00b7 UP: RING OVER (unchanged)")}
+      ${tile(cellSvg([ring(),chan(SPOKE_W)]),"OCCLUSION \u00b7 DN: RING UNDER \u2014 HALF PEEKS")}
+    </div>
+  </div>`;
+
+  /* branch tees: three down treatments */
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">BRANCH \u25bc</span> — THE HARD CASE, THREE CUTS</div>
+    <div class="note">A branch-\u25bc tee's run crosses the whole cell, covering the ring to \u00b110&nbsp;px —
+    a same-size ring (outer edge 12.5) shows only 2.5&nbsp;px slivers. <b>O1</b> honest: same size, thin
+    slivers. <b>O2</b> hidden-line: the classic drafting answer — the covered circle drawn fully,
+    dashed, over the run (risk: dashed rings already mean hint/preview). <b>O3</b> tuned: ring at
+    r=12, slivers grow to 4.5&nbsp;px — a size fib for legibility. Branch-\u25b2 shown for contrast:
+    over-ring interrupting the run.</div>
+    <div class="row">
+      ${tile(cellSvg([chan(RUN),ring(),dotm()]),"BRANCH \u25b2 \u00b7 OVER, INTERRUPTS RUN")}
+      ${tile(cellSvg([ring(),chan(RUN)]),"O1 \u00b7 HONEST SLIVERS (r=10)")}
+      ${tile(cellSvg([ring(),chan(RUN),ring(10,true)]),"O2 \u00b7 HIDDEN-LINE DASHED")}
+      ${tile(cellSvg([ring(12),chan(RUN)]),"O3 \u00b7 TUNED SLIVERS (r=12)")}
+    </div>
+  </div>`;
+
+  /* system strip */
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">STRIP</span> — THE SYSTEM BREATHING</div>
+    <div class="note">Same five-cell run twice: straight \u00b7 branch-\u25b2 tee \u00b7 straight \u00b7
+    branch-\u25bc tee \u00b7 elbow dn. Top: occlusion (O3 for the covered ring). Bottom: marks alone.
+    Judge at arm's length — which one do you <b>see</b> without reading?</div>
+    ${(function(){
+      const W=5*C;
+      const g=`<rect x="0" y="0" width="${W}" height="${C}" fill="none" stroke="var(--cline)"/>`
+        +[1,2,3,4].map(i=>`<line x1="${i*C}" y1="0" x2="${i*C}" y2="${C}" stroke="var(--cline)"/>`).join("");
+      const seg=i=>`M ${i*C} ${m} L ${(i+1)*C} ${m}`;
+      const at=(i,inner)=>`<g transform="translate(${i*C},0)">${inner}</g>`;
+      const occ2=`<svg width="${W+8}" height="${C+8}" viewBox="-4 -4 ${W+8} ${C+8}">${g}`
+        +at(3,ring(12))+at(4,ring())
+        +chan(seg(0))+chan(seg(1))+chan(seg(2))+chan(seg(3))+chan(`M ${4*C} ${m} L ${4*C+m} ${m}`)
+        +at(1,ring()+dotm())
+        +`</svg>`;
+      const marks=`<svg width="${W+8}" height="${C+8}" viewBox="-4 -4 ${W+8} ${C+8}">${g}`
+        +chan(seg(0))+chan(seg(1))+chan(seg(2))+chan(seg(3))+chan(`M ${4*C} ${m} L ${4*C+m} ${m}`)
+        +at(1,ring()+dotm())+at(3,ring()+crossm())+at(4,ring()+crossm())
+        +`</svg>`;
+      return `<div class="row">${tile(occ2,"OCCLUSION (O3)")}${tile(marks,"MARKS ALONE")}</div>`;
+    })()}
+  </div>`;
+
+  /* edges + the marks question */
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">EDGES</span> — WHERE OCCLUSION CAN'T REACH, AND WHAT MARKS REMAIN</div>
+    <div class="note">Bare vertical ports have no run: Riser \u00d72's floors keep \u2297 below /
+    \u2299 above. Vertical runs keep the chevron (rr tee shown, ring over its spoke as today). Which
+    leaves one call: does the <b>up-ring keep its \u2299 dot</b>? Dropping it makes occlusion carry
+    everything on run-parts but forks the rule ("\u2299 only on bare ports"); keeping it means one
+    sentence — \u2299 opens up, \u2297 opens down, chevron both, and depth is drawn too. Belt and
+    braces. Both shown.</div>
+    <div class="row">
+      ${tile(cellSvg([ring(),crossm()]),"RISER \u00d72 \u00b7 LOWER FLOOR \u2297")}
+      ${tile(cellSvg([ring(),dotm()]),"RISER \u00d72 \u00b7 UPPER FLOOR \u2299")}
+      ${tile(cellSvg([chan(SPOKE_E),ring(),chevm()]),"RR TEE \u00b7 CHEVRON + SPOKE")}
+      ${tile(cellSvg([chan(RUN),ring(),dotm()]),"UP-RING WITH \u2299 (one rule)")}
+      ${tile(cellSvg([chan(RUN),ring()]),"UP-RING BARE (occlusion only)")}
+    </div>
+  </div>`;
+
+  return h;
+}
+
+function paint(){ document.getElementById("board").innerHTML=boardHTML(); }
+document.getElementById("tt").addEventListener("click",()=>{
+  document.body.dataset.theme=document.body.dataset.theme==="workshop"?"":"workshop";
+  paint();
+});
+paint();
+
+})();
+</script>
+</body>
+</html>

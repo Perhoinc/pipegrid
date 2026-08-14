@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>PIPEGRID — Riser icon mockups</title>
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12151b; --panel2:#0e1116; --edge:#2c313d;
+    --text:#c7d3e2; --dim:#5f6775; --acc:#e0a14e; --onfg:#0b0d10;
+    --icase:#8ea6bf; --ilum:#e8f2fc; --ifg:#c7d3e2; --ghost:#3d6f9f;
+    --cpipe:#4a5568; --clum:#dfe6f0; --cline:rgba(140,160,185,0.13);
+  }
+  body[data-theme="workshop"]{
+    --bg:#e6dfcf; --panel:#efe9dc; --panel2:#f3eee2; --edge:#c9c0aa;
+    --text:#2a2a28; --dim:#8a8272; --acc:#e0771e; --onfg:#efe9dc;
+    --icase:#2a2a28; --ilum:#efe9dc; --ifg:#2a2a28; --ghost:#6b7c8f;
+    --cpipe:#2a2a28; --clum:#efe9dc; --cline:rgba(90,80,60,0.22);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  body{background:var(--bg);color:var(--text);
+       font-family:ui-monospace,SFMono-Regular,Menlo,monospace;-webkit-text-size-adjust:100%;
+       padding:14px;}
+  .hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:4px;flex-wrap:wrap;}
+  .title{font-size:15px;font-weight:700;letter-spacing:4px;}
+  .sub{font-size:9px;letter-spacing:1.5px;color:var(--dim);}
+  .themebtn{margin-left:auto;font-family:inherit;font-size:10px;letter-spacing:.5px;text-transform:uppercase;
+        padding:7px 9px;border:1px solid var(--edge);border-radius:4px;background:transparent;
+        color:var(--text);cursor:pointer;}
+  #board{display:flex;flex-direction:column;gap:12px;max-width:820px;margin-top:10px;}
+  .panel{border:1px solid var(--edge);border-radius:8px;background:var(--panel);padding:12px;}
+  .plabel{font-size:10px;font-weight:700;letter-spacing:2px;margin-bottom:2px;}
+  .plabel .tag{color:var(--acc);}
+  .note{font-size:9px;color:var(--dim);line-height:1.7;max-width:700px;margin:4px 0 10px;}
+  .note b{color:var(--text);font-weight:700;}
+  .tiles{display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;}
+  .tile{width:82px;height:62px;border:1px solid var(--edge);border-radius:6px;background:var(--panel);
+        display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;}
+  .tile.sm{width:52px;height:52px;}
+  .tlbl{font-size:7px;letter-spacing:1.1px;text-transform:uppercase;color:var(--dim);white-space:nowrap;}
+  .h4on{border-color:var(--edge);box-shadow:inset 3px 0 0 var(--acc);
+        background:color-mix(in srgb,var(--acc) 10%,transparent);}
+  .vign{background:var(--panel2);border:1px solid var(--edge);border-radius:8px;padding:10px;
+        display:inline-block;text-align:center;}
+  .cap{font-size:8px;letter-spacing:1px;color:var(--dim);margin-top:6px;}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <span class="title">PIPEGRID</span>
+  <span class="sub">RISER ICONS · IN THE LOCKED D+H4 LANGUAGE · STATIC BOARD</span>
+  <button class="themebtn" id="tt">Theme</button>
+</div>
+<div id="board"></div>
+<script>
+(function(){
+"use strict";
+
+function iSvg(inner,sz){ return `<svg width="${sz||32}" height="${sz||32}" viewBox="0 0 44 44">${inner}</svg>`; }
+function iPipe(path){
+  return `<path d="${path}" fill="none" stroke="var(--icase)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>`
+        +`<path d="${path}" fill="none" stroke="var(--ilum)" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+}
+function iArc(cx,cy,r,a1,a2){
+  const N=16; let d="";
+  for(let k=0;k<=N;k++){const t=(a1+(a2-a1)*k/N)*Math.PI/180;
+    d+=(k?" L ":"M ")+(cx+r*Math.cos(t)).toFixed(1)+" "+(cy+r*Math.sin(t)).toFixed(1);}
+  return d;
+}
+function ring(cx,cy,r,up,neutral){
+  let g=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--icase)" stroke-width="${r>7?5:4.2}"/>`;
+  if(neutral) return g;
+  if(up) g+=`<circle cx="${cx}" cy="${cy}" r="${r*0.32}" fill="var(--icase)"/>`;
+  else g+=`<path d="M ${cx-r*0.5} ${cy-r*0.5} L ${cx+r*0.5} ${cy+r*0.5} M ${cx-r*0.5} ${cy+r*0.5} L ${cx+r*0.5} ${cy-r*0.5}" stroke="var(--icase)" stroke-width="2.4" stroke-linecap="round"/>`;
+  return g;
+}
+const dot=(x,y)=>`<circle cx="${x}" cy="${y}" r="3.4" fill="var(--acc)"/>`;
+const STUB=`<path d="M4 22 H13" fill="none" stroke="var(--icase)" stroke-width="11" stroke-linecap="round"/><path d="M4 22 H13" fill="none" stroke="var(--ilum)" stroke-width="4.5" stroke-linecap="round"/>`;
+const IPATH={tee:"M22 6 V38 M22 22 H38", capline:"M6 22 H22"};
+
+/* ---- LOCKED language, applied ---- */
+const LOCKED={
+  tsplit:iPipe("M22 6 V38 "+iArc(38,6,16,180,90))+dot(22,6),
+  src:iPipe(IPATH.capline)+`<circle cx="22" cy="22" r="7" fill="var(--acc)" stroke="var(--ilum)" stroke-width="2.5"/>`,
+  snk:iPipe(IPATH.capline)+`<circle cx="22" cy="22" r="7" fill="var(--icase)" stroke="var(--ilum)" stroke-width="2.5"/>`+dot(6,22),
+  vup:STUB+ring(22,22,9,true)+dot(6,22),
+  vdn:STUB+ring(22,22,9,false)+dot(6,22)
+};
+
+/* ---- current riser icons, for the diagnosis panel ---- */
+const CUR={
+  riser1:ring(22,22,9,true)+`<path d="M 22 14.5 L 22 1.5" fill="none" stroke="var(--acc)" stroke-width="3.6"/>`,   // stand-in for old N arrow
+  riser:ring(22,14,7,true)+ring(22,30,7,false)+`<path d="M 34 28 L 34 16" fill="none" stroke="var(--acc)" stroke-width="3.6"/>`
+};
+
+/* ---- candidates (default rising: agreeing \u2299 marks throughout) ---- */
+const CAND={
+  A1:ring(22,22,10,true),
+  A2:ring(19,19,10,true)
+    +`<circle cx="30" cy="30" r="8" fill="none" stroke="var(--ghost)" stroke-width="2" stroke-dasharray="3.5 3.5"/>`
+    +`<circle cx="30" cy="30" r="2" fill="var(--ghost)"/>`,
+  B1:ring(22,22,10,true)
+    +`<path d="M33 16 L37 16 M35 14 L35 18" stroke="var(--ifg)" stroke-width="2" stroke-linecap="round"/>`
+    +`<path d="M33 27 H37" stroke="var(--ifg)" stroke-width="2" stroke-linecap="round"/>`,   // ×1 tally: one tick
+  B2:ring(22,22,10,true)
+    +`<path d="M33 14 H37 M33 19 H37" stroke="var(--ifg)" stroke-width="2" stroke-linecap="round"/>`, // ×2 tally: two ticks
+  C1:`<path d="M6 15 H16 M28 15 H38" stroke="var(--ifg)" stroke-width="1.6" stroke-dasharray="3 3"/>`
+    +`<path d="M6 29 H16 M28 29 H38" stroke="var(--ifg)" stroke-width="1.6" stroke-dasharray="3 3"/>`
+    +iPipe("M22 8 V36"),
+  C2:`<path d="M6 12 H16 M28 12 H38" stroke="var(--ifg)" stroke-width="1.6" stroke-dasharray="3 3"/>`
+    +`<path d="M6 22 H16 M28 22 H38" stroke="var(--ifg)" stroke-width="1.6" stroke-dasharray="3 3"/>`
+    +`<path d="M6 32 H16 M28 32 H38" stroke="var(--ifg)" stroke-width="1.6" stroke-dasharray="3 3"/>`
+    +iPipe("M22 5 V39"),
+  D1:ring(22,22,10,true),
+  D2:`<path d="M22 17 V27" stroke="var(--icase)" stroke-width="6"/>`
+    +ring(22,12,7,true)+ring(22,32,7,true)
+};
+
+function tile(inner,label,sz,cls){
+  return `<div class="tile ${cls||''}">${iSvg(inner,sz||32)}<span class="tlbl">${label}</span></div>`;
+}
+
+/* small canvas truth vignette: what a riser looks like placed (either kind) */
+function vignPlaced(){
+  const C=44,m=22;
+  let s="";
+  for(let i=0;i<=2;i++) s+=`<line x1="${i*C}" y1="0" x2="${i*C}" y2="${C}" stroke="var(--cline)"/>`;
+  for(let i=0;i<=1;i++) s+=`<line x1="0" y1="${i*C}" x2="${2*C}" y2="${i*C}" stroke="var(--cline)"/>`;
+  s+=`<circle cx="${m}" cy="${m}" r="10" fill="var(--clum)" stroke="var(--cpipe)" stroke-width="5"/>`;
+  s+=`<circle cx="${m}" cy="${m}" r="3.2" fill="var(--cpipe)"/>`;
+  return `<svg width="${2*C}" height="${C}" viewBox="0 0 ${2*C} ${C}">${s}</svg>`;
+}
+
+function boardHTML(){
+  let h="";
+
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">LOCKED</span> — D LANGUAGE + H4, APPLIED</div>
+    <div class="note">The rule as amended: <b>amber marks where flow enters</b> — a part (inlet dot at
+    the port) or the system (Source's core goes amber: flow originates here). Sink keeps a neutral core
+    and takes an ordinary inlet dot. Elbows up/dn: stub + ring + inlet dot. One H4 active button for
+    reference. Everything below is drawn in this language.</div>
+    <div class="tiles">
+      ${tile(LOCKED.tsplit,"Split \u00b7 run")}
+      ${tile(LOCKED.src,"Source")}
+      ${tile(LOCKED.snk,"Sink")}
+      ${tile(LOCKED.vup,"Elbow up")}
+      ${tile(LOCKED.vdn,"Elbow dn")}
+      <div class="tile h4on">${iSvg(LOCKED.tsplit,30)}<span class="tlbl">H4 active</span></div>
+    </div>
+  </div>`;
+
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">DIAGNOSIS</span> — WHY THE CURRENT ICONS LIE</div>
+    <div class="note">On canvas, BOTH risers place as <b>one ring</b> on the layer you're looking at —
+    that's the v35 plan-view convention. The current \u00d71 icon adds an arrow the canvas never shows;
+    the current \u00d72 icon shows a \u2299/\u2297 pair, which <b>contradicts the pass-through rule</b>
+    (a rising riser is \u2299 on both floors — the marks always agree). No wonder neither resembles
+    what lands. The candidates fix resemblance and truth; the remaining job is saying "\u00d71 vs
+    \u00d72" honestly.</div>
+    <div class="row">
+      ${tile(CUR.riser1,"Now: \u00d71")}
+      ${tile(CUR.riser,"Now: \u00d72")}
+      <div class="vign">${vignPlaced()}<div class="cap">PLACED (EITHER KIND): ONE RING</div></div>
+    </div>
+  </div>`;
+
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">R-A</span> — CANVAS-TRUE · GHOST TELLS THE FLOORS</div>
+    <div class="note">\u00d71 = exactly what places: one ring. \u00d72 = the ring plus a small
+    <b>dashed hint ring</b> in ghost colour, offset to be readable — borrowed from real canvas
+    vocabulary (the dashed ring that marks a port opening into the next floor). Most faithful;
+    the \u00d72 mark is the subtlest of the four.</div>
+    <div class="tiles">${tile(CAND.A1,"Riser \u00d71")}${tile(CAND.A2,"Riser \u00d72")}
+      ${tile(CAND.A1,"",26,"sm")}${tile(CAND.A2,"",26,"sm")}</div>
+  </div>`;
+
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">R-B</span> — RING + FLOOR TALLY</div>
+    <div class="note">One ring; beside it a drawing-office tally of floors spanned — one tick for
+    \u00d71, two for \u00d72 (the \u00d71 keeps a small + to read "one more floor up"). Says the count
+    explicitly without pretending the canvas shows two circles. Reads well small; the tally is new
+    vocabulary, but callout-shaped.</div>
+    <div class="tiles">${tile(CAND.B1,"Riser \u00d71")}${tile(CAND.B2,"Riser \u00d72")}
+      ${tile(CAND.B1,"",26,"sm")}${tile(CAND.B2,"",26,"sm")}</div>
+  </div>`;
+
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">R-C</span> — SECTION · PIPE THROUGH FLOOR LINES</div>
+    <div class="note">A deliberate break: side elevation instead of plan. Vertical pipe crossing dashed
+    floor lines — one bay for \u00d71, two for \u00d72. Span count is unmistakable and it's the only
+    candidate a newcomer reads with zero training. Cost: these two icons alone leave the plan-view
+    language (as Elbow up's stub already half-does).</div>
+    <div class="tiles">${tile(CAND.C1,"Riser \u00d71")}${tile(CAND.C2,"Riser \u00d72")}
+      ${tile(CAND.C1,"",26,"sm")}${tile(CAND.C2,"",26,"sm")}</div>
+  </div>`;
+
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">R-D</span> — DUMBBELL · ONE PART, TWO FLOORS</div>
+    <div class="note">\u00d71 = one ring (same as R-A). \u00d72 = two rings joined by a visible casing
+    bar — the old pair made honest: connected (one part, not two) and <b>agreeing marks</b> (\u2299
+    \u2299, rising). Distinct at a glance; slight fiction remains, since no floor ever shows both
+    rings at once.</div>
+    <div class="tiles">${tile(CAND.D1,"Riser \u00d71")}${tile(CAND.D2,"Riser \u00d72")}
+      ${tile(CAND.D1,"",26,"sm")}${tile(CAND.D2,"",26,"sm")}</div>
+  </div>`;
+
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">NOTE</span> — WHERE THESE WILL LIVE</div>
+    <div class="note">When the Vert tool dissolves (your fold-in directive), risers most honestly
+    become <b>vertical poses of Straight</b> — the pose row under the Straight flyout-to-be. The
+    52\u00d752 strips above preview each candidate at pose-button scale; whichever wins must survive
+    there.</div>
+  </div>`;
+
+  return h;
+}
+
+function paint(){ document.getElementById("board").innerHTML=boardHTML(); }
+document.getElementById("tt").addEventListener("click",()=>{
+  document.body.dataset.theme=document.body.dataset.theme==="workshop"?"":"workshop";
+  paint();
+});
+paint();
+
+})();
+</script>
+</body>
+</html>

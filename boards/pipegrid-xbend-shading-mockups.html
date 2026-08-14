@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>PIPEGRID — xbend ⇕ render variants</title>
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12151b; --panel2:#0e1116; --edge:#2c313d;
+    --text:#c7d3e2; --dim:#5f6775; --acc:#e0a14e;
+  }
+  body[data-theme="workshop"]{
+    --bg:#e6dfcf; --panel:#efe9dc; --panel2:#f3eee2; --edge:#c9c0aa;
+    --text:#2a2a28; --dim:#8a8272; --acc:#e0771e;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  body{background:var(--bg);color:var(--text);
+       font-family:ui-monospace,SFMono-Regular,Menlo,monospace;-webkit-text-size-adjust:100%;
+       padding:14px;}
+  .hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:4px;flex-wrap:wrap;}
+  .title{font-size:15px;font-weight:700;letter-spacing:4px;}
+  .sub{font-size:9px;letter-spacing:1.5px;color:var(--dim);}
+  .themebtn{margin-left:auto;font-family:inherit;font-size:10px;letter-spacing:.5px;text-transform:uppercase;
+        padding:7px 9px;border:1px solid var(--edge);border-radius:4px;background:transparent;
+        color:var(--text);cursor:pointer;}
+  #board{display:flex;flex-direction:column;gap:12px;max-width:900px;margin-top:10px;}
+  .panel{border:1px solid var(--edge);border-radius:8px;background:var(--panel);padding:12px;}
+  .plabel{font-size:10px;font-weight:700;letter-spacing:2px;margin-bottom:2px;}
+  .plabel .tag{color:var(--acc);}
+  .note{font-size:9px;color:var(--dim);line-height:1.7;max-width:740px;margin:4px 0 10px;}
+  .note b{color:var(--text);font-weight:700;}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;}
+  .vign{background:var(--panel2);border:1px solid var(--edge);border-radius:8px;padding:10px;
+        display:inline-block;text-align:center;}
+  .cap{font-size:8px;letter-spacing:1px;color:var(--dim);margin-top:6px;max-width:150px;line-height:1.5;}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <span class="title">PIPEGRID</span>
+  <span class="sub">XBEND \u21d5 \u00b7 TWIN-ELBOW RENDER \u00b7 THREE TREATMENTS \u00b7 STATIC BOARD</span>
+  <button class="themebtn" id="tt">Theme</button>
+</div>
+<div id="board"></div>
+<script>
+(function(){
+"use strict";
+const C=44, m=22, FAINT=0.3;
+const PALETTES={
+  carbon:{pipe:"#4a5568",pipeHi:"#dfe6f0",line:"rgba(140,160,185,0.13)"},
+  workshop:{pipe:"#2a2a28",pipeHi:"#efe9dc",line:"rgba(90,80,60,0.22)"}
+};
+let COL=PALETTES.carbon;
+function shade(hex,f){                              // mix toward black by factor f
+  const n=parseInt(hex.slice(1),16);
+  const r=Math.round(((n>>16)&255)*(1-f)), g=Math.round(((n>>8)&255)*(1-f)), b=Math.round((n&255)*(1-f));
+  return "#"+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
+}
+let GID=0;
+
+/* geometry: up-elbow feeds from W, ring at (m-6); down-elbow feeds from E, ring at (m+6) */
+let OFF=3;
+let UPX=m-OFF, DNX=m+OFF;
+function setOff(o){ OFF=o; UPX=m-OFF; DNX=m+OFF; }
+function chanC(d,cas,lum){
+  return `<path d="${d}" fill="none" stroke="${cas||COL.pipe}" stroke-width="20" stroke-linecap="round"/>`
+       + `<path d="${d}" fill="none" stroke="${lum||COL.pipeHi}" stroke-width="8" stroke-linecap="round"/>`;
+}
+function ringC(cx,st,fill){
+  return `<circle cx="${cx}" cy="${m}" r="10" fill="${fill||COL.pipeHi}" stroke="${st||COL.pipe}" stroke-width="5"/>`;
+}
+const dotC=cx=>`<circle cx="${cx}" cy="${m}" r="3.2" fill="${COL.pipe}"/>`;
+const grid1=()=>`<rect x="0" y="0" width="${C}" height="${C}" fill="none" stroke="${COL.line}"/>`;
+const cell=(layers,sz)=>`<svg width="${sz||C+8}" height="${sz||C+8}" viewBox="-4 -4 ${C+8} ${C+8}">${grid1()}${layers.join("")}</svg>`;
+const tile=(svg,label)=>`<div class="vign">${svg}<div class="cap">${label}</div></div>`;
+
+/* X1 — pure layering */
+function x1(){
+  return [ringC(DNX),                                  // down-ring first: dives under
+          chanC(`M ${C} ${m} L ${DNX} ${m}`),          // its spoke covers the inner half
+          chanC(`M 0 ${m} L ${UPX} ${m}`),             // up-spoke
+          ringC(UPX)+dotC(UPX)];                       // up-ring topmost, \u2299
+}
+/* X2 — lower assembly dimmed */
+function x2(){
+  return [`<g opacity="0.55">`+ringC(DNX)+chanC(`M ${C} ${m} L ${DNX} ${m}`)+`</g>`,
+          chanC(`M 0 ${m} L ${UPX} ${m}`),
+          ringC(UPX)+dotC(UPX)];
+}
+/* X3 — gradient: the descending stream darkens toward its bore */
+function x3long(){
+  const ic="g"+(GID++), il="g"+(GID++), ir="g"+(GID++);
+  const dkC=shade(COL.pipe,0.7), dkL=shade(COL.pipeHi,0.45), pit=shade(COL.pipeHi,0.7);
+  const grad=`<defs>
+    <linearGradient id="${ic}" gradientUnits="userSpaceOnUse" x1="${C}" y1="0" x2="${DNX}" y2="0">
+      <stop offset="0" stop-color="${COL.pipe}"/><stop offset="0.3" stop-color="${dkC}"/>
+      <stop offset="1" stop-color="${dkC}"/></linearGradient>
+    <linearGradient id="${il}" gradientUnits="userSpaceOnUse" x1="${C}" y1="0" x2="${DNX}" y2="0">
+      <stop offset="0" stop-color="${COL.pipeHi}"/><stop offset="0.3" stop-color="${dkL}"/>
+      <stop offset="1" stop-color="${dkL}"/></linearGradient>
+    <radialGradient id="${ir}" gradientUnits="userSpaceOnUse" cx="${DNX}" cy="${m}" r="10">
+      <stop offset="0" stop-color="${pit}"/><stop offset="1" stop-color="${dkL}"/></radialGradient>
+  </defs>`;
+  return [grad,
+          ringC(DNX,dkC,`url(#${ir})`),                // looking down into the bore
+          chanC(`M ${C} ${m} L ${DNX} ${m}`,`url(#${ic})`,`url(#${il})`),
+          chanC(`M 0 ${m} L ${UPX} ${m}`),
+          ringC(UPX)+dotC(UPX)];
+}
+function x3(){
+  const ic="g"+(GID++), il="g"+(GID++);
+  const dkC=shade(COL.pipe,0.68), dkL=shade(COL.pipeHi,0.35);
+  const grad=`<defs>
+    <linearGradient id="${ic}" gradientUnits="userSpaceOnUse" x1="${C}" y1="0" x2="${DNX}" y2="0">
+      <stop offset="0" stop-color="${COL.pipe}"/><stop offset="1" stop-color="${dkC}"/></linearGradient>
+    <linearGradient id="${il}" gradientUnits="userSpaceOnUse" x1="${C}" y1="0" x2="${DNX}" y2="0">
+      <stop offset="0" stop-color="${COL.pipeHi}"/><stop offset="1" stop-color="${dkL}"/></linearGradient>
+  </defs>`;
+  return [grad,
+          ringC(DNX,dkC,dkL),                          // the bore itself sits in shadow
+          chanC(`M ${C} ${m} L ${DNX} ${m}`,`url(#${ic})`,`url(#${il})`),
+          chanC(`M 0 ${m} L ${UPX} ${m}`),
+          ringC(UPX)+dotC(UPX)];
+}
+/* neighbours for the distinctness check */
+const chev=(u,d)=>
+   `<path d="M ${m-4} ${m-1.6} L ${m} ${m-5.6} L ${m+4} ${m-1.6}" opacity="${u}" fill="none" stroke="${COL.pipe}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`
+  +`<path d="M ${m-4} ${m+1.6} L ${m} ${m+5.6} L ${m+4} ${m+1.6}" opacity="${d}" fill="none" stroke="${COL.pipe}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`;
+function junc(){ return [chanC(`M 0 ${m} L ${m} ${m}`),chanC(`M ${m} ${m} L ${C} ${m}`),ringC(m)+chev(1,1)]; }
+function teeUp(){ return [chanC(`M 0 ${m} L ${C} ${m}`),ringC(m)+dotC(m)]; }
+function vdnCell(){ return [ringC(m),chanC(`M 0 ${m} L ${m} ${m}`)]; }
+
+function boardHTML(){
+  let h="";
+
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">BRIEF</span> — TWIN ELBOWS, THREE SHADINGS</div>
+    <div class="note">Faint-faint is withdrawn: chevrons mean a <b>shared vertical bore</b>, and the
+    bend pair has none — so it renders as what it is, an up-elbow and a down-elbow sharing a cell,
+    each under the existing rules (up: ring over + \u2299, topmost; down: ring under its spoke, bare),
+    offset toward their feed sides (tightened per feedback — sweep below). The offset is truthful here — two real bores — unlike the
+    riser-\u00d71 pair we killed. Three treatments of the same geometry below; toggle the theme, since
+    darkening has less room to work against Workshop's near-black pipe.</div>
+  </div>`;
+
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">X1 / X2 / X3</span> — AT 1\u00d7 AND 2\u00d7</div>
+    <div class="note"><b>X1 pure layering</b>: draw order alone — no new vocabulary, opacity keeps its
+    two existing meanings. <b>X2 dimmed lower</b>: the descending assembly at 55% — most legible depth
+    cue, but opacity now speaks a third dialect (ghost floors, faint mouths, and this). <b>X3-LONG</b>: the shadow REACHES — dark from 30% of the limb onward, a long plateau running up the
+    pipe with only the far port end in daylight, so the whole limb visibly tucks under; the bore keeps
+    its radial pit. Ramp start, shades and pit are each one constant.</div>
+    <div class="row">
+      ${tile(cell(x1()),"X1 \u00b7 LAYERING")}
+      ${tile(cell(x2()),"X2 \u00b7 DIMMED")}
+      ${tile(cell(x3()),"X3 \u00b7 GRADIENT")}
+    </div>
+    <div class="row" style="margin-top:8px">
+      ${tile(cell(x3(),100),"X3 \u00b7 APPROVED \u00b7 2\u00d7")}
+      ${tile(cell(x3long(),100),"X3-LONG \u00b7 SHADOW REACHES \u00b7 2\u00d7")}
+      ${tile(cell(x3long()),"X3-LONG \u00b7 1\u00d7")}
+    </div>
+    <div class="note" style="margin-top:8px"><b>Offset sweep</b> (X3 dress, 2\u00d7): the ring pair at
+    \u00b13 / \u00b14 / \u00b15 px. Tighter reads more like one assembly; wider separates the bores.
+    Pick on the device.</div>
+    <div class="row">
+      ${(function(){ setOff(3); const a=tile(cell(x3(),100),"\u00b13");
+                     setOff(4); const b=tile(cell(x3(),100),"\u00b14");
+                     setOff(5); const c=tile(cell(x3(),100),"\u00b15");
+                     setOff(3); return a+b+c; })()}
+    </div>
+  </div>`;
+
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">CONTEXT</span> — THE DISTINCTNESS TEST</div>
+    <div class="note">Your objection's second half: the bend pair must not be mistakable for its
+    neighbours. The line-up, X1 shown (swap mentally): the mixing junction (bore + through chevrons),
+    the branch-\u25b2 tee (one centred \u2299 on a full run), a lone elbow-dn (single under-ring), and
+    the bend pair (twin offset rings, one over-\u2299, one under-bare). Trace adds two amber marks
+    here, one per stream.</div>
+    <div class="row">
+      ${tile(cell(junc()),"JUNCTION \u21d5")}
+      ${tile(cell(teeUp()),"TEE \u00b7 BR \u25b2")}
+      ${tile(cell(vdnCell()),"ELBOW DN")}
+      ${tile(cell(x3long()),"BEND PAIR \u21d5 (X3-LONG)")}
+    </div>
+  </div>`;
+
+  return h;
+}
+
+function paint(){ GID=0; document.getElementById("board").innerHTML=boardHTML(); }
+document.getElementById("tt").addEventListener("click",()=>{
+  const w=document.body.dataset.theme==="workshop";
+  document.body.dataset.theme=w?"":"workshop";
+  COL=PALETTES[w?"carbon":"workshop"];
+  paint();
+});
+paint();
+
+})();
+</script>
+</body>
+</html>

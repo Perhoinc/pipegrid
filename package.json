@@ -1,0 +1,12 @@
+{
+  "name": "pipegrid",
+  "version": "38.0.0",
+  "private": true,
+  "description": "PIPEGRID - a pipe-layout visualiser for iPad. The app is index.html; docs/PIPEGRID-STATE.md is the memory.",
+  "scripts": {
+    "test": "node test/test.js"
+  },
+  "devDependencies": {
+    "jsdom": "^24.1.3"
+  }
+}

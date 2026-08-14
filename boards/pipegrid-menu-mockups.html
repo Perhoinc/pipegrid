@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>PIPEGRID — Menu regrouping mockups</title>
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12151b; --panel2:#0e1116; --edge:#2c313d;
+    --text:#c7d3e2; --dim:#5f6775; --acc:#e0a14e; --danger:#ff5d55; --onfg:#0b0d10;
+    --icase:#8ea6bf; --ilum:#e8f2fc; --ifg:#c7d3e2;
+  }
+  body[data-theme="workshop"]{
+    --bg:#e6dfcf; --panel:#efe9dc; --panel2:#f3eee2; --edge:#c9c0aa;
+    --text:#2a2a28; --dim:#8a8272; --acc:#e0771e; --danger:#cf2f2a; --onfg:#efe9dc;
+    --icase:#2a2a28; --ilum:#efe9dc; --ifg:#2a2a28;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  body{background:var(--bg);color:var(--text);
+       font-family:ui-monospace,SFMono-Regular,Menlo,monospace;-webkit-text-size-adjust:100%;
+       padding:14px;}
+  .hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:4px;flex-wrap:wrap;}
+  .title{font-size:15px;font-weight:700;letter-spacing:4px;}
+  .sub{font-size:9px;letter-spacing:1.5px;color:var(--dim);}
+  .themebtn{margin-left:auto;font-family:inherit;font-size:10px;letter-spacing:.5px;text-transform:uppercase;
+        padding:7px 9px;border:1px solid var(--edge);border-radius:4px;background:transparent;
+        color:var(--text);cursor:pointer;}
+  #board{display:flex;flex-direction:column;gap:12px;max-width:860px;margin-top:10px;}
+  .panel{border:1px solid var(--edge);border-radius:8px;background:var(--panel);padding:12px;}
+  .plabel{font-size:10px;font-weight:700;letter-spacing:2px;margin-bottom:2px;}
+  .plabel .tag{color:var(--acc);}
+  .note{font-size:9px;color:var(--dim);line-height:1.7;max-width:720px;margin:4px 0 10px;}
+  .note b{color:var(--text);font-weight:700;}
+  .stage{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start;}
+  .minirail{display:flex;flex-direction:column;gap:5px;align-items:center;padding:8px 6px;
+        border:1px solid var(--edge);border-radius:8px;background:var(--panel);}
+  .rbtn{width:44px;height:44px;border:1px solid var(--edge);border-radius:6px;background:transparent;
+        display:grid;place-items:center;padding:0;}
+  .rbtn.h4on{box-shadow:inset 3px 0 0 var(--acc);background:color-mix(in srgb,var(--acc) 10%,transparent);}
+  .pop{background:var(--panel);border:1px solid var(--edge);border-radius:8px;padding:12px;min-width:190px;
+       box-shadow:0 8px 30px rgba(0,0,0,.25);}
+  .lbl{font-size:9px;letter-spacing:2px;color:var(--dim);margin:0 0 8px;}
+  .lbl.mid{margin-top:12px;border-top:1px solid var(--edge);padding-top:10px;}
+  .prow{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
+  .sbtn{font-family:inherit;font-size:10px;letter-spacing:.5px;text-transform:uppercase;
+        padding:7px 9px;border:1px solid var(--edge);border-radius:4px;background:transparent;
+        color:var(--text);}
+  .sbtn.on{background:var(--acc);border-color:var(--acc);color:var(--onfg);}
+  .sbtn.danger{color:var(--danger);border-color:color-mix(in srgb,var(--danger) 45%,var(--edge));}
+  .seg{display:flex;border:1px solid var(--edge);border-radius:4px;overflow:hidden;}
+  .seg span{font-size:10px;letter-spacing:.5px;text-transform:uppercase;padding:7px 9px;}
+  .seg span.on{background:var(--acc);color:var(--onfg);}
+  .steplbl{font-size:9px;letter-spacing:1.5px;color:var(--dim);width:44px;}
+  .step b{width:24px;height:24px;font-size:13px;border:1px solid var(--edge);border-radius:4px;
+          display:inline-grid;place-items:center;font-weight:400;}
+  .step i{width:22px;text-align:center;font-size:12px;font-style:normal;display:inline-block;}
+  .hint{font-size:9px;color:var(--dim);line-height:1.6;max-width:210px;}
+  .rlbl{font-size:8px;letter-spacing:1.5px;color:var(--dim);text-align:center;margin-bottom:4px;}
+  .col{display:flex;flex-direction:column;align-items:center;}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <span class="title">PIPEGRID</span>
+  <span class="sub">MENU REGROUPING · VIEW / THEME / \u22ef · STATIC BOARD</span>
+  <button class="themebtn" id="tt">Theme</button>
+</div>
+<div id="board"></div>
+<script>
+(function(){
+"use strict";
+
+/* rail icons, verbatim shapes from v35 */
+function iSvg(inner,sz){ return `<svg width="${sz||30}" height="${sz||30}" viewBox="0 0 44 44">${inner}</svg>`; }
+function iStroke(paths,w,col){
+  return paths.map(pp=>`<path d="${pp}" fill="none" stroke="${col||'var(--ifg)'}" stroke-width="${w||3.2}" stroke-linecap="round" stroke-linejoin="round"/>`).join("");
+}
+const MAG="M19 19 m-10 0 a10 10 0 1 0 20 0 a10 10 0 1 0 -20 0 M27 27 L37 37";
+const ICON={
+  zoomp:iStroke([MAG,"M14 19 H24 M19 14 V24"],3.2),
+  zoomm:iStroke([MAG,"M14 19 H24"],3.2),
+  view:iStroke(["M22 8 L36 16 L22 24 L8 16 Z","M8 22 L22 30 L36 22","M8 28 L22 36 L36 28"],3),
+  theme:`<path d="M22 7 A15 15 0 1 0 22 37 A15 15 0 1 0 22 7 Z" fill="none" stroke="var(--ifg)" stroke-width="3"/><path d="M22 7 A15 15 0 0 1 22 37 Z" fill="var(--ifg)"/>`,
+  more:iStroke(["M12 22 h.1 M22 22 h.1 M32 22 h.1"],5),
+  file:iStroke(["M14 8 H26 L32 14 V36 H14 Z","M26 8 V14 H32"],3)
+};
+function rail(btns){
+  return `<div class="minirail">`+btns.map(b=>
+    `<button class="rbtn ${b[2]||''}" title="${b[1]}">${iSvg(ICON[b[0]],28)}</button>`).join("")+`</div>`;
+}
+const toggles=(on)=>`
+  <div class="prow"><button class="sbtn on">Ghost layers</button></div>
+  <div class="prow"><button class="sbtn">Footprints</button></div>
+  <div class="prow"><button class="sbtn on">Validate</button></div>`;
+const themeRow=`<div class="prow"><span class="steplbl">THEME</span>
+  <span class="seg"><span class="on">Carbon</span><span>Workshop</span></span></div>`;
+const gridRows=`
+  <div class="prow"><span class="steplbl">ROWS</span><span class="step"><b>\u2212</b><i>8</i><b>+</b></span></div>
+  <div class="prow"><span class="steplbl">COLS</span><span class="step"><b>\u2212</b><i>8</i><b>+</b></span></div>`;
+const fileRows=`
+  <div class="prow"><button class="sbtn">Save file</button><button class="sbtn">Load file</button></div>`;
+const dangerRows=`
+  <div class="prow"><button class="sbtn danger">Clear layer</button><button class="sbtn danger">Clear</button></div>`;
+const hintRow=`<div class="hint">Gesture = flow: press upstream, drag the way it runs\u2026</div>`;
+
+function pop(title,inner){ return `<div class="pop"><div class="lbl">${title}</div>${inner}</div>`; }
+function col(label,inner){ return `<div class="col"><div class="rlbl">${label}</div>${inner}</div>`; }
+
+function boardHTML(){
+  let h="";
+
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">DIAGNOSIS</span> — WHAT'S MISGROUPED TODAY</div>
+    <div class="note">Bottom of the rail: zoom \u00b1, VIEW (ghost/footprints/validate), THEME, \u22ef
+    (grid steppers, clears, save/load, hint). Two faults. <b>Theme is an appearance control</b> living
+    a button away from the other appearance controls. And in \u22ef, <b>Clear sits in the row right
+    beside Save/Load</b> — destruction adjacent to preservation, one mis-tap apart. Whatever grouping
+    wins below, danger moves to the bottom behind a divider.</div>
+    <div class="stage">
+      ${col("RAIL · NOW",rail([["zoomp","Zoom in"],["zoomm","Zoom out"],["view","View","h4on"],["theme","Theme"],["more","More"]]))}
+      ${col("VIEW · NOW",pop("VIEW",toggles()))}
+      ${col("\u22ef · NOW",pop("",gridRows+dangerRows+fileRows+hintRow))}
+    </div>
+  </div>`;
+
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">M-A</span> — TWO MENUS · LOOK vs DOCUMENT</div>
+    <div class="note">VIEW absorbs Theme (appearance, reunited); \u22ef becomes the BOARD menu — grid,
+    file, then danger at the bottom behind a divider, hint last. Rail drops one button. Mid-session
+    toggles stay one tap away where they are now; theme costs one more tap, which a set-and-forget
+    control can afford.</div>
+    <div class="stage">
+      ${col("RAIL",rail([["zoomp","Zoom in"],["zoomm","Zoom out"],["view","View","h4on"],["more","Board"]]))}
+      ${col("VIEW",pop("VIEW",toggles()+themeRow))}
+      ${col("BOARD",pop("GRID",gridRows+`<div class="lbl mid">FILE</div>`+fileRows+`<div class="lbl mid">DANGER</div>`+dangerRows+hintRow))}
+    </div>
+  </div>`;
+
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">M-B</span> — ONE MENU · EVERYTHING UNDER \u22ef</div>
+    <div class="note">View and Theme buttons both dissolve; \u22ef holds sectioned everything: VIEW /
+    GRID / FILE / DANGER / hint. Rail drops two buttons — the leanest rail possible. Cost lands on
+    the toggles: ghost/footprints/validate are mid-session instruments and now live inside a longer
+    menu; the popover also grows tall on a landscape iPad.</div>
+    <div class="stage">
+      ${col("RAIL",rail([["zoomp","Zoom in"],["zoomm","Zoom out"],["more","Menu","h4on"]]))}
+      ${col("\u22ef",pop("VIEW",toggles()+themeRow+`<div class="lbl mid">GRID</div>`+gridRows+`<div class="lbl mid">FILE</div>`+fileRows+`<div class="lbl mid">DANGER</div>`+dangerRows+hintRow))}
+    </div>
+  </div>`;
+
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">M-C</span> — THREE VERBS · LOOK / KEEP / SHAPE</div>
+    <div class="note">Split by what you're doing: VIEW (ghost/footprints/validate/theme), FILE
+    (save/load — its own rail button, one tap, the thing you do at every session edge), and \u22ef
+    for setup (grid steppers, danger, hint). Rail stays the same length as today. Most legible
+    grouping; one more top-level concept to hold.</div>
+    <div class="stage">
+      ${col("RAIL",rail([["zoomp","Zoom in"],["zoomm","Zoom out"],["view","View","h4on"],["file","File"],["more","Setup"]]))}
+      ${col("VIEW",pop("VIEW",toggles()+themeRow))}
+      ${col("FILE",pop("FILE",fileRows))}
+      ${col("SETUP",pop("GRID",gridRows+`<div class="lbl mid">DANGER</div>`+dangerRows+hintRow))}
+    </div>
+  </div>`;
+
+  return h;
+}
+
+function paint(){ document.getElementById("board").innerHTML=boardHTML(); }
+document.getElementById("tt").addEventListener("click",()=>{
+  document.body.dataset.theme=document.body.dataset.theme==="workshop"?"":"workshop";
+  paint();
+});
+paint();
+
+})();
+</script>
+</body>
+</html>

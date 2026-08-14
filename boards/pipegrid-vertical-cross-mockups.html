@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>PIPEGRID — Vertical crosses · mockup board</title>
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12151b; --panel2:#0e1116; --edge:#2c313d;
+    --text:#c7d3e2; --dim:#5f6775; --acc:#e0a14e;
+    --icase:#8ea6bf; --ilum:#e8f2fc; --ifg:#c7d3e2;
+    --cpipe:#4a5568; --clum:#dfe6f0; --cline:rgba(140,160,185,0.13);
+  }
+  body[data-theme="workshop"]{
+    --bg:#e6dfcf; --panel:#efe9dc; --panel2:#f3eee2; --edge:#c9c0aa;
+    --text:#2a2a28; --dim:#8a8272; --acc:#e0771e;
+    --icase:#2a2a28; --ilum:#efe9dc; --ifg:#2a2a28;
+    --cpipe:#2a2a28; --clum:#efe9dc; --cline:rgba(90,80,60,0.22);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  body{background:var(--bg);color:var(--text);
+       font-family:ui-monospace,SFMono-Regular,Menlo,monospace;-webkit-text-size-adjust:100%;
+       padding:14px;}
+  .hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:4px;flex-wrap:wrap;}
+  .title{font-size:15px;font-weight:700;letter-spacing:4px;}
+  .sub{font-size:9px;letter-spacing:1.5px;color:var(--dim);}
+  .themebtn{margin-left:auto;font-family:inherit;font-size:10px;letter-spacing:.5px;text-transform:uppercase;
+        padding:7px 9px;border:1px solid var(--edge);border-radius:4px;background:transparent;
+        color:var(--text);cursor:pointer;}
+  #board{display:flex;flex-direction:column;gap:12px;max-width:900px;margin-top:10px;}
+  .panel{border:1px solid var(--edge);border-radius:8px;background:var(--panel);padding:12px;}
+  .plabel{font-size:10px;font-weight:700;letter-spacing:2px;margin-bottom:2px;}
+  .plabel .tag{color:var(--acc);}
+  .note{font-size:9px;color:var(--dim);line-height:1.7;max-width:740px;margin:4px 0 10px;}
+  .note b{color:var(--text);font-weight:700;}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;}
+  .vign{background:var(--panel2);border:1px solid var(--edge);border-radius:8px;padding:10px;
+        display:inline-block;text-align:center;}
+  .cap{font-size:8px;letter-spacing:1px;color:var(--dim);margin-top:6px;max-width:140px;line-height:1.5;}
+  .floorlbl{font-size:9px;font-weight:700;letter-spacing:1.5px;color:var(--acc);margin-bottom:4px;}
+  .flyout{display:flex;flex-direction:column;gap:5px;align-items:center;padding:8px 6px;
+          border:1px solid var(--edge);border-radius:8px;background:var(--panel);}
+  .fbtn{width:82px;height:62px;border:1px solid var(--edge);border-radius:6px;background:transparent;
+        display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;}
+  .flbl{font-size:7px;letter-spacing:1.1px;text-transform:uppercase;color:var(--dim);white-space:nowrap;}
+  .fdiv{width:70px;border-top:1px solid var(--edge);margin:3px 0;}
+  .fhead{font-size:7px;letter-spacing:2px;color:var(--dim);}
+  .poserow{display:flex;gap:4px;}
+  .pbtn{width:48px;height:54px;border:1px solid var(--edge);border-radius:6px;background:transparent;
+        display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;}
+  .pbtn .flbl{font-size:6.5px;}
+  .pbtn.on{box-shadow:inset 3px 0 0 var(--acc);background:rgba(224,161,78,0.10);}
+  .pbtn.on .flbl{color:var(--acc);}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <span class="title">PIPEGRID</span>
+  <span class="sub">VERTICAL CROSSES + RISER \u00d73 \u00b7 STATIC BOARD \u00b7 FOR v38</span>
+  <button class="themebtn" id="tt">Theme</button>
+</div>
+<div id="board"></div>
+<script>
+(function(){
+"use strict";
+const C=44, m=22, FAINT=0.3;
+
+/* canvas builders */
+const chan=d=>`<path d="${d}" fill="none" stroke="var(--cpipe)" stroke-width="20" stroke-linecap="round"/>`
+             +`<path d="${d}" fill="none" stroke="var(--clum)" stroke-width="8" stroke-linecap="round"/>`;
+const ring=()=>`<circle cx="${m}" cy="${m}" r="10" fill="var(--clum)" stroke="var(--cpipe)" stroke-width="5"/>`;
+const chev=(upOp,dnOp)=>
+   `<path d="M ${m-4} ${m-1.6} L ${m} ${m-5.6} L ${m+4} ${m-1.6}" opacity="${upOp}" fill="none" stroke="var(--cpipe)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`
+  +`<path d="M ${m-4} ${m+1.6} L ${m} ${m+5.6} L ${m+4} ${m+1.6}" opacity="${dnOp}" fill="none" stroke="var(--cpipe)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`;
+const grid1=()=>`<rect x="0" y="0" width="${C}" height="${C}" fill="none" stroke="var(--cline)"/>`;
+const cell=layers=>`<svg width="${C+8}" height="${C+8}" viewBox="-4 -4 ${C+8} ${C+8}">${grid1()}${layers.join("")}</svg>`;
+const tile=(svg,label)=>`<div class="vign">${svg}<div class="cap">${label}</div></div>`;
+const ftile=(f,svg,label)=>`<div class="vign"><div class="floorlbl">${f}</div>${svg}<div class="cap">${label}</div></div>`;
+
+const RUN=`M 0 ${m} L ${C} ${m}`;
+const SPK_W=`M 0 ${m} L ${m} ${m}`, SPK_E=`M ${m} ${m} L ${C} ${m}`;
+const GAP_W=`M 0 ${m} L ${m-16} ${m}`, GAP_E=`M ${m+16} ${m} L ${C} ${m}`;
+
+/* icon builders (v37 language) */
+function iSvg(inner,sz){ return `<svg width="${sz||32}" height="${sz||32}" viewBox="0 0 44 44">${inner}</svg>`; }
+function iPipe(path){
+  return `<path d="${path}" fill="none" stroke="var(--icase)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>`
+       + `<path d="${path}" fill="none" stroke="var(--ilum)" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+}
+function iArc(cx,cy,r,a1,a2){
+  const N=16; let d="";
+  for(let k=0;k<=N;k++){const t=(a1+(a2-a1)*k/N)*Math.PI/180;
+    d+=(k?" L ":"M ")+(cx+r*Math.cos(t)).toFixed(1)+" "+(cy+r*Math.sin(t)).toFixed(1);}
+  return d;
+}
+const iDot=(x,y)=>`<circle cx="${x}" cy="${y}" r="3.4" fill="var(--acc)"/>`;
+const iRingBare=()=>`<circle cx="22" cy="22" r="9" fill="none" stroke="var(--icase)" stroke-width="5"/>`;
+const iFloor=y=>`<path d="M6 ${y} H16 M28 ${y} H38" fill="none" stroke="var(--ifg)" stroke-width="1.6" stroke-dasharray="3 3"/>`;
+const IPATH_CROSS="M22 6 V38 M6 22 H38";
+const VARC={
+  xsplit:iPipe(IPATH_CROSS)+iDot(22,6),
+  xmerge:iPipe(IPATH_CROSS)+iDot(38,22)+iDot(22,38)+iDot(6,22),
+  xjunc:iPipe(IPATH_CROSS)+iDot(22,6)+iDot(22,38),
+  xover:iPipe("M22 6 V38")+iPipe("M6 22 H14 M30 22 H38")+iDot(22,6)+iDot(6,22),
+  xbend:iPipe(iArc(38,6,16,180,90)+" "+iArc(6,38,16,0,-90))+iDot(22,6)+iDot(6,22)
+};
+const POSE_FLAT=iPipe(IPATH_CROSS);
+const POSE_VERT=iPipe("M6 22 H38")+iRingBare();      // full run + neutral bore: the \u21d5 pose mark
+const R3=iFloor(10)+iFloor(18)+iFloor(26)+iFloor(34)+iPipe("M22 4 V40");
+
+function boardHTML(){
+  let h="";
+
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">BRIEF</span> — TWO POSES, AND A GRAMMAR THAT FINISHES ITSELF</div>
+    <div class="note">Ratified: the Cross pose row is <b>FLAT / VERTICAL \u21d5</b>. Stood in a vertical
+    plane every cross keeps two horizontal arms (nudge-aimed) and gains U+D; which arm carries the
+    role port is the slot-walk dimension, already legal on all four arms. Marks, trace, BOM, mating
+    all generalise untouched — except one case that <b>completes</b> the chevron grammar: see GRAMMAR.
+    Riser \u00d73 rides along; its middle floor is a state we already ship.</div>
+  </div>`;
+
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">GRAMMAR</span> — THE FOUR CHEVRON STATES (one is new)</div>
+    <div class="note">Rule unchanged: <b>full points along the pipe's body, faint marks the mouth.</b>
+    Applied strictly, a vertical xbend — two independent turns in one cell (W\u2192U, E\u2192D) — has
+    NO vertical body passing the floor: both vertical ports are mouths. So it takes <b>faint\u2013faint</b>,
+    the fourth state the grade always implied. And that's what tells it apart from a vertical junction
+    (full\u2013full, body passing through) — the grammar disambiguates the two identical-looking parts
+    by itself.</div>
+    <div class="row">
+      ${tile(cell([ring()+chev(1,FAINT)]),"BOTTOM \u00b7 body above, opens down")}
+      ${tile(cell([ring()+chev(1,1)]),"THROUGH \u00b7 body both ways")}
+      ${tile(cell([ring()+chev(FAINT,1)]),"TOP \u00b7 body below, opens up")}
+      ${tile(cell([ring()+chev(FAINT,FAINT)]),"MOUTHS \u00b7 NEW \u00b7 opens both ways, body horizontal")}
+    </div>
+  </div>`;
+
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">CANVAS</span> — THE VERTICAL CROSSES, FINAL DRESS</div>
+    <div class="note">Mixing crosses (Split / Merge / Junction \u21d5) share one static render, exactly
+    as their flat selves share the + shape: two aimed spokes, bore, through-chevrons — role and flow
+    are trace's story. The <b>overpass \u21d5</b> reuses the flat xover's own no-connection mark: the
+    horizontal channel breaks in a gap straddling the bore (never an under-ring — that means "opens
+    down", not "passes under"). The <b>bend pair \u21d5</b>: two spokes + the new mouths state.</div>
+    <div class="row">
+      ${tile(cell([chan(SPK_W),chan(SPK_E),ring()+chev(1,1)]),"SPLIT / MERGE / JUNCTION \u21d5 \u00b7 mixing hub")}
+      ${tile(cell([chan(GAP_W),chan(GAP_E),ring()+chev(1,1)]),"OVERPASS \u21d5 \u00b7 gap = no connection")}
+      ${tile(cell([chan(SPK_W),chan(SPK_E),ring()+chev(FAINT,FAINT)]),"BEND PAIR \u21d5 \u00b7 W\u2192U \u00b7 E\u2192D")}
+    </div>
+    <div class="note" style="margin-top:8px">Trace already speaks these: a \u21d5 split fed from a
+    horizontal arm sends flow up AND down \u2192 amber chevrons; fed from above \u2192 amber \u2297
+    through-fall. The existing two-port agree/disagree logic covers every case with zero new marks.</div>
+  </div>`;
+
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">RISER \u00d73</span> — THREE FLOORS, ALL STATES SHIPPED</div>
+    <div class="note">New kind spanning [L, L+1, L+2]; ports D at the bottom floor, U at the top; the
+    middle floor occupies but owns no port — pure body, <b>through</b>. Counts as <b>Straight-3</b> in
+    the bill (\u21c5 in layer detail), and takes the fourth slot in the Straight pose row with a
+    three-bay section icon.</div>
+    <div class="row">
+      ${ftile("L0",cell([ring()+chev(1,FAINT)]),"bottom")}
+      ${ftile("L1",cell([ring()+chev(1,1)]),"through \u00b7 no port, pure body")}
+      ${ftile("L2",cell([ring()+chev(FAINT,1)]),"top")}
+      <div class="vign">${iSvg(R3,40)}<div class="cap">POSE ICON \u00b7 RISER \u00d73</div></div>
+    </div>
+  </div>`;
+
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">UI</span> — THE CROSS FLYOUT, POSED</div>
+    <div class="note">Five variants as today (icons stay flat-drawn — pose composes, exactly like the
+    tees), then the two-button pose row. The \u21d5 mark: full run + neutral bore — distinct from the
+    tee's riser-run stub-and-bore.</div>
+    <div class="flyout" style="align-self:flex-start">
+      <button class="fbtn">${iSvg(VARC.xsplit,30)}<span class="flbl">Split 1\u21923</span></button>
+      <button class="fbtn">${iSvg(VARC.xmerge,30)}<span class="flbl">Merge 3\u21921</span></button>
+      <button class="fbtn">${iSvg(VARC.xjunc,30)}<span class="flbl">Junction 2\u00b72</span></button>
+      <button class="fbtn">${iSvg(VARC.xover,30)}<span class="flbl">Overpass</span></button>
+      <button class="fbtn">${iSvg(VARC.xbend,30)}<span class="flbl">Bend pair</span></button>
+      <div class="fdiv"></div><div class="fhead">POSE</div>
+      <div class="poserow">
+        <button class="pbtn">${iSvg(POSE_FLAT,24)}<span class="flbl">Flat</span></button>
+        <button class="pbtn on">${iSvg(POSE_VERT,24)}<span class="flbl">Vert \u21d5</span></button>
+      </div>
+    </div>
+  </div>`;
+
+  return h;
+}
+
+function paint(){ document.getElementById("board").innerHTML=boardHTML(); }
+document.getElementById("tt").addEventListener("click",()=>{
+  document.body.dataset.theme=document.body.dataset.theme==="workshop"?"":"workshop";
+  paint();
+});
+paint();
+
+})();
+</script>
+</body>
+</html>

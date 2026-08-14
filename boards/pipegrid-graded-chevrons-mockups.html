@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>PIPEGRID — Graded chevrons · final glyph system</title>
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12151b; --panel2:#0e1116; --edge:#2c313d;
+    --text:#c7d3e2; --dim:#5f6775; --acc:#e0a14e;
+    --cpipe:#4a5568; --clum:#dfe6f0; --cline:rgba(140,160,185,0.13);
+  }
+  body[data-theme="workshop"]{
+    --bg:#e6dfcf; --panel:#efe9dc; --panel2:#f3eee2; --edge:#c9c0aa;
+    --text:#2a2a28; --dim:#8a8272; --acc:#e0771e;
+    --cpipe:#2a2a28; --clum:#efe9dc; --cline:rgba(90,80,60,0.22);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  body{background:var(--bg);color:var(--text);
+       font-family:ui-monospace,SFMono-Regular,Menlo,monospace;-webkit-text-size-adjust:100%;
+       padding:14px;}
+  .hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:4px;flex-wrap:wrap;}
+  .title{font-size:15px;font-weight:700;letter-spacing:4px;}
+  .sub{font-size:9px;letter-spacing:1.5px;color:var(--dim);}
+  .themebtn{margin-left:auto;font-family:inherit;font-size:10px;letter-spacing:.5px;text-transform:uppercase;
+        padding:7px 9px;border:1px solid var(--edge);border-radius:4px;background:transparent;
+        color:var(--text);cursor:pointer;}
+  #board{display:flex;flex-direction:column;gap:12px;max-width:920px;margin-top:10px;}
+  .panel{border:1px solid var(--edge);border-radius:8px;background:var(--panel);padding:12px;}
+  .plabel{font-size:10px;font-weight:700;letter-spacing:2px;margin-bottom:2px;}
+  .plabel .tag{color:var(--acc);}
+  .note{font-size:9px;color:var(--dim);line-height:1.7;max-width:760px;margin:4px 0 10px;}
+  .note b{color:var(--text);font-weight:700;}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;}
+  .vign{background:var(--panel2);border:1px solid var(--edge);border-radius:8px;padding:10px;
+        display:inline-block;text-align:center;}
+  .cap{font-size:8px;letter-spacing:1px;color:var(--dim);margin-top:6px;max-width:120px;line-height:1.5;}
+  .floorlbl{font-size:9px;font-weight:700;letter-spacing:1.5px;color:var(--acc);margin-bottom:4px;}
+  .chain{display:flex;flex-direction:column;gap:6px;align-items:center;}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <span class="title">PIPEGRID</span>
+  <span class="sub">GRADED CHEVRONS · ONE MARK FOR ALL VERTICAL PIPE · STATIC BOARD</span>
+  <button class="themebtn" id="tt">Theme</button>
+</div>
+<div id="board"></div>
+<script>
+(function(){
+"use strict";
+const C=44, m=22;
+
+const chan=d=>`<path d="${d}" fill="none" stroke="var(--cpipe)" stroke-width="20" stroke-linecap="round"/>`
+             +`<path d="${d}" fill="none" stroke="var(--clum)" stroke-width="8" stroke-linecap="round"/>`;
+const ring=r=>`<circle cx="${m}" cy="${m}" r="${r||10}" fill="var(--clum)" stroke="var(--cpipe)" stroke-width="5"/>`;
+const dotm=()=>`<circle cx="${m}" cy="${m}" r="3.2" fill="var(--cpipe)"/>`;
+function chevPair(upOp,dnOp){
+  return `<path d="M ${m-4} ${m-1.6} L ${m} ${m-5.6} L ${m+4} ${m-1.6}" opacity="${upOp}" fill="none" stroke="var(--cpipe)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`
+       + `<path d="M ${m-4} ${m+1.6} L ${m} ${m+5.6} L ${m+4} ${m+1.6}" opacity="${dnOp}" fill="none" stroke="var(--cpipe)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`;
+}
+const grid1=()=>`<rect x="0" y="0" width="${C}" height="${C}" fill="none" stroke="var(--cline)"/>`;
+function cellSvg(layers){
+  return `<svg width="${C+8}" height="${C+8}" viewBox="-4 -4 ${C+8} ${C+8}">${grid1()}${layers.join("")}</svg>`;
+}
+const SPOKE_W=`M 0 ${m} L ${m} ${m}`, RUN=`M 0 ${m} L ${C} ${m}`, SPOKE_E=`M ${m} ${m} L ${C} ${m}`;
+const tile=(svg,label)=>`<div class="vign">${svg}<div class="cap">${label}</div></div>`;
+const ftile=(floor,svg,label)=>`<div class="vign"><div class="floorlbl">${floor}</div>${svg}<div class="cap">${label}</div></div>`;
+
+/* the three chevron states */
+const BOTTOM=ring()+chevPair(1,0.5);     // bottom of run: pipe extends UP (\u25b2 full), opens down (\u25bc half)
+const THROUGH=ring()+chevPair(1,1);      // pass-through: run continues both ways
+const TOP=ring()+chevPair(0.5,1);        // top of run: pipe extends DOWN (\u25bc full), opens up (\u25b2 half)
+
+function boardHTML(){
+  let h="";
+
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">SYSTEM</span> — THREE RULES, TOTAL COVERAGE</div>
+    <div class="note"><b>1.</b> Up-opening on a horizontal-run part \u2192 ring OVER the channel + \u2299.
+    <b>2.</b> Down-opening on a horizontal-run part \u2192 ring UNDER the channel, r=12, no mark —
+    the occlusion says it (O3). <b>3.</b> Vertical pipe at this floor — riser \u00d71, each floor of
+    riser \u00d72 (and \u00d73 to come), riser-run tees, future vertical crosses — \u2192 <b>chevron
+    pair, graded</b>: the FULL chevron points along the pipe's body, the HALF one marks the opening.
+    Bottom of a run: \u25b2 full, \u25bc half. Top: \u25bc full, \u25b2 half. Passing through: both
+    full. One mark for all vertical pipe, whatever part it belongs to — and no orphan cases left:
+    every vertical port in the catalogue lands in exactly one rule.</div>
+  </div>`;
+
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">GRADED</span> — READING A RUN FLOOR BY FLOOR</div>
+    <div class="note">A Riser \u00d73 (or a \u00d72+\u00d71 chain) seen one floor at a time, bottom to
+    top. The strong chevron always points <b>into the pipe</b>; the faint one is the mouth. Climb the
+    layers and the pair rolls over exactly where the run ends — the gradient draws the run's extent
+    without ever showing two floors at once.</div>
+    <div class="row">
+      ${ftile("L0 \u00b7 BOTTOM",cellSvg([BOTTOM]),"\u25b2 FULL \u00b7 \u25bc HALF<br>pipe above, opens down")}
+      ${ftile("L1 \u00b7 THROUGH",cellSvg([THROUGH]),"BOTH FULL<br>run passes through")}
+      ${ftile("L2 \u00b7 TOP",cellSvg([TOP]),"\u25bc FULL \u00b7 \u25b2 HALF<br>pipe below, opens up")}
+    </div>
+  </div>`;
+
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">CARD</span> — THE COMPLETE VOCABULARY, FINAL DRESS</div>
+    <div class="note">Every part-class in the locked system. This is the reference card v36 implements.</div>
+    <div class="row">
+      ${tile(cellSvg([chan(SPOKE_W),ring(),dotm()]),"ELBOW UP \u00b7 over + \u2299")}
+      ${tile(cellSvg([ring(),chan(SPOKE_W)]),"ELBOW DN \u00b7 under, bare")}
+      ${tile(cellSvg([chan(RUN),ring(),dotm()]),"BRANCH \u25b2 TEE \u00b7 over + \u2299")}
+      ${tile(cellSvg([ring(12),chan(RUN)]),"BRANCH \u25bc TEE \u00b7 under O3, bare")}
+      ${tile(cellSvg([BOTTOM]),"RISER \u00d72 \u00b7 LOWER FLOOR")}
+      ${tile(cellSvg([TOP]),"RISER \u00d72 \u00b7 UPPER FLOOR")}
+      ${tile(cellSvg([THROUGH]),"RISER \u00d71 \u00b7 THROUGH")}
+      ${tile(cellSvg([chan(SPOKE_E),ring(),chevPair(1,1)]),"RR TEE \u00b7 THROUGH + SPOKE")}
+    </div>
+    <div class="note" style="margin-top:8px">Note the quiet win: a riser \u00d71 and an rr tee mid-chain
+    now wear the <b>same</b> through-mark — a vertical pipe is a vertical pipe — while their spokes
+    (or absence) tell them apart, which is the honest difference. And your original v34 riser \u00d72
+    icon intuition — \u2299 above, \u2297 below — survives translated: the graded pair says
+    top-and-bottom-of-run, only now truthfully and per floor.</div>
+  </div>`;
+
+  return h;
+}
+
+function paint(){ document.getElementById("board").innerHTML=boardHTML(); }
+document.getElementById("tt").addEventListener("click",()=>{
+  document.body.dataset.theme=document.body.dataset.theme==="workshop"?"":"workshop";
+  paint();
+});
+paint();
+
+})();
+</script>
+</body>
+</html>

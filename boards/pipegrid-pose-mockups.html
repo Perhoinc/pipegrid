@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>PIPEGRID — Pose mockups (v35)</title>
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12151b; --panel2:#0e1116; --edge:#2c313d;
+    --text:#c7d3e2; --dim:#5f6775; --acc:#e0a14e; --danger:#ff5d55;
+    --icase:#8ea6bf; --ilum:#e8f2fc; --ifg:#c7d3e2; --onfg:#0b0d10;
+  }
+  body[data-theme="workshop"]{
+    --bg:#e6dfcf; --panel:#efe9dc; --panel2:#f3eee2; --edge:#c9c0aa;
+    --text:#2a2a28; --dim:#8a8272; --acc:#e0771e; --danger:#cf2f2a;
+    --icase:#2a2a28; --ilum:#efe9dc; --ifg:#2a2a28; --onfg:#efe9dc;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  body{background:var(--bg);color:var(--text);
+       font-family:ui-monospace,SFMono-Regular,Menlo,monospace;-webkit-text-size-adjust:100%;
+       padding:14px;}
+  .hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:4px;flex-wrap:wrap;}
+  .title{font-size:15px;font-weight:700;letter-spacing:4px;}
+  .sub{font-size:9px;letter-spacing:1.5px;color:var(--dim);}
+  .themebtn{margin-left:auto;font-family:inherit;font-size:10px;letter-spacing:.5px;text-transform:uppercase;
+        padding:7px 9px;border:1px solid var(--edge);border-radius:4px;background:transparent;
+        color:var(--text);cursor:pointer;}
+  #board{display:flex;flex-direction:column;gap:12px;max-width:760px;margin-top:10px;}
+  .panel{border:1px solid var(--edge);border-radius:8px;background:var(--panel);padding:12px;}
+  .plabel{font-size:10px;font-weight:700;letter-spacing:2px;margin-bottom:2px;}
+  .plabel .tag{color:var(--acc);}
+  .note{font-size:9px;color:var(--dim);line-height:1.7;max-width:660px;margin:4px 0 10px;}
+  .note b{color:var(--text);font-weight:700;}
+  .stagewrap{display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;}
+  .rail{display:flex;flex-direction:column;gap:5px;align-items:center;padding:8px 6px;
+        border:1px solid var(--edge);border-radius:8px;background:var(--panel);}
+  .rgap{height:10px;flex:none;}
+  .lread{font-size:10px;font-weight:700;letter-spacing:1px;color:var(--acc);flex:none;
+         min-width:30px;text-align:center;}
+  .rbtn{width:44px;height:44px;border:1px solid var(--edge);border-radius:6px;background:transparent;
+        display:grid;place-items:center;padding:0;flex:none;}
+  .rbtn.on{background:var(--acc);border-color:var(--acc);}
+  .rbtn.on svg path{stroke:var(--onfg) !important;}
+  .rbtn.on svg circle{fill:var(--onfg) !important;stroke:var(--onfg) !important;}
+  .flyout{display:flex;flex-direction:column;gap:5px;align-items:center;padding:8px 6px;
+          border:1px solid var(--edge);border-radius:8px;background:var(--panel);}
+  .rbtn.fly{width:82px;height:62px;flex-direction:column;display:flex;align-items:center;
+            justify-content:center;gap:3px;}
+  .flbl{font-size:7px;letter-spacing:1.1px;text-transform:uppercase;color:var(--dim);white-space:nowrap;}
+  .rbtn.on .flbl{color:var(--onfg);}
+  .fdiv{width:70px;border-top:1px solid var(--edge);margin:3px 0;}
+  .fhead{font-size:7px;letter-spacing:2px;color:var(--dim);}
+  .poserow{display:flex;gap:4px;}
+  .pbtn{width:38px;height:38px;border:1px solid var(--edge);border-radius:6px;background:transparent;
+        display:grid;place-items:center;padding:0;}
+  .pbtn.on{background:var(--acc);border-color:var(--acc);}
+  .pbtn.on svg path{stroke:var(--onfg) !important;}
+  .pbtn.on svg circle{stroke:var(--onfg) !important;fill:none !important;}
+  .ellip{font-size:9px;color:var(--dim);letter-spacing:1px;padding:4px 0;}
+  .vign{background:var(--panel2);border:1px solid var(--edge);border-radius:8px;padding:10px;
+        display:inline-block;}
+  .cap{font-size:8px;letter-spacing:1px;color:var(--dim);margin-top:6px;}
+  .bommock{background:var(--panel);border:1px solid var(--edge);border-radius:8px;padding:12px;
+           display:inline-block;min-width:230px;}
+  .bomlbl{font-size:9px;letter-spacing:2px;color:var(--dim);margin-bottom:8px;}
+  .bomrow{display:flex;justify-content:space-between;gap:16px;margin-bottom:4px;}
+  .bomrow .k{font-size:10px;}
+  .bomrow .n{font-size:11px;font-weight:700;}
+  .bomsub{font-size:9px;color:var(--dim);letter-spacing:.5px;margin:-2px 0 6px 10px;}
+  .bomtot{border-top:1px solid var(--edge);padding-top:6px;margin-top:6px;}
+  .bomtot .k{color:var(--dim);}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <span class="title">PIPEGRID</span>
+  <span class="sub">POSE MOCKUPS · FOR v35 · VERTICAL TEES · STATIC BOARD</span>
+  <button class="themebtn" id="tt">Theme</button>
+</div>
+<div id="board"></div>
+<script>
+(function(){
+"use strict";
+
+/* ---- palettes (canvas colours, verbatim from v34) ---- */
+const PALETTES={
+  carbon:{pipe:"#4a5568",pipeHi:"#dfe6f0",flow:"#e0a14e",flowHi:"#ffc45e",
+          preview:"#3d6f9f",line:"rgba(140,160,185,0.13)"},
+  workshop:{pipe:"#2a2a28",pipeHi:"#efe9dc",flow:"#e0771e",flowHi:"#e0771e",
+          preview:"#6b7c8f",line:"rgba(90,80,60,0.22)"}
+};
+let COL=PALETTES.carbon;
+const CELL=44;
+
+/* ---- icon builders (verbatim from v34) ---- */
+function iSvg(inner,sz){ return `<svg width="${sz||30}" height="${sz||30}" viewBox="0 0 44 44">${inner}</svg>`; }
+function iPipe(path,capCircle){
+  let t=`<path d="${path}" fill="none" stroke="var(--icase)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>`;
+  t+=`<path d="${path}" fill="none" stroke="var(--ilum)" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+  if(capCircle) t+=`<circle cx="22" cy="22" r="7" fill="var(--icase)" stroke="var(--ilum)" stroke-width="2.5"/>`;
+  return t;
+}
+function iStroke(paths,w,col){
+  return paths.map(pp=>`<path d="${pp}" fill="none" stroke="${col||'var(--ifg)'}" stroke-width="${w||3.2}" stroke-linecap="round" stroke-linejoin="round"/>`).join("");
+}
+function iArrow(x,y,dir){
+  const dd={N:[0,-1],E:[1,0],S:[0,1],W:[-1,0]}[dir], px=-dd[1], py=dd[0];
+  const ax=x+dd[0]*6.5, ay=y+dd[1]*6.5, bx=x-dd[0]*3.5, by=y-dd[1]*3.5;
+  return `<path d="M ${bx+px*5.5} ${by+py*5.5} L ${ax} ${ay} L ${bx-px*5.5} ${by-py*5.5}" fill="none" stroke="var(--acc)" stroke-width="3.6" stroke-linejoin="round"/>`;
+}
+function iArc(cx,cy,r,a1,a2){
+  const N=16; let d="";
+  for(let k=0;k<=N;k++){const t=(a1+(a2-a1)*k/N)*Math.PI/180;
+    d+=(k?" L ":"M ")+(cx+r*Math.cos(t)).toFixed(1)+" "+(cy+r*Math.sin(t)).toFixed(1);}
+  return d;
+}
+function iRing(up){                                 // FLOW ring: ⊙ rising / ⊗ descending
+  let g=`<circle cx="22" cy="22" r="9" fill="none" stroke="var(--icase)" stroke-width="5"/>`;
+  if(up) g+=`<circle cx="22" cy="22" r="3" fill="var(--icase)"/>`;
+  else g+=`<path d="M17.5 17.5 L26.5 26.5 M17.5 26.5 L26.5 17.5" stroke="var(--icase)" stroke-width="2.6" stroke-linecap="round"/>`;
+  return g;
+}
+function arcArrow(cx,cy,R,deg1,deg2,w,skewDeg){
+  const a1=deg1*Math.PI/180, a2=deg2*Math.PI/180, N=22;
+  let d="";
+  for(let k=0;k<=N;k++){const t=a1+(a2-a1)*k/N;
+    d+=(k?" L ":"M ")+(cx+R*Math.cos(t)).toFixed(1)+" "+(cy+R*Math.sin(t)).toFixed(1);}
+  const sg=Math.sign(a2-a1);
+  let tx=-Math.sin(a2)*sg, ty=Math.cos(a2)*sg;
+  if(skewDeg){const k=skewDeg*Math.PI/180,c=Math.cos(k),n=Math.sin(k);
+    const rx=tx*c-ty*n, ry=tx*n+ty*c; tx=rx; ty=ry;}
+  const ex=cx+R*Math.cos(a2), ey=cy+R*Math.sin(a2);
+  const px=-ty, py=tx, L=7, Wd=4.6;
+  return `<path d="${d}" fill="none" stroke="var(--ifg)" stroke-width="${w}" stroke-linecap="round"/>`+
+    `<path d="M ${(ex-tx*L+px*Wd).toFixed(1)} ${(ey-ty*L+py*Wd).toFixed(1)} L ${ex.toFixed(1)} ${ey.toFixed(1)} L ${(ex-tx*L-px*Wd).toFixed(1)} ${(ey-ty*L-py*Wd).toFixed(1)}" fill="none" stroke="var(--ifg)" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/>`;
+}
+const IPATH={straight:"M6 22 H38", tee:"M22 6 V38 M22 22 H38", cross:"M22 6 V38 M6 22 H38", capline:"M6 22 H22"};
+const VERT_STUB=`<path d="M4 22 H13" fill="none" stroke="var(--icase)" stroke-width="11" stroke-linecap="round"/><path d="M4 22 H13" fill="none" stroke="var(--ilum)" stroke-width="4.5" stroke-linecap="round"/>`;
+
+/* ---- NEW: pose marks (GEOMETRY, deliberately not ⊙/⊗) ---- */
+function wedge(up,x,y,sc){                          // out-of-plane wedge, outlined triangle
+  const s=sc||1, X=x||22, Y=y||22;
+  const d= up ? `M ${X-6*s} ${Y+4*s} L ${X} ${Y-6*s} L ${X+6*s} ${Y+4*s} Z`
+              : `M ${X-6*s} ${Y-4*s} L ${X} ${Y+6*s} L ${X+6*s} ${Y-4*s} Z`;
+  return `<path d="${d}" fill="var(--ifg)" stroke="var(--ifg)" stroke-width="1.6" stroke-linejoin="round"/>`;
+}
+function nRing(cx,cy,r){                            // NEUTRAL ring: vertical port, flow unspecified
+  return `<circle cx="${cx||22}" cy="${cy||22}" r="${r||9}" fill="none" stroke="var(--icase)" stroke-width="5"/>`;
+}
+const POSE_ICONS={
+  flat:iPipe(IPATH.tee),
+  bup:iPipe(IPATH.straight)+wedge(true,22,16),
+  bdn:iPipe(IPATH.straight)+wedge(false,22,28),
+  rrun:VERT_STUB+nRing(24,22,9)
+};
+
+/* ---- existing v34 tee + vert variant icons (verbatim) ---- */
+const VAR_TEE={
+  tsplit:iPipe("M22 6 V38 "+iArc(38,6,16,180,90))+iArrow(22,8,"S")+iArrow(36,22,"E")+iArrow(22,36,"S"),
+  tsplitb:iPipe(iArc(38,6,16,90,180)+" "+iArc(38,38,16,-90,-180))+iArrow(36,22,"W")+iArrow(22,8,"N")+iArrow(22,36,"S"),
+  tmerge:iPipe("M22 6 V38 "+iArc(38,38,16,-90,-180))+iArrow(22,8,"S")+iArrow(36,22,"W")+iArrow(22,36,"S"),
+  tmergeb:iPipe(iArc(38,6,16,90,180)+" "+iArc(38,38,16,-90,-180))+iArrow(22,8,"S")+iArrow(22,36,"N")+iArrow(36,22,"E")
+};
+const VAR_VERT={
+  vup:VERT_STUB+iRing(true)+iArrow(8,22,"E"),
+  vdn:VERT_STUB+iRing(false)+iArrow(8,22,"E"),
+  riser1:iRing(true)+iArrow(22,8,"N"),
+  riser:`<circle cx="22" cy="14" r="7" fill="none" stroke="var(--icase)" stroke-width="4.5"/><circle cx="22" cy="14" r="2.4" fill="var(--icase)"/><circle cx="22" cy="30" r="7" fill="none" stroke="var(--icase)" stroke-width="4.5"/><path d="M18.6 26.6 L25.4 33.4 M18.6 33.4 L25.4 26.6" stroke="var(--icase)" stroke-width="2.2" stroke-linecap="round"/>`+iArrow(34,22,"N")
+};
+const PART_ICONS={
+  vert:VERT_STUB+iRing(true),
+  straight:iPipe(IPATH.straight), elbow:iPipe(iArc(6,6,24,0,90)),
+  tee:iPipe(IPATH.tee), cross:iPipe(IPATH.cross), cap:iPipe(IPATH.capline,true)
+};
+
+/* ---- Direction A preset icons: kind+pose fixed → flow is known → honest ⊙/⊗ ---- */
+const A_ICONS={
+  tsplit_up:  iPipe(IPATH.straight)+iRing(true) +iArrow(8,22,"E")+iArrow(36,22,"E"),   // in W → out E, out ⊙
+  tmerge_up:  iPipe(IPATH.straight)+iRing(false)+iArrow(8,22,"E")+iArrow(36,22,"E"),   // branch feeds DOWN in: ⊗
+  tsplit_dn:  iPipe(IPATH.straight)+iRing(false)+iArrow(8,22,"E")+iArrow(36,22,"E"),   // out downward: ⊗
+  tmerge_dn:  iPipe(IPATH.straight)+iRing(true) +iArrow(8,22,"E")+iArrow(36,22,"E"),   // rises IN from below: ⊙
+  tsplit_rr:  nRing(22,22,9)+`<circle cx="22" cy="22" r="3" fill="var(--icase)"/>`+
+              `<path d="M31 22 H40" fill="none" stroke="var(--icase)" stroke-width="9" stroke-linecap="round"/><path d="M31 22 H40" fill="none" stroke="var(--ilum)" stroke-width="4" stroke-linecap="round"/>`+iArrow(36,22,"E"),
+  tmerge_rr:  nRing(22,22,9)+`<circle cx="22" cy="22" r="3" fill="var(--icase)"/>`+
+              `<path d="M31 22 H40" fill="none" stroke="var(--icase)" stroke-width="9" stroke-linecap="round"/><path d="M31 22 H40" fill="none" stroke="var(--ilum)" stroke-width="4" stroke-linecap="round"/>`+iArrow(36,22,"W")
+};
+
+/* ---- canvas-language vignettes (drawn with the app's stroke conventions) ---- */
+function chan(d,traceLum){
+  return `<path d="${d}" fill="none" stroke="${COL.pipe}" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>`+
+         `<path d="${d}" fill="none" stroke="${traceLum||COL.pipeHi}" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>`;
+}
+function glyph(cx,cy,up){
+  let g=`<circle cx="${cx}" cy="${cy}" r="10" fill="${COL.pipeHi}" stroke="${COL.pipe}" stroke-width="5"/>`;
+  if(up) g+=`<circle cx="${cx}" cy="${cy}" r="3.2" fill="${COL.pipe}"/>`;
+  else g+=`<path d="M ${cx-4.6} ${cy-4.6} L ${cx+4.6} ${cy+4.6} M ${cx-4.6} ${cy+4.6} L ${cx+4.6} ${cy-4.6}" stroke="${COL.pipe}" stroke-width="2.6" stroke-linecap="round"/>`;
+  return g;
+}
+function gridBG(cols,rows){
+  let s="";
+  for(let i=0;i<=cols;i++) s+=`<line x1="${i*CELL}" y1="0" x2="${i*CELL}" y2="${rows*CELL}" stroke="${COL.line}"/>`;
+  for(let i=0;i<=rows;i++) s+=`<line x1="0" y1="${i*CELL}" x2="${cols*CELL}" y2="${i*CELL}" stroke="${COL.line}"/>`;
+  return s;
+}
+function vign1(){       // tsplit pose ▲ mid-run: run channel + ⊙ at centre
+  const H=CELL, m=CELL/2;
+  let s=gridBG(3,1);
+  s+=chan(`M 0 ${m} L ${CELL} ${m}`);                        // feeding straight
+  s+=chan(`M ${CELL} ${m} L ${2*CELL} ${m}`);                // the tee's run channel
+  s+=chan(`M ${2*CELL} ${m} L ${3*CELL} ${m}`);              // receiving straight
+  s+=glyph(CELL+m, m, true);                                  // branch rises: ⊙
+  return `<svg width="${3*CELL}" height="${H}" viewBox="0 0 ${3*CELL} ${H}">${s}</svg>`;
+}
+function vign2(){       // riser-run tsplit: ±7 glyph pair + aimed E spoke
+  const H=CELL, m=CELL/2;
+  let s=gridBG(2,1);
+  s+=chan(`M ${m} ${m} L ${CELL} ${m}`);                     // spoke centre → E port
+  s+=chan(`M ${CELL} ${m} L ${2*CELL} ${m}`);                // receiving straight
+  s+=glyph(m-7, m-7, true);                                   // U out: rising ⊙
+  s+=glyph(m+7, m+7, true);                                   // D in: rising ⊙
+  return `<svg width="${2*CELL}" height="${H}" viewBox="0 0 ${2*CELL} ${H}">${s}</svg>`;
+}
+
+/* ---- board assembly ---- */
+function rb(icon,on){ return `<button class="rbtn${on?' on':''}">${iSvg(icon)}</button>`; }
+function fb(icon,label,on){ return `<button class="rbtn fly${on?' on':''}">${iSvg(icon,32)}<span class="flbl">${label}</span></button>`; }
+function pb(icon,on){ return `<button class="pbtn${on?' on':''}">${iSvg(icon,26)}</button>`; }
+function railFrag(extra){
+  return `<div class="rail">
+    ${rb(PART_ICONS.straight)}${rb(PART_ICONS.elbow)}${rb(PART_ICONS.tee,true)}
+    ${rb(PART_ICONS.cross)}${rb(PART_ICONS.cap)}${rb(PART_ICONS.vert)}
+    ${extra||""}
+  </div>`;
+}
+
+const TWIST_ICON=`<path d="M8 32 H18" fill="none" stroke="var(--icase)" stroke-width="9" stroke-linecap="round"/><path d="M8 32 H18" fill="none" stroke="var(--ilum)" stroke-width="4" stroke-linecap="round"/>`
+  +arcArrow(18,32,17,0,-90,3.2,-14);
+
+function boardHTML(){
+  let h="";
+
+  /* 0 — the model */
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">MODEL</span> — POSE, NOT CATALOGUE</div>
+    <div class="note">A rotated fitting is the same fitting. Pose generalises <b>rot 0–3</b> to
+    <b>{plane, rot}</b>: flat · EW-vertical · NS-vertical — 12 poses per planar part, one direction-map
+    table, zero new kinds. The four tee flow-roles stay four; SWAP, trace cycling, autoOrient untouched.
+    Compass aiming stays in the nudge, exactly as today — the UI below only has to choose among
+    <b>four pose classes</b>: FLAT, BRANCH ▲, BRANCH ▼, RISER-RUN ⇅.<br><br>
+    Convention guard: <b>⊙/⊗ is flow, so it cannot label pose.</b> A merge-tee whose branch opens
+    upward carries descending inflow — canvas shows ⊗ under a part you posed "up". Pose marks are
+    therefore geometric (wedges, neutral rings); rings with dot/cross remain flow-only.</div>
+  </div>`;
+
+  /* A */
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">A</span> — GROW THE VERT FLYOUT · PRESETS</div>
+    <div class="note">Every kind × pose is a labelled button. Everything lives in one place, no new
+    concept — but tees alone add 12 presets (4 roles × 3 vertical poses; 6 shown, 6 elided), and
+    crosses would push past 25. Note the honest collision: the two buttons posed ▲ disagree on the
+    ring — <b>SPLIT ▲ shows ⊙, MERGE ▲ shows ⊗</b> — because the ring reports flow. Correct, and
+    confusing at the moment of choice.</div>
+    <div class="stagewrap">
+      ${railFrag()}
+      <div class="flyout">
+        ${fb(VAR_VERT.vup,"Elbow up")}${fb(VAR_VERT.vdn,"Elbow dn")}
+        ${fb(VAR_VERT.riser1,"Riser ×1")}${fb(VAR_VERT.riser,"Riser ×2")}
+        <div class="fdiv"></div>
+        ${fb(A_ICONS.tsplit_up,"Split ▲",true)}${fb(A_ICONS.tmerge_up,"Merge ▲")}
+        ${fb(A_ICONS.tsplit_dn,"Split ▼")}${fb(A_ICONS.tmerge_dn,"Merge ▼")}
+        ${fb(A_ICONS.tsplit_rr,"Split ⇅")}${fb(A_ICONS.tmerge_rr,"Merge ⇅")}
+        <div class="ellip">… + branch-role ×2 = 12</div>
+      </div>
+    </div>
+  </div>`;
+
+  /* B */
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">B</span> — POSE ROW IN THE TEE FLYOUT · COMPOSE</div>
+    <div class="note">The Tee flyout keeps its four roles and gains one row of four pose classes;
+    choice = role × pose, so nothing multiplies. The same row drops into the Cross flyout unchanged
+    when the mirror widens. Pose is visible right where variants are chosen. Cost: one more concept
+    in the flyout, and pose must reset (or persist?) when switching part families.</div>
+    <div class="stagewrap">
+      ${railFrag()}
+      <div class="flyout">
+        ${fb(VAR_TEE.tsplit,"Split · run",true)}${fb(VAR_TEE.tsplitb,"Split · branch")}
+        ${fb(VAR_TEE.tmerge,"Merge · run")}${fb(VAR_TEE.tmergeb,"Merge · branch")}
+        <div class="fdiv"></div>
+        <div class="fhead">POSE</div>
+        <div class="poserow">
+          ${pb(POSE_ICONS.flat)}${pb(POSE_ICONS.bup,true)}${pb(POSE_ICONS.bdn)}${pb(POSE_ICONS.rrun)}
+        </div>
+      </div>
+    </div>
+  </div>`;
+
+  /* C */
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">C</span> — TWIST MODIFIER ON THE RAIL · GLOBAL</div>
+    <div class="note">One rail control cycles pose — FLAT → ▲ → ▼ → ⇅ — for whatever part tool is
+    active, with a readout in the rail's register (like L#). Scales to crosses and elbows for free;
+    flyouts stay exactly as they are. Cost: pose becomes a <b>mode</b> that lives away from the
+    variant choice — easy to leave twisted and place a surprise, so the readout (and maybe a ghost
+    cue) has to carry the state hard.</div>
+    <div class="stagewrap">
+      ${railFrag(`<div class="rgap"></div>${rb(TWIST_ICON,false)}<div class="lread">▲</div>`)}
+      <div class="flyout">
+        ${fb(VAR_TEE.tsplit,"Split · run",true)}${fb(VAR_TEE.tsplitb,"Split · branch")}
+        ${fb(VAR_TEE.tmerge,"Merge · run")}${fb(VAR_TEE.tmergeb,"Merge · branch")}
+      </div>
+    </div>
+  </div>`;
+
+  /* canvas language */
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">CANVAS</span> — RENDER LANGUAGE, UNCHANGED RULES</div>
+    <div class="note">Branch-posed tee = its run channel + one flow ring at centre (velbow's rule,
+    inherited). Riser-run tee = the riser1 convention — D/U rings offset ±7 — plus one nudge-aimed
+    spoke. Below: a Split ▲ mid-run (ring reads ⊙, flow rising out) and a riser-run Split feeding
+    east (both rings ⊙ — flow rises through).</div>
+    <div class="stagewrap">
+      <div class="vign" id="v1"></div>
+      <div class="vign" id="v2"></div>
+    </div>
+  </div>`;
+
+  /* cut list */
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">CUT LIST</span> — SAME LINE · POSE SUBTOTALS</div>
+    <div class="note">A rotated fitting orders as the same fitting: one line per kind, with a dim
+    pose subtotal beneath — only when poses are mixed. Copy-text mirrors the same shape.</div>
+    <div class="bommock">
+      <div class="bomlbl">CUT LIST</div>
+      <div class="bomrow"><span class="k">Split · run</span><span class="n">× 5</span></div>
+      <div class="bomsub">flat ×3 · ▲ ×1 · ⇅ ×1</div>
+      <div class="bomrow"><span class="k">Merge · branch</span><span class="n">× 2</span></div>
+      <div class="bomrow"><span class="k">Straight-3</span><span class="n">× 4</span></div>
+      <div class="bomrow"><span class="k">Elbow span 2</span><span class="n">× 3</span></div>
+      <div class="bomrow"><span class="k">Riser ×2</span><span class="n">× 1</span></div>
+      <div class="bomrow bomtot"><span class="k">TOTAL</span><span class="n">15</span></div>
+    </div>
+  </div>`;
+
+  return h;
+}
+
+function paint(){
+  document.getElementById("board").innerHTML=boardHTML();
+  document.getElementById("v1").innerHTML=vign1()+`<div class="cap">SPLIT · RUN, POSE ▲ — RING READS ⊙</div>`;
+  document.getElementById("v2").innerHTML=vign2()+`<div class="cap">SPLIT · RISER-RUN — BOTH RINGS ⊙, SPOKE AIMED E</div>`;
+}
+document.getElementById("tt").addEventListener("click",()=>{
+  const w=document.body.dataset.theme==="workshop";
+  document.body.dataset.theme=w?"":"workshop";
+  COL=PALETTES[w?"carbon":"workshop"];
+  paint();
+});
+paint();
+
+})();
+</script>
+</body>
+</html>

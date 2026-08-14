@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>PIPEGRID — Flow arrows &amp; highlight mockups</title>
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12151b; --panel2:#0e1116; --edge:#2c313d;
+    --text:#c7d3e2; --dim:#5f6775; --acc:#e0a14e; --onfg:#0b0d10;
+    --icase:#8ea6bf; --ilum:#e8f2fc; --ifg:#c7d3e2;
+  }
+  body[data-theme="workshop"]{
+    --bg:#e6dfcf; --panel:#efe9dc; --panel2:#f3eee2; --edge:#c9c0aa;
+    --text:#2a2a28; --dim:#8a8272; --acc:#e0771e; --onfg:#efe9dc;
+    --icase:#2a2a28; --ilum:#efe9dc; --ifg:#2a2a28;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  body{background:var(--bg);color:var(--text);
+       font-family:ui-monospace,SFMono-Regular,Menlo,monospace;-webkit-text-size-adjust:100%;
+       padding:14px;}
+  .hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:4px;flex-wrap:wrap;}
+  .title{font-size:15px;font-weight:700;letter-spacing:4px;}
+  .sub{font-size:9px;letter-spacing:1.5px;color:var(--dim);}
+  .themebtn{margin-left:auto;font-family:inherit;font-size:10px;letter-spacing:.5px;text-transform:uppercase;
+        padding:7px 9px;border:1px solid var(--edge);border-radius:4px;background:transparent;
+        color:var(--text);cursor:pointer;}
+  #board{display:flex;flex-direction:column;gap:12px;max-width:820px;margin-top:10px;}
+  .panel{border:1px solid var(--edge);border-radius:8px;background:var(--panel);padding:12px;}
+  .plabel{font-size:10px;font-weight:700;letter-spacing:2px;margin-bottom:2px;}
+  .plabel .tag{color:var(--acc);}
+  .note{font-size:9px;color:var(--dim);line-height:1.7;max-width:700px;margin:4px 0 10px;}
+  .note b{color:var(--text);font-weight:700;}
+  .tiles{display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;}
+  .tile{width:82px;height:62px;border:1px solid var(--edge);border-radius:6px;background:var(--panel);
+        display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;}
+  .tlbl{font-size:7px;letter-spacing:1.1px;text-transform:uppercase;color:var(--dim);white-space:nowrap;}
+  .rails{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start;}
+  .railcol{display:flex;flex-direction:column;gap:6px;align-items:center;}
+  .rlbl{font-size:8px;letter-spacing:1.5px;color:var(--dim);}
+  .minirail{display:flex;flex-direction:column;gap:5px;align-items:center;padding:8px 6px;
+        border:1px solid var(--edge);border-radius:8px;background:var(--panel);}
+  .rbtn{width:44px;height:44px;border:1px solid var(--edge);border-radius:6px;background:transparent;
+        display:grid;place-items:center;padding:0;}
+  .fbtn{width:82px;height:62px;border:1px solid var(--edge);border-radius:6px;background:transparent;
+        display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;}
+  /* H1 current: full fill, silhouette */
+  .h1.on{background:var(--acc);border-color:var(--acc);}
+  .h1.on svg path{stroke:var(--onfg) !important;}
+  .h1.on svg circle{fill:var(--onfg) !important;stroke:var(--onfg) !important;}
+  .h1.on .tlbl{color:var(--onfg);}
+  /* H2 border only */
+  .h2.on{border:2px solid var(--acc);}
+  /* H3 border + tint */
+  .h3.on{border:2px solid var(--acc);background:color-mix(in srgb,var(--acc) 14%,transparent);}
+  /* H4 register bar + tint */
+  .h4.on{border-color:var(--edge);box-shadow:inset 3px 0 0 var(--acc);background:color-mix(in srgb,var(--acc) 10%,transparent);}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <span class="title">PIPEGRID</span>
+  <span class="sub">FLOW ARROWS &amp; TOOL HIGHLIGHT · STATIC BOARD</span>
+  <button class="themebtn" id="tt">Theme</button>
+</div>
+<div id="board"></div>
+<script>
+(function(){
+"use strict";
+
+/* ---- icon builders, verbatim from v35 ---- */
+function iSvg(inner,sz){ return `<svg width="${sz||32}" height="${sz||32}" viewBox="0 0 44 44">${inner}</svg>`; }
+function iPipe(path,capCircle){
+  let t=`<path d="${path}" fill="none" stroke="var(--icase)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>`;
+  t+=`<path d="${path}" fill="none" stroke="var(--ilum)" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+  if(capCircle) t+=`<circle cx="22" cy="22" r="7" fill="var(--icase)" stroke="var(--ilum)" stroke-width="2.5"/>`;
+  return t;
+}
+function iArc(cx,cy,r,a1,a2){
+  const N=16; let d="";
+  for(let k=0;k<=N;k++){const t=(a1+(a2-a1)*k/N)*Math.PI/180;
+    d+=(k?" L ":"M ")+(cx+r*Math.cos(t)).toFixed(1)+" "+(cy+r*Math.sin(t)).toFixed(1);}
+  return d;
+}
+function iArrow(x,y,dir){                       // A: the current chevron
+  const dd={N:[0,-1],E:[1,0],S:[0,1],W:[-1,0]}[dir], px=-dd[1], py=dd[0];
+  const ax=x+dd[0]*6.5, ay=y+dd[1]*6.5, bx=x-dd[0]*3.5, by=y-dd[1]*3.5;
+  return `<path d="M ${bx+px*5.5} ${by+py*5.5} L ${ax} ${ay} L ${bx-px*5.5} ${by-py*5.5}" fill="none" stroke="var(--acc)" stroke-width="3.6" stroke-linejoin="round"/>`;
+}
+const IPATH={straight:"M6 22 H38", tee:"M22 6 V38 M22 22 H38", cross:"M22 6 V38 M6 22 H38", capline:"M6 22 H22"};
+
+/* ---- candidate languages ---- */
+function tri(x,y,ang,s,col){                    // solid triangle, tip forward along ang (deg)
+  const a=ang*Math.PI/180, S=s||5;
+  const tx=Math.cos(a), ty=Math.sin(a), px=-ty, py=tx;
+  const p1=[x+tx*S, y+ty*S], p2=[x-tx*S+px*S*0.85, y-ty*S+py*S*0.85], p3=[x-tx*S-px*S*0.85, y-ty*S-py*S*0.85];
+  return `<path d="M ${p1[0].toFixed(1)} ${p1[1].toFixed(1)} L ${p2[0].toFixed(1)} ${p2[1].toFixed(1)} L ${p3[0].toFixed(1)} ${p3[1].toFixed(1)} Z" fill="${col||'var(--acc)'}"/>`;
+}
+const DIRANG={N:-90,E:0,S:90,W:180};
+function dotAt(x,y){ return `<circle cx="${x}" cy="${y}" r="3.4" fill="var(--acc)"/>`; }
+
+/* Port px in the 44-viewbox */
+const P={N:[22,6],E:[38,22],S:[22,38],W:[6,22]};
+
+/* Per-part channel geometry + io per candidate (icon orientations = v35 catalogue rot0) */
+const PARTS={
+  tsplit:{pipe:"M22 6 V38 "+iArc(38,6,16,180,90), io:{N:"in",S:"out",E:"out"},
+          mids:[[22,13,90],[22,31,90],[33.3,10.7,45]]},
+  tmergeb:{pipe:iArc(38,6,16,90,180)+" "+iArc(38,38,16,-90,-180), io:{N:"in",S:"in",E:"out"},
+          mids:[[33.3,10.7,45],[33.3,33.3,-45]]},
+  xjunc:{pipe:IPATH.cross, io:{N:"in",E:"out",S:"in",W:"out"},
+          mids:[[22,12,90],[30,22,0],[22,32,-90],[12,22,180]]},
+  xbend:{pipe:iArc(38,6,16,180,90)+" "+iArc(6,38,16,0,-90), io:{N:"in",E:"out",S:"out",W:"in"},
+          mids:[[33.3,10.7,45],[10.7,33.3,45]]},
+  src:{pipe:IPATH.capline, cap:true, io:{W:"out"}, mids:[[12,22,180]]}
+};
+const ROW=["tsplit","tmergeb","xjunc","xbend","src"];
+const RLBL={tsplit:"Split \u00b7 run",tmergeb:"Merge \u00b7 branch",xjunc:"Junction 2\u00b72",xbend:"Bend overpass",src:"Source"};
+
+function base(k){ return iPipe(PARTS[k].pipe,PARTS[k].cap); }
+/* A — current: chevron at EVERY port, pointing with flow */
+function candA(k){
+  let g=base(k);
+  for(const d in PARTS[k].io){
+    const io=PARTS[k].io[d], [x,y]=P[d];
+    const ang=io==="out"?DIRANG[d]:DIRANG[{N:"S",S:"N",E:"W",W:"E"}[d]];
+    g+=iArrow(x,y, io==="out"?d:{N:"S",S:"N",E:"W",W:"E"}[d]);
+  }
+  return g;
+}
+/* B — role only: ONE arrow on the unique role port (inlets where no unique) */
+const ROLE={tsplit:["N"],tmergeb:["E"],xjunc:["N","S"],xbend:["N","W"],src:["W"]};
+function candB(k){
+  let g=base(k);
+  for(const d of ROLE[k]){
+    const io=PARTS[k].io[d];
+    g+=iArrow(P[d][0],P[d][1], io==="out"?d:{N:"S",S:"N",E:"W",W:"E"}[d]);
+  }
+  return g;
+}
+/* C — inline: small solid triangles ON the lumen, mid-channel, travelling with flow */
+function candC(k){
+  let g=base(k);
+  for(const m of PARTS[k].mids) g+=tri(m[0],m[1],m[2],4.6);
+  return g;
+}
+/* D — inlet dots: amber dot AT each inlet, outlets bare (valve-schematic register) */
+function candD(k){
+  let g=base(k);
+  for(const d in PARTS[k].io) if(PARTS[k].io[d]==="in") g+=dotAt(P[d][0],P[d][1]);
+  if(k==="src") g+=dotAt(6,22);   // src has no inlet: mark the emitting face instead
+  return g;
+}
+
+function tileRow(fn){
+  return `<div class="tiles">`+ROW.map(k=>
+    `<div class="tile">${iSvg(fn(k))}<span class="tlbl">${RLBL[k]}</span></div>`).join("")+`</div>`;
+}
+
+/* ---- highlight candidates ---- */
+function railCol(cls,label){
+  return `<div class="railcol"><span class="rlbl">${label}</span>
+    <div class="minirail">
+      <button class="rbtn ${cls}">${iSvg(iPipe(IPATH.straight),28)}</button>
+      <button class="rbtn ${cls} on">${iSvg(iPipe(IPATH.tee),28)}</button>
+      <button class="rbtn ${cls}">${iSvg(iPipe(IPATH.cross),28)}</button>
+    </div>
+    <button class="fbtn ${cls} on">${iSvg(candA("tsplit"),30)}<span class="tlbl">Split \u00b7 run</span></button>
+  </div>`;
+}
+
+function boardHTML(){
+  let h="";
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">BRIEF</span> — TWO DIALS, ONE LEGIBILITY PROBLEM</div>
+    <div class="note">The fill highlight erases amber arrows; the arrows themselves crowd small icons.
+    Fix either end or both. Below: four <b>arrow languages</b> stress-tested across the part families
+    (a language that only works on tees isn't a language), then four <b>highlight treatments</b> —
+    each shown on a mini rail plus an ACTIVE variant button carrying arrows, the exact case that
+    fails today. Any arrow language composes with any border-style highlight.</div>
+  </div>`;
+
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">A</span> — CURRENT · CHEVRON AT EVERY PORT</div>
+    <div class="note">Complete: every port states its direction. But 4-port parts wear four amber
+    marks on a 32&nbsp;px icon — the mess you named — and under the filled highlight they vanish entirely.</div>
+    ${tileRow(candA)}
+  </div>`;
+
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">B</span> — ROLE ARROW ONLY</div>
+    <div class="note">One chevron on the part's <b>role port</b> (the unique in/out); everything else is
+    implied, which is true — the other ports can only be the complement. Parts without a unique port
+    (junction, two-stream) mark their inlets. Quietest change; the labels still carry the words.</div>
+    ${tileRow(candB)}
+  </div>`;
+
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">C</span> — INLINE · TRIANGLES ON THE LUMEN</div>
+    <div class="note">Flow marked <b>in the pipe</b>, mid-channel, the way drawings annotate direction —
+    one solid triangle per stream, travelling with it. Ports stay clean; the mark sits where trace
+    mode animates. Densest information per mark; slightly smaller targets to read.</div>
+    ${tileRow(candC)}
+  </div>`;
+
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">D</span> — INLET DOTS</div>
+    <div class="note">Valve-schematic register: a dot marks each <b>inlet</b>, outlets stay bare. No
+    direction to draw at all — direction is inferred, dots just say "feed here". Calmest of the four;
+    asks the most of the reader on first contact (and Source needs a special rule, shown).</div>
+    ${tileRow(candD)}
+  </div>`;
+
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">H</span> — ACTIVE-TOOL HIGHLIGHT</div>
+    <div class="note">H1 is today: full amber fill, icon reduced to silhouette — flow illegible, your
+    call to kill it. H2 border only. H3 border + 14% amber tint (border does the saying, tint does the
+    finding at a glance). H4 drawing-office register: inset amber bar + faint tint, quietest. The
+    variant button below each rail is the acid test — arrows must survive the ON state.</div>
+    <div class="rails">
+      ${railCol("h1","H1 · FILL (NOW)")}
+      ${railCol("h2","H2 · BORDER")}
+      ${railCol("h3","H3 · BORDER + TINT")}
+      ${railCol("h4","H4 · REGISTER BAR")}
+    </div>
+  </div>`;
+
+  return h;
+}
+
+function paint(){ document.getElementById("board").innerHTML=boardHTML(); }
+document.getElementById("tt").addEventListener("click",()=>{
+  document.body.dataset.theme=document.body.dataset.theme==="workshop"?"":"workshop";
+  paint();
+});
+paint();
+
+})();
+</script>
+</body>
+</html>

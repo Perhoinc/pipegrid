@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>PIPEGRID — Both-ways ring mockups</title>
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12151b; --panel2:#0e1116; --edge:#2c313d;
+    --text:#c7d3e2; --dim:#5f6775; --acc:#e0a14e;
+  }
+  body[data-theme="workshop"]{
+    --bg:#e6dfcf; --panel:#efe9dc; --panel2:#f3eee2; --edge:#c9c0aa;
+    --text:#2a2a28; --dim:#8a8272; --acc:#e0771e;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  body{background:var(--bg);color:var(--text);
+       font-family:ui-monospace,SFMono-Regular,Menlo,monospace;-webkit-text-size-adjust:100%;
+       padding:14px;}
+  .hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:4px;flex-wrap:wrap;}
+  .title{font-size:15px;font-weight:700;letter-spacing:4px;}
+  .sub{font-size:9px;letter-spacing:1.5px;color:var(--dim);}
+  .themebtn{margin-left:auto;font-family:inherit;font-size:10px;letter-spacing:.5px;text-transform:uppercase;
+        padding:7px 9px;border:1px solid var(--edge);border-radius:4px;background:transparent;
+        color:var(--text);cursor:pointer;}
+  #board{display:flex;flex-direction:column;gap:12px;max-width:760px;margin-top:10px;}
+  .panel{border:1px solid var(--edge);border-radius:8px;background:var(--panel);padding:12px;}
+  .plabel{font-size:10px;font-weight:700;letter-spacing:2px;margin-bottom:2px;}
+  .plabel .tag{color:var(--acc);}
+  .note{font-size:9px;color:var(--dim);line-height:1.7;max-width:660px;margin:4px 0 10px;}
+  .note b{color:var(--text);font-weight:700;}
+  .row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;}
+  .vign{background:var(--panel2);border:1px solid var(--edge);border-radius:8px;padding:10px;
+        display:inline-block;}
+  .cap{font-size:8px;letter-spacing:1px;color:var(--dim);margin-top:6px;}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <span class="title">PIPEGRID</span>
+  <span class="sub">BOTH-WAYS RING · ONE BORE, TWO VERTICAL FLOWS · STATIC BOARD</span>
+  <button class="themebtn" id="tt">Theme</button>
+</div>
+<div id="board"></div>
+<script>
+(function(){
+"use strict";
+
+const PALETTES={
+  carbon:{pipe:"#4a5568",pipeHi:"#dfe6f0",line:"rgba(140,160,185,0.13)"},
+  workshop:{pipe:"#2a2a28",pipeHi:"#efe9dc",line:"rgba(90,80,60,0.22)"}
+};
+let COL=PALETTES.carbon;
+const CELL=44;
+
+/* ---- ring + marks, all dims scale-multiplied so the loupe is honest ---- */
+function ring(cx,cy,s){
+  return `<circle cx="${cx}" cy="${cy}" r="${10*s}" fill="${COL.pipeHi}" stroke="${COL.pipe}" stroke-width="${5*s}"/>`;
+}
+function markDot(cx,cy,s,r){ return `<circle cx="${cx}" cy="${cy}" r="${(r||3.2)*s}" fill="${COL.pipe}"/>`; }
+function markCross(cx,cy,s,a){
+  const A=(a||4.6)*s;
+  return `<path d="M ${cx-A} ${cy-A} L ${cx+A} ${cy+A} M ${cx-A} ${cy+A} L ${cx+A} ${cy-A}" stroke="${COL.pipe}" stroke-width="${2.6*s}" stroke-linecap="round"/>`;
+}
+
+/* reference marks */
+function gUp(cx,cy,s){ return ring(cx,cy,s)+markDot(cx,cy,s); }
+function gDn(cx,cy,s){ return ring(cx,cy,s)+markCross(cx,cy,s); }
+
+/* OPT A — combined: dot + cross superposed in one ring */
+function gComb(cx,cy,s){ return ring(cx,cy,s)+markCross(cx,cy,s)+markDot(cx,cy,s,2.4); }
+
+/* OPT B1 — split ring: hairline divider, half dot · half cross */
+function gSplit(cx,cy,s){
+  let g=ring(cx,cy,s);
+  g+=`<path d="M ${cx} ${cy-7*s} L ${cx} ${cy+7*s}" stroke="${COL.pipe}" stroke-width="${1.4*s}"/>`;
+  g+=markDot(cx-4*s,cy,s,2.2);
+  g+=markCross(cx+4*s,cy,s,2.4);
+  return g;
+}
+
+/* OPT B2 — chevrons: mini up + down, stacked */
+function gChev(cx,cy,s){
+  let g=ring(cx,cy,s);
+  g+=`<path d="M ${cx-4*s} ${cy-1.6*s} L ${cx} ${cy-5.6*s} L ${cx+4*s} ${cy-1.6*s}" fill="none" stroke="${COL.pipe}" stroke-width="${2.4*s}" stroke-linecap="round" stroke-linejoin="round"/>`;
+  g+=`<path d="M ${cx-4*s} ${cy+1.6*s} L ${cx} ${cy+5.6*s} L ${cx+4*s} ${cy+1.6*s}" fill="none" stroke="${COL.pipe}" stroke-width="${2.4*s}" stroke-linecap="round" stroke-linejoin="round"/>`;
+  return g;
+}
+
+/* OPT C — pair returns, this case only: ±7 offset ⊙ / ⊗ */
+function gPair(cx,cy,s){
+  return gUp(cx-7*s,cy-7*s,s)+gDn(cx+7*s,cy+7*s,s);
+}
+
+/* ---- vignette: split·branch vertical tee fed from the west ---- */
+function chan(d){
+  return `<path d="${d}" fill="none" stroke="${COL.pipe}" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>`+
+         `<path d="${d}" fill="none" stroke="${COL.pipeHi}" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>`;
+}
+function gridBG(cols,rows){
+  let s="";
+  for(let i=0;i<=cols;i++) s+=`<line x1="${i*CELL}" y1="0" x2="${i*CELL}" y2="${rows*CELL}" stroke="${COL.line}"/>`;
+  for(let i=0;i<=rows;i++) s+=`<line x1="0" y1="${i*CELL}" x2="${cols*CELL}" y2="${i*CELL}" stroke="${COL.line}"/>`;
+  return s;
+}
+function vign(markFn){
+  const m=CELL/2;
+  let s=gridBG(2,1);
+  s+=chan(`M 0 ${m} L ${CELL} ${m}`);                 // feeding straight
+  s+=chan(`M ${CELL} ${m} L ${CELL+m} ${m}`);         // tee's branch spoke, W → centre
+  s+=markFn(CELL+m,m,1);
+  return `<svg width="${2*CELL}" height="${CELL}" viewBox="0 0 ${2*CELL} ${CELL}">${s}</svg>`;
+}
+function loupe(markFn,w){
+  const W=w||96, s=3;
+  return `<svg width="${W}" height="${W}" viewBox="0 0 ${W} ${W}">${markFn(W/2,W/2,s)}</svg>`;
+}
+
+function optPanel(tag,name,markFn,noteHtml){
+  return `<div class="panel">
+    <div class="plabel"><span class="tag">${tag}</span> — ${name}</div>
+    <div class="note">${noteHtml}</div>
+    <div class="row">
+      <div class="vign">${vign(markFn)}<div class="cap">1× — SPLIT·BRANCH TEE, FED FROM W</div></div>
+      <div class="vign">${loupe(markFn,120)}<div class="cap">3× LOUPE</div></div>
+    </div>
+  </div>`;
+}
+
+function boardHTML(){
+  let h="";
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">BRIEF</span> — ONE BORE, TWO VERTICAL FLOWS</div>
+    <div class="note">Only branch-role vertical tees need this: split·branch sends flow both up and
+    down out of one bore; merge·branch draws it in from both. Either way the bore carries
+    <b>rising AND descending flow at once</b> — and the two roles share the same vertical picture, so
+    one mark serves both (the branch spoke tells the rest, and trace arrows settle it live).
+    Reference, at canvas scale and 3×:</div>
+    <div class="row">
+      <div class="vign">${loupe(gUp,96)}<div class="cap">⊙ RISING</div></div>
+      <div class="vign">${loupe(gDn,96)}<div class="cap">⊗ DESCENDING</div></div>
+      <div class="vign">${loupe(gUp,32)}${loupe(gDn,32)}<div class="cap">1× ACTUAL (r=10)</div></div>
+    </div>
+  </div>`;
+
+  h+=optPanel("A","COMBINED · DOT + CROSS SUPERPOSED",gComb,
+    `Zero new vocabulary — it literally says ⊙ and ⊗ at once. The dot shrinks slightly (2.4) so the
+     cross stays legible under it. Risk: at r=10 on a dim iPad it may read as a smudged ⊗, and a
+     smudge that means "both ways" is a bad failure mode.`);
+
+  h+=optPanel("B1","SPLIT RING · HALF DOT, HALF CROSS",gSplit,
+    `One hairline divider, miniature ⊙ and ⊗ side by side — the bore as a sectioned drawing. Honest
+     and self-explaining, but the marks drop to ~half size and the divider adds a line the flow
+     convention has never used. The most "drawing-office" of the three.`);
+
+  h+=optPanel("B2","CHEVRONS · UP + DOWN STACKED",gChev,
+    `New vocabulary: paired chevrons say "both directions" without borrowing ⊙/⊗ at all, so nothing
+     smudges and nothing shrinks. Cost: a third mark to learn, and chevrons flirt with the layer ▲▼
+     rail icons — context (inside a ring, on canvas) probably disarms that, but it's a real echo.`);
+
+  h+=optPanel("C","PAIR RETURNS · THIS CASE ONLY",gPair,
+    `The ±7 pair comes back for exactly the case where it carried real information: ⊙ up-left,
+     ⊗ down-right. Perfectly explicit, no new marks — but it reintroduces the offset lie precisely
+     where the geometry is a single bore, and makes one part family render wider than its cell
+     neighbours. The exception would need remembering.`);
+
+  return h;
+}
+
+function paint(){ document.getElementById("board").innerHTML=boardHTML(); }
+document.getElementById("tt").addEventListener("click",()=>{
+  const w=document.body.dataset.theme==="workshop";
+  document.body.dataset.theme=w?"":"workshop";
+  COL=PALETTES[w?"carbon":"workshop"];
+  paint();
+});
+paint();
+
+})();
+</script>
+</body>
+</html>

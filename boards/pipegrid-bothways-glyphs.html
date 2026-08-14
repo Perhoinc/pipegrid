@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>PIPEGRID — Both-ways glyph (v35)</title>
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12151b; --panel2:#0e1116; --edge:#2c313d;
+    --text:#c7d3e2; --dim:#5f6775; --acc:#e0a14e;
+  }
+  body[data-theme="workshop"]{
+    --bg:#e6dfcf; --panel:#efe9dc; --panel2:#f3eee2; --edge:#c9c0aa;
+    --text:#2a2a28; --dim:#8a8272; --acc:#e0771e;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  body{background:var(--bg);color:var(--text);
+       font-family:ui-monospace,SFMono-Regular,Menlo,monospace;-webkit-text-size-adjust:100%;
+       padding:14px;}
+  .hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:4px;flex-wrap:wrap;}
+  .title{font-size:15px;font-weight:700;letter-spacing:4px;}
+  .sub{font-size:9px;letter-spacing:1.5px;color:var(--dim);}
+  .themebtn{margin-left:auto;font-family:inherit;font-size:10px;letter-spacing:.5px;text-transform:uppercase;
+        padding:7px 9px;border:1px solid var(--edge);border-radius:4px;background:transparent;
+        color:var(--text);cursor:pointer;}
+  #board{display:flex;flex-direction:column;gap:12px;max-width:760px;margin-top:10px;}
+  .panel{border:1px solid var(--edge);border-radius:8px;background:var(--panel);padding:12px;}
+  .plabel{font-size:10px;font-weight:700;letter-spacing:2px;margin-bottom:2px;}
+  .plabel .tag{color:var(--acc);}
+  .note{font-size:9px;color:var(--dim);line-height:1.7;max-width:660px;margin:4px 0 10px;}
+  .note b{color:var(--text);font-weight:700;}
+  .stagewrap{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;}
+  .vign{background:var(--panel2);border:1px solid var(--edge);border-radius:8px;padding:10px;
+        display:inline-block;}
+  .cap{font-size:8px;letter-spacing:1px;color:var(--dim);margin-top:6px;}
+  .bigrow{display:flex;gap:10px;align-items:center;}
+  .biglbl{font-size:8px;letter-spacing:1px;color:var(--dim);text-align:center;margin-top:4px;}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <span class="title">PIPEGRID</span>
+  <span class="sub">BOTH-WAYS GLYPH · SINGLE-RING CONVENTION · STATIC BOARD</span>
+  <button class="themebtn" id="tt">Theme</button>
+</div>
+<div id="board"></div>
+<script>
+(function(){
+"use strict";
+
+const PALETTES={
+  carbon:{pipe:"#4a5568",pipeHi:"#dfe6f0",line:"rgba(140,160,185,0.13)"},
+  workshop:{pipe:"#2a2a28",pipeHi:"#efe9dc",line:"rgba(90,80,60,0.22)"}
+};
+let COL=PALETTES.carbon;
+const CELL=44;
+
+/* ---- canvas strokes (app conventions) ---- */
+function chan(d){
+  return `<path d="${d}" fill="none" stroke="${COL.pipe}" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>`+
+         `<path d="${d}" fill="none" stroke="${COL.pipeHi}" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>`;
+}
+function gridBG(cols,rows){
+  let s="";
+  for(let i=0;i<=cols;i++) s+=`<line x1="${i*CELL}" y1="0" x2="${i*CELL}" y2="${rows*CELL}" stroke="${COL.line}"/>`;
+  for(let i=0;i<=rows;i++) s+=`<line x1="0" y1="${i*CELL}" x2="${cols*CELL}" y2="${i*CELL}" stroke="${COL.line}"/>`;
+  return s;
+}
+
+/* ---- glyph family, scale-parametric (s=1 is canvas scale) ---- */
+function ringBase(cx,cy,s){
+  return `<circle cx="${cx}" cy="${cy}" r="${10*s}" fill="${COL.pipeHi}" stroke="${COL.pipe}" stroke-width="${5*s}"/>`;
+}
+function markDot(cx,cy,s){
+  return `<circle cx="${cx}" cy="${cy}" r="${3.2*s}" fill="${COL.pipe}"/>`;
+}
+function markCross(cx,cy,s){
+  const a=4.6*s;
+  return `<path d="M ${cx-a} ${cy-a} L ${cx+a} ${cy+a} M ${cx-a} ${cy+a} L ${cx+a} ${cy-a}" stroke="${COL.pipe}" stroke-width="${2.6*s}" stroke-linecap="round"/>`;
+}
+function gUp(cx,cy,s){ return ringBase(cx,cy,s)+markDot(cx,cy,s); }
+function gDn(cx,cy,s){ return ringBase(cx,cy,s)+markCross(cx,cy,s); }
+
+/* OPTION 1 — combined: cross under, dot over (four radiating arms + core) */
+function gBoth1(cx,cy,s){ return ringBase(cx,cy,s)+markCross(cx,cy,s)+markDot(cx,cy,s); }
+
+/* OPTION 2 — halved dot: semicircle core, flat edge vertical */
+function gBoth2(cx,cy,s){
+  const r=4.6*s;
+  return ringBase(cx,cy,s)+
+    `<path d="M ${cx} ${cy-r} A ${r} ${r} 0 0 0 ${cx} ${cy+r} Z" fill="${COL.pipe}"/>`;
+}
+
+/* OPTION 3 — the pair returns for this one case (U at −7, D at +7) */
+function gBoth3(cx,cy,s,diverging){
+  const o=7*s;
+  // diverging (split·branch): U out ⊙ / D out ⊗ ; converging (merge·branch): U in ⊗ / D in ⊙
+  const uUp=diverging, dUp=!diverging;
+  return (uUp?gUp:gDn)(cx-o,cy-o,s)+(dUp?gUp:gDn)(cx+o,cy+o,s);
+}
+
+/* ---- vignettes: split·branch and merge·branch on a vertical run ---- */
+function vign(glyphFn,diverging){
+  const m=CELL/2;
+  let s=gridBG(2,1);
+  s+=chan(`M 0 ${m} L ${CELL} ${m}`);              // feeding/leaving straight on the branch
+  s+=chan(`M ${CELL} ${m} L ${CELL+m} ${m}`);      // the tee's branch spoke, W port → centre
+  s+=glyphFn(CELL+m,m,1,diverging);
+  return `<svg width="${2*CELL}" height="${CELL}" viewBox="0 0 ${2*CELL} ${CELL}">${s}</svg>`;
+}
+function big(glyphFn,diverging){
+  const S=3, W=(diverging===undefined?24:34)*2*S;
+  const c=W/2;
+  return `<svg width="${W}" height="${W}" viewBox="0 0 ${W} ${W}">${glyphFn(c,c,S,diverging)}</svg>`;
+}
+
+function panel(tag,title,note,glyphFn,roleAgnostic){
+  let h=`<div class="panel">
+    <div class="plabel"><span class="tag">${tag}</span> — ${title}</div>
+    <div class="note">${note}</div>
+    <div class="stagewrap">
+      <div class="vign">${vign(glyphFn,true)}<div class="cap">SPLIT · BRANCH — DIVERGING (UP + DOWN OUT)</div></div>
+      <div class="vign">${vign(glyphFn,false)}<div class="cap">MERGE · BRANCH — CONVERGING (UP + DOWN IN)</div></div>
+      <div class="vign"><div class="bigrow">
+        ${big(gUp)}${big(gDn)}${big(glyphFn,true)}${roleAgnostic?"":big(glyphFn,false)}
+      </div><div class="biglbl">FAMILY AT 3× — ⊙ · ⊗ · CANDIDATE${roleAgnostic?"":" (DIV / CONV)"}</div></div>
+    </div>
+  </div>`;
+  return h;
+}
+
+function boardHTML(){
+  let h=`<div class="panel">
+    <div class="plabel"><span class="tag">RULE</span> — SINGLE RING, PLAN-TRUE</div>
+    <div class="note">Settled: every vertical bore renders as <b>one concentric ring</b> — riser ×1
+    loses its ±7 pair, riser ×2 stays one ring per layer, vertical-run tees are one ring + aimed
+    spoke. Pass-throughs never conflict (rising = ⊙, descending = ⊗, both openings always agree).
+    This board decides the one case the pair carried real information: <b>branch-role vertical
+    tees</b>, where one bore holds two opposite flows.<br><br>
+    The trade to weigh: options 1 and 2 are <b>role-agnostic</b> — split·branch and merge·branch
+    wear the same mark, and the role reads from the variant chosen, the branch arrow in trace, or
+    the cut list. Option 3 keeps the distinction on the board but re-admits the offset for exactly
+    the case where it lies least — two openings genuinely doing different things.</div>
+  </div>`;
+
+  h+=panel("1","COMBINED — DOT + CROSS",
+    "Both marks in one ring: the core says rising, the arms say descending. Reads as a small star. "+
+    "Stays strictly inside the existing vocabulary — nothing new to learn, but the densest mark in "+
+    "the family at cell scale.",
+    gBoth1,true);
+
+  h+=panel("2","HALVED — SEMICIRCLE CORE",
+    "The dot cut in half: half rising, half not. Lightest mark of the three and unmistakable at a "+
+    "glance, but it is a <b>new symbol</b> — a third member of the ring family to learn, with no "+
+    "engineering-drawing precedent behind it.",
+    gBoth2,true);
+
+  h+=panel("3","PAIR — FOR THIS CASE ONLY",
+    "The ±7 pair survives solely where the two openings disagree. Keeps the split/merge distinction "+
+    "legible on the board (⊙ upper = diverging, ⊗ upper = converging) and stays honest to flow — at "+
+    "the price of one exception to the new plan-true rule.",
+    gBoth3,false);
+
+  return h;
+}
+
+function paint(){ document.getElementById("board").innerHTML=boardHTML(); }
+document.getElementById("tt").addEventListener("click",()=>{
+  const w=document.body.dataset.theme==="workshop";
+  document.body.dataset.theme=w?"":"workshop";
+  COL=PALETTES[w?"carbon":"workshop"];
+  paint();
+});
+paint();
+
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>PIPEGRID — Ring semantics: flow vs geometry</title>
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12151b; --panel2:#0e1116; --edge:#2c313d;
+    --text:#c7d3e2; --dim:#5f6775; --acc:#e0a14e;
+    --cpipe:#4a5568; --clum:#dfe6f0; --cline:rgba(140,160,185,0.13); --cflow:#ffc45e;
+  }
+  body[data-theme="workshop"]{
+    --bg:#e6dfcf; --panel:#efe9dc; --panel2:#f3eee2; --edge:#c9c0aa;
+    --text:#2a2a28; --dim:#8a8272; --acc:#e0771e;
+    --cpipe:#2a2a28; --clum:#efe9dc; --cline:rgba(90,80,60,0.22); --cflow:#e0771e;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  body{background:var(--bg);color:var(--text);
+       font-family:ui-monospace,SFMono-Regular,Menlo,monospace;-webkit-text-size-adjust:100%;
+       padding:14px;}
+  .hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:4px;flex-wrap:wrap;}
+  .title{font-size:15px;font-weight:700;letter-spacing:4px;}
+  .sub{font-size:9px;letter-spacing:1.5px;color:var(--dim);}
+  .themebtn{margin-left:auto;font-family:inherit;font-size:10px;letter-spacing:.5px;text-transform:uppercase;
+        padding:7px 9px;border:1px solid var(--edge);border-radius:4px;background:transparent;
+        color:var(--text);cursor:pointer;}
+  #board{display:flex;flex-direction:column;gap:12px;max-width:900px;margin-top:10px;}
+  .panel{border:1px solid var(--edge);border-radius:8px;background:var(--panel);padding:12px;}
+  .plabel{font-size:10px;font-weight:700;letter-spacing:2px;margin-bottom:2px;}
+  .plabel .tag{color:var(--acc);}
+  .note{font-size:9px;color:var(--dim);line-height:1.7;max-width:740px;margin:4px 0 10px;}
+  .note b{color:var(--text);font-weight:700;}
+  .grid{display:grid;grid-template-columns:150px repeat(6,72px);gap:5px;align-items:center;overflow-x:auto;}
+  .chead{font-size:7px;letter-spacing:1px;color:var(--dim);text-transform:uppercase;text-align:center;
+         line-height:1.5;align-self:end;padding-bottom:2px;}
+  .rhead{font-size:8px;letter-spacing:1.2px;color:var(--text);line-height:1.6;}
+  .rhead i{display:block;font-style:normal;color:var(--dim);font-size:7px;letter-spacing:1px;}
+  .cell{width:72px;height:64px;background:var(--panel2);border:1px solid var(--edge);border-radius:6px;
+        display:grid;place-items:center;}
+  .verdict{font-size:8px;letter-spacing:1px;text-align:center;color:var(--dim);}
+  .verdict b{color:var(--acc);}
+  .vpulse{animation:vpulse 1s ease-in-out infinite;}
+  @keyframes vpulse{50%{opacity:0.35;}}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <span class="title">PIPEGRID</span>
+  <span class="sub">RING SEMANTICS · FLOW vs GEOMETRY · SAME SIX SITUATIONS · STATIC BOARD</span>
+  <button class="themebtn" id="tt">Theme</button>
+</div>
+<div id="board"></div>
+<script>
+(function(){
+"use strict";
+const C=44, m=22;
+
+function chan(d){
+  return `<path d="${d}" fill="none" stroke="var(--cpipe)" stroke-width="20" stroke-linecap="round"/>`
+       + `<path d="${d}" fill="none" stroke="var(--clum)" stroke-width="8" stroke-linecap="round"/>`;
+}
+function ringOnly(){
+  return `<circle cx="${m}" cy="${m}" r="10" fill="var(--clum)" stroke="var(--cpipe)" stroke-width="5"/>`;
+}
+function mark(kind,col){
+  const K=col||"var(--cpipe)";
+  if(kind==="dot") return `<circle cx="${m}" cy="${m}" r="3.2" fill="${K}"/>`;
+  if(kind==="cross") return `<path d="M ${m-4.6} ${m-4.6} L ${m+4.6} ${m+4.6} M ${m-4.6} ${m+4.6} L ${m+4.6} ${m-4.6}" stroke="${K}" stroke-width="2.6" stroke-linecap="round"/>`;
+  return `<path d="M ${m-4} ${m-1.6} L ${m} ${m-5.6} L ${m+4} ${m-1.6}" fill="none" stroke="${K}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`
+       + `<path d="M ${m-4} ${m+1.6} L ${m} ${m+5.6} L ${m+4} ${m+1.6}" fill="none" stroke="${K}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`;
+}
+function vign(spokes,markKind,markCol,pulse){
+  let s=`<line x1="0" y1="0" x2="${C}" y2="0" stroke="var(--cline)"/><line x1="0" y1="${C}" x2="${C}" y2="${C}" stroke="var(--cline)"/>`
+       +`<line x1="0" y1="0" x2="0" y2="${C}" stroke="var(--cline)"/><line x1="${C}" y1="0" x2="${C}" y2="${C}" stroke="var(--cline)"/>`;
+  for(const sp of spokes) s+=chan(sp);
+  s+=`<g class="${pulse?'vpulse':''}">${ringOnly()}${mark(markKind,markCol)}</g>`;
+  return `<svg width="${C+8}" height="${C+8}" viewBox="-4 -4 ${C+8} ${C+8}">${s}</svg>`;
+}
+const SPK={none:[],w:[`M 0 ${m} L ${m} ${m}`],e:[`M ${m} ${m} L ${C} ${m}`],run:[`M 0 ${m} L ${C} ${m}`]};
+
+/* six situations: [column label, spokes, F-mark, G-mark, trace-mark] */
+const SIT=[
+ ["Elbow up<br>fed from ABOVE","w","cross","dot","cross"],
+ ["Branch \u25bc tee<br>fed from BELOW","run","dot","cross","dot"],
+ ["Riser \u00d71<br>rising","none","dot","chev","dot"],
+ ["Split\u00b7run \u21c5<br>rising","e","dot","chev","dot"],
+ ["Split\u00b7branch \u21c5<br>(diverging)","e","chev","chev","chev"],
+ ["Riser \u00d72<br>lower floor, rising","none","dot","cross","dot"]
+];
+
+function rowCells(idx,col,pulse){
+  return SIT.map(s=>`<div class="cell">${vign(SPK[s[1]],s[idx],col,pulse)}</div>`).join("");
+}
+function verdictCells(){
+  return SIT.map(s=>`<div class="verdict">${s[2]===s[3]?"agree":"<b>DIFFER</b>"}</div>`).join("");
+}
+
+function boardHTML(){
+  let h="";
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">BRIEF</span> — TWO MEANINGS FIGHTING OVER TWO MARKS</div>
+    <div class="note"><b>F · flow:</b> \u2299 = material rising toward you, \u2297 = descending —
+    io-dependent, changes when trace-taps walk a part. Shown with <b>amber marks</b>, the honest dress
+    for flow vocabulary (amber already means flow: arrows, inlet dots). <b>G · geometry:</b> \u2299 =
+    this opening faces UP, \u2297 = faces DOWN, chevrons = opens BOTH ways — fixed per part+pose,
+    flow-blind. Pipe-coloured, like the structure it describes. Same six situations below under each;
+    the third row is trace mode, where <b>both proposals show the same thing</b>: amber flow marks,
+    pulsing.</div>
+  </div>`;
+
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">GRID</span> — SIX SITUATIONS \u00d7 THREE READINGS</div>
+    <div class="grid">
+      <div></div>${SIT.map(s=>`<div class="chead">${s[0]}</div>`).join("")}
+      <div class="rhead">F \u00b7 FLOW \u00b7 STATIC<i>amber marks \u00b7 io-driven</i></div>${rowCells(2,"var(--cflow)",false)}
+      <div class="rhead">G \u00b7 GEOMETRY \u00b7 STATIC<i>pipe marks \u00b7 pose-driven</i></div>${rowCells(3,null,false)}
+      <div class="rhead">TRACE \u00b7 BOTH<i>amber flow \u00b7 pulsing</i></div>${rowCells(4,"var(--cflow)",true)}
+      <div></div>${verdictCells()}
+    </div>
+    <div class="note" style="margin-top:10px">Read column by column. Where they differ, ask which
+    answer you wanted while <b>building</b>, not tracing: the elbow fed from above — did you want
+    "material comes down" (F \u2297) or "this fitting opens upward" (G \u2299)? Your original
+    complaint was column 2: F prints \u2299 on a fitting that visibly opens downward.</div>
+  </div>`;
+
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">READING</span> — WHAT EACH BUYS, WHAT EACH COSTS</div>
+    <div class="note"><b>F keeps</b> rising/descending visible without entering trace, and marks stay
+    truthful mid-trace-walk (they follow io). But notice rows 1 and 3: <b>F's static picture IS the
+    trace picture</b> — static answers the flow question twice and never answers "what is this
+    fitting". Marks also mutate when a walk moves a role port, so the same placed object changes its
+    face.<br><br>
+    <b>G makes</b> the static board a true drawing of the kit: marks never change once placed, icons
+    and canvas agree forever (Elbow up is \u2299 everywhere, always), and the stacking question —
+    "which openings face me from the floor below?" — is answered at a glance. Chevrons simplify to one
+    rule: opens both ways (all pass-throughs, all riser-run tees). Costs: rising-vs-descending is one
+    trace toggle away instead of ambient, and it's a mid-project convention flip — every ring you've
+    learned re-reads.<br><br>
+    Two-colour grammar either way: <b>pipe-coloured = structure, amber = flow.</b> G uses both
+    registers in their places; F spends amber everywhere and leaves the structure register empty.</div>
+  </div>`;
+
+  return h;
+}
+
+function paint(){ document.getElementById("board").innerHTML=boardHTML(); }
+document.getElementById("tt").addEventListener("click",()=>{
+  document.body.dataset.theme=document.body.dataset.theme==="workshop"?"":"workshop";
+  paint();
+});
+paint();
+
+})();
+</script>
+</body>
+</html>

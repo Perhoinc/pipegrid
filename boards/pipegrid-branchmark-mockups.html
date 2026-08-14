@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>PIPEGRID — Both-ways ring · chevrons vs branch-shape</title>
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12151b; --panel2:#0e1116; --edge:#2c313d;
+    --text:#c7d3e2; --dim:#5f6775; --acc:#e0a14e;
+  }
+  body[data-theme="workshop"]{
+    --bg:#e6dfcf; --panel:#efe9dc; --panel2:#f3eee2; --edge:#c9c0aa;
+    --text:#2a2a28; --dim:#8a8272; --acc:#e0771e;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  body{background:var(--bg);color:var(--text);
+       font-family:ui-monospace,SFMono-Regular,Menlo,monospace;-webkit-text-size-adjust:100%;
+       padding:14px;}
+  .hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:4px;flex-wrap:wrap;}
+  .title{font-size:15px;font-weight:700;letter-spacing:4px;}
+  .sub{font-size:9px;letter-spacing:1.5px;color:var(--dim);}
+  .themebtn{margin-left:auto;font-family:inherit;font-size:10px;letter-spacing:.5px;text-transform:uppercase;
+        padding:7px 9px;border:1px solid var(--edge);border-radius:4px;background:transparent;
+        color:var(--text);cursor:pointer;}
+  #board{display:flex;flex-direction:column;gap:12px;max-width:760px;margin-top:10px;}
+  .panel{border:1px solid var(--edge);border-radius:8px;background:var(--panel);padding:12px;}
+  .plabel{font-size:10px;font-weight:700;letter-spacing:2px;margin-bottom:2px;}
+  .plabel .tag{color:var(--acc);}
+  .note{font-size:9px;color:var(--dim);line-height:1.7;max-width:660px;margin:4px 0 10px;}
+  .note b{color:var(--text);font-weight:700;}
+  .row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;}
+  .vign{background:var(--panel2);border:1px solid var(--edge);border-radius:8px;padding:10px;
+        display:inline-block;text-align:center;}
+  .cap{font-size:8px;letter-spacing:1px;color:var(--dim);margin-top:6px;}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <span class="title">PIPEGRID</span>
+  <span class="sub">BOTH-WAYS RING · CHEVRONS vs BRANCH-SHAPE · STATIC BOARD</span>
+  <button class="themebtn" id="tt">Theme</button>
+</div>
+<div id="board"></div>
+<script>
+(function(){
+"use strict";
+
+const PALETTES={
+  carbon:{pipe:"#4a5568",pipeHi:"#dfe6f0",line:"rgba(140,160,185,0.13)"},
+  workshop:{pipe:"#2a2a28",pipeHi:"#efe9dc",line:"rgba(90,80,60,0.22)"}
+};
+let COL=PALETTES.carbon;
+const CELL=44;
+
+function ring(cx,cy,s){
+  return `<circle cx="${cx}" cy="${cy}" r="${10*s}" fill="${COL.pipeHi}" stroke="${COL.pipe}" stroke-width="${5*s}"/>`;
+}
+function markDot(cx,cy,s){ return `<circle cx="${cx}" cy="${cy}" r="${3.2*s}" fill="${COL.pipe}"/>`; }
+function markCross(cx,cy,s){
+  const A=4.6*s;
+  return `<path d="M ${cx-A} ${cy-A} L ${cx+A} ${cy+A} M ${cx-A} ${cy+A} L ${cx+A} ${cy-A}" stroke="${COL.pipe}" stroke-width="${2.6*s}" stroke-linecap="round"/>`;
+}
+function gUp(cx,cy,s){ return ring(cx,cy,s)+markDot(cx,cy,s); }
+function gDn(cx,cy,s){ return ring(cx,cy,s)+markCross(cx,cy,s); }
+
+/* B2 — chevrons (the standing candidate) */
+function gChev(cx,cy,s){
+  let g=ring(cx,cy,s);
+  g+=`<path d="M ${cx-4*s} ${cy-1.6*s} L ${cx} ${cy-5.6*s} L ${cx+4*s} ${cy-1.6*s}" fill="none" stroke="${COL.pipe}" stroke-width="${2.4*s}" stroke-linecap="round" stroke-linejoin="round"/>`;
+  g+=`<path d="M ${cx-4*s} ${cy+1.6*s} L ${cx} ${cy+5.6*s} L ${cx+4*s} ${cy+1.6*s}" fill="none" stroke="${COL.pipe}" stroke-width="${2.4*s}" stroke-linecap="round" stroke-linejoin="round"/>`;
+  return g;
+}
+
+/* D1 — branch section, straight: stem from the spoke side into a full vertical bar (⊢) */
+/* stemDir: unit vector pointing from ring centre toward where the spoke enters */
+function gSectT(cx,cy,s,stemDir){
+  const dx=(stemDir&&stemDir[0])??-1, dy=(stemDir&&stemDir[1])??0;   // default: spoke from W
+  let g=ring(cx,cy,s);
+  g+=`<path d="M ${cx+dx*5*s} ${cy+dy*5*s} L ${cx} ${cy}" stroke="${COL.pipe}" stroke-width="${2.4*s}" stroke-linecap="round" fill="none"/>`;
+  g+=`<path d="M ${cx-dy*5*s} ${cy-dx*5*s} L ${cx+dy*5*s} ${cy+dx*5*s}" stroke="${COL.pipe}" stroke-width="${2.4*s}" stroke-linecap="round" fill="none"/>`;
+  return g;
+}
+
+/* D2 — branch section, arced: twin quarter-curves from the stem — miniature of the flat
+   split·branch icon (two arcs from one port) */
+function gSectArc(cx,cy,s,stemDir){
+  const dx=(stemDir&&stemDir[0])??-1, dy=(stemDir&&stemDir[1])??0;
+  const sx=cx+dx*5*s, sy=cy+dy*5*s;                 // stem tip at spoke side
+  const qx=cx-dx*2*s, qy=cy-dy*2*s;                 // control point past centre
+  const uax=cx-dx*2*s-dy*5*s, uay=cy-dy*2*s-dx*5*s; // up-arm end
+  const dax=cx-dx*2*s+dy*5*s, day=cy-dy*2*s+dx*5*s; // down-arm end
+  let g=ring(cx,cy,s);
+  g+=`<path d="M ${sx} ${sy} Q ${qx} ${qy} ${uax} ${uay}" fill="none" stroke="${COL.pipe}" stroke-width="${2.4*s}" stroke-linecap="round"/>`;
+  g+=`<path d="M ${sx} ${sy} Q ${qx} ${qy} ${dax} ${day}" fill="none" stroke="${COL.pipe}" stroke-width="${2.4*s}" stroke-linecap="round"/>`;
+  return g;
+}
+
+/* ---- vignette: split·branch vertical tee fed from the west ---- */
+function chan(d){
+  return `<path d="${d}" fill="none" stroke="${COL.pipe}" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>`+
+         `<path d="${d}" fill="none" stroke="${COL.pipeHi}" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>`;
+}
+function gridBG(cols,rows){
+  let s="";
+  for(let i=0;i<=cols;i++) s+=`<line x1="${i*CELL}" y1="0" x2="${i*CELL}" y2="${rows*CELL}" stroke="${COL.line}"/>`;
+  for(let i=0;i<=rows;i++) s+=`<line x1="0" y1="${i*CELL}" x2="${cols*CELL}" y2="${i*CELL}" stroke="${COL.line}"/>`;
+  return s;
+}
+function vign(markFn){
+  const m=CELL/2;
+  let s=gridBG(2,1);
+  s+=chan(`M 0 ${m} L ${CELL} ${m}`);
+  s+=chan(`M ${CELL} ${m} L ${CELL+m} ${m}`);
+  s+=markFn(CELL+m,m,1,[-1,0]);
+  return `<svg width="${2*CELL}" height="${CELL}" viewBox="0 0 ${2*CELL} ${CELL}">${s}</svg>`;
+}
+function vignN(markFn){        // spoke from the NORTH — shows the mark rotating with the nudge
+  const m=CELL/2;
+  let s=gridBG(1,2);
+  s+=chan(`M ${m} 0 L ${m} ${CELL}`);
+  s+=chan(`M ${m} ${CELL} L ${m} ${CELL+m}`);
+  s+=markFn(m,CELL+m,1,[0,-1]);
+  return `<svg width="${CELL}" height="${2*CELL}" viewBox="0 0 ${CELL} ${2*CELL}">${s}</svg>`;
+}
+function loupe(markFn,w,stemDir){
+  const W=w||96, s=3;
+  return `<svg width="${W}" height="${W}" viewBox="0 0 ${W} ${W}">${markFn(W/2,W/2,s,stemDir)}</svg>`;
+}
+
+function optPanel(tag,name,markFn,noteHtml,rotates){
+  return `<div class="panel">
+    <div class="plabel"><span class="tag">${tag}</span> — ${name}</div>
+    <div class="note">${noteHtml}</div>
+    <div class="row">
+      <div class="vign">${vign(markFn)}<div class="cap">1× — FED FROM W</div></div>
+      ${rotates?`<div class="vign">${vignN(markFn)}<div class="cap">1× — FED FROM N</div></div>`:""}
+      <div class="vign">${loupe(markFn,120,[-1,0])}<div class="cap">3× LOUPE</div></div>
+    </div>
+  </div>`;
+}
+
+function boardHTML(){
+  let h="";
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">BRIEF</span> — CHEVRONS vs BRANCH-SHAPE</div>
+    <div class="note">Same case as before: branch-role vertical tee, one bore, rising and descending
+    flow at once. Standing candidate B2 against the owner's proposal — <b>the branch's own shape as
+    the in-ring mark</b>: a section of the part, stem entering from the spoke side and dividing into
+    the two vertical arms. Two cuts of it below (straight ⊢ and arced), plus the reference marks.</div>
+    <div class="row">
+      <div class="vign">${loupe(gUp,72)}<div class="cap">⊙</div></div>
+      <div class="vign">${loupe(gDn,72)}<div class="cap">⊗</div></div>
+      <div class="vign">${loupe(gChev,72)}<div class="cap">B2</div></div>
+      <div class="vign">${loupe(gSectT,72,[-1,0])}<div class="cap">D1</div></div>
+      <div class="vign">${loupe(gSectArc,72,[-1,0])}<div class="cap">D2</div></div>
+    </div>
+  </div>`;
+
+  h+=optPanel("B2","CHEVRONS · UP + DOWN STACKED",gChev,
+    `The standing candidate, for direct comparison. Says only "both vertical directions" — nothing
+     about the part. Fixed orientation, never rotates. Faint echo of the layer ▲▼ buttons remains
+     its only vice.`,false);
+
+  h+=optPanel("D1","BRANCH SECTION · STRAIGHT ⊢",gSectT,
+    `The part itself as the mark: stem enters from the spoke side, vertical bar = the two arms of
+     the run. <b>Rotates with the nudge</b> (second vignette: fed from N), so mark and spoke always
+     agree — the ring becomes a true plan-section of the fitting. Reads as geometry, not flow: it
+     shows WHERE the branch is, and leaves rising/descending entirely to trace. Sober, systemic.`,true);
+
+  h+=optPanel("D2","BRANCH SECTION · TWIN ARCS",gSectArc,
+    `Same idea, drawn the way the flat split·branch icon draws itself — two curves peeling off one
+     stem. Strong family resemblance to the flyout icon language, and the fork shape whispers
+     "divides" where D1's ⊢ stays mute. At 1× the curves soften toward a blob sooner than D1's
+     right angles; judge on the device.`,true);
+
+  h+=`<div class="panel">
+    <div class="plabel"><span class="tag">NOTE</span> — WHAT EACH VOCABULARY COMMITS TO</div>
+    <div class="note">B2 keeps the ring a <b>flow instrument</b> (⊙ up, ⊗ down, chevrons both) —
+    consistent with "glyph shows flow, not the part". D1/D2 quietly change the rule for this one
+    case: the ring shows the <b>part's section</b>, flow deferred to trace. That's defensible —
+    it's exactly the case where flow is unsummarisable — but it is a second convention living
+    inside the first. If the section idea wins, it should probably win for its self-orienting
+    honesty (mark = fitting, rotates with the aim), not despite the rule change.</div>
+  </div>`;
+
+  return h;
+}
+
+function paint(){ document.getElementById("board").innerHTML=boardHTML(); }
+document.getElementById("tt").addEventListener("click",()=>{
+  const w=document.body.dataset.theme==="workshop";
+  document.body.dataset.theme=w?"":"workshop";
+  COL=PALETTES[w?"carbon":"workshop"];
+  paint();
+});
+paint();
+
+})();
+</script>
+</body>
+</html>

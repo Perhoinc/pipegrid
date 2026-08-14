@@ -1,0 +1,1822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>PIPEGRID</title>
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12151b; --panel2:#0e1116; --edge:#2c313d;
+    --text:#c7d3e2; --dim:#5f6775; --acc:#e0a14e; --danger:#ff5d55;
+    --icase:#8ea6bf; --ilum:#e8f2fc; --ifg:#c7d3e2; --onfg:#0b0d10;
+    --acctint:rgba(224,161,78,0.10); --dgredge:rgba(255,93,85,0.45);
+  }
+  body[data-theme="workshop"]{
+    --bg:#e6dfcf; --panel:#efe9dc; --panel2:#f3eee2; --edge:#c9c0aa;
+    --text:#2a2a28; --dim:#8a8272; --acc:#e0771e; --danger:#cf2f2a;
+    --icase:#2a2a28; --ilum:#efe9dc; --ifg:#2a2a28; --onfg:#efe9dc;
+    --acctint:rgba(224,119,30,0.12); --dgredge:rgba(207,47,42,0.45);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;overscroll-behavior:none;}
+  body{background:var(--bg);color:var(--text);
+       font-family:ui-monospace,SFMono-Regular,Menlo,monospace;-webkit-text-size-adjust:100%;}
+  #app{padding:10px;height:100%;display:flex;flex-direction:column;gap:8px;}
+  .hdr{display:flex;align-items:baseline;gap:10px;}
+  .title{font-size:15px;font-weight:700;letter-spacing:4px;color:var(--text);}
+  .status{display:flex;gap:14px;font-size:10px;letter-spacing:.5px;align-items:baseline;flex-wrap:wrap;}
+  .stat{display:flex;align-items:baseline;gap:5px;}
+  .stat .l{color:var(--dim);font-size:8px;letter-spacing:1px;}
+  .stat .v{font-size:13px;font-weight:700;}
+  .main{display:flex;gap:8px;flex:1;min-height:0;align-items:stretch;}
+  .rail{display:flex;flex-direction:column;gap:5px;align-items:center;padding:8px 6px;
+        border:1px solid var(--edge);border-radius:8px;background:var(--panel);overflow-y:auto;}
+  .rgap{height:10px;flex:none;}
+  .lread{font-size:10px;font-weight:700;letter-spacing:1px;color:var(--acc);flex:none;
+         min-width:30px;text-align:center;}
+  .rbtn{width:44px;height:44px;border:1px solid var(--edge);border-radius:6px;background:transparent;
+        display:grid;place-items:center;cursor:pointer;padding:0;flex:none;transition:all .12s;}
+  .rbtn:focus-visible{outline:2px solid var(--acc);outline-offset:2px;}
+  .rbtn.on{box-shadow:inset 3px 0 0 var(--acc);background:var(--acctint);}
+  .rbtn.danger svg path{stroke:var(--danger) !important;}
+  .flyout{display:none;flex-direction:column;gap:5px;align-items:center;padding:8px 6px;
+          border:1px solid var(--edge);border-radius:8px;background:var(--panel);overflow-y:auto;}
+  .flyout.open{display:flex;}
+  .rbtn.fly{width:82px;height:62px;flex-direction:column;display:flex;align-items:center;
+            justify-content:center;gap:3px;}
+  .flbl{font-size:7px;letter-spacing:1.1px;text-transform:uppercase;color:var(--dim);white-space:nowrap;}
+  .rbtn.on .flbl{color:var(--acc);}
+  .fdiv{width:70px;border-top:1px solid var(--edge);margin:3px 0;flex:none;}
+  .fhead{font-size:7px;letter-spacing:2px;color:var(--dim);flex:none;}
+  .poserow{display:flex;gap:4px;flex:none;}
+  .pbtn{width:48px;height:54px;border:1px solid var(--edge);border-radius:6px;background:transparent;
+        display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+        cursor:pointer;padding:0;flex:none;}
+  .pbtn .flbl{font-size:6.5px;}
+  .pbtn:focus-visible{outline:2px solid var(--acc);outline-offset:2px;}
+  .pbtn.on{box-shadow:inset 3px 0 0 var(--acc);background:var(--acctint);}
+  .pbtn.on .flbl{color:var(--acc);}
+  .selchip{display:none;position:absolute;right:14px;top:52px;z-index:5;
+           background:var(--panel);border:1px solid var(--edge);border-radius:6px;
+           padding:7px 10px;font-size:9px;letter-spacing:.8px;color:var(--text);
+           box-shadow:0 6px 20px rgba(0,0,0,.3);}
+  .selchip.open{display:block;}
+  .pad{display:inline-block;padding:1000px;}
+  .canvas{flex:1;background:var(--panel2);border:1px solid var(--edge);
+          border-radius:8px;padding:8px;overflow:auto;min-width:0;
+          touch-action:none;overscroll-behavior:contain;}
+  svg{display:block;touch-action:none;user-select:none;-webkit-user-select:none;}
+  #scene *{pointer-events:none;}
+  .settings{display:none;position:absolute;left:64px;bottom:14px;z-index:5;
+            background:var(--panel);border:1px solid var(--edge);border-radius:8px;padding:12px;
+            box-shadow:0 8px 30px rgba(0,0,0,.35);}
+  .settings.open{display:block;}
+  .settings .row{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
+  .settings .lbl{font-size:9px;letter-spacing:1.5px;color:var(--dim);width:56px;}
+  .sbtn{font-family:inherit;font-size:10px;letter-spacing:.5px;text-transform:uppercase;
+        padding:7px 9px;border:1px solid var(--edge);border-radius:4px;background:transparent;
+        color:var(--text);cursor:pointer;}
+  .sbtn.on{background:var(--acc);border-color:var(--acc);color:var(--onfg);}
+  .sbtn.danger{color:var(--danger);border-color:var(--dgredge);}
+  .step button{width:24px;height:24px;font-size:13px;border:1px solid var(--edge);border-radius:4px;
+               background:transparent;color:var(--text);cursor:pointer;font-family:inherit;}
+  .step span.v{width:20px;text-align:center;font-size:12px;display:inline-block;}
+  .hint{font-size:9px;color:var(--dim);line-height:1.6;max-width:250px;}
+  .flow-anim{stroke-dasharray:10 14;animation:flow 1s linear infinite;}
+  @keyframes flow{to{stroke-dashoffset:-24;}}
+  .vpulse{animation:vpulse 1s ease-in-out infinite;}
+  @keyframes vpulse{50%{opacity:0.35;}}
+  @media (prefers-reduced-motion:reduce){.flow-anim{animation:none;}}
+  @media (max-width:640px){
+    .main{flex-direction:column;}
+    .rail{flex-direction:row;overflow-x:auto;overflow-y:hidden;}
+    .rgap{height:auto;width:10px;}
+    .flyout{flex-direction:row;overflow-x:auto;}
+    .settings{left:10px;bottom:70px;}
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+(function(){
+"use strict";
+
+const CELL=44;
+const GLYPH_FAINT=0.3;                 // graded chevrons: the faint mouth
+const ELBOW_SPAN_DEAD=0.65;            // cells of travel before span 2 arms
+const XBEND_OFF=3;                     // bend-pair ring offset toward each feed side (px)
+const XB_RAMP=0.65;                    // shadow plateau start along the descending limb
+const XB_DKC=0.7, XB_DKL=0.4, XB_PIT=0.7;   // casing / lumen / bore-pit shade factors
+const XGEOS={xbranch:1,xcross:1,xover:1,xbend:1};   // the cross family
+function shade(hex,f){                 // mix a hex colour toward black by factor f
+  const n=parseInt(hex.slice(1),16);
+  const r=Math.round(((n>>16)&255)*(1-f)), g=Math.round(((n>>8)&255)*(1-f)), b=Math.round((n&255)*(1-f));
+  return "#"+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
+}
+let ZOOM=1;
+const PALETTES={
+  carbon:{pipe:"#4a5568",pipeHi:"#dfe6f0",flow:"#e0a14e",flowHi:"#ffc45e",
+          up:"#2b7e91",upHi:"#66e4ff",fconf:"#66e4ff",
+          conflict:"#ff5d55",open:"#ffd75e",line:"rgba(140,160,185,0.13)",
+          dim:"#5f6775",preview:"#3d6f9f",subfill:"rgba(120,140,165,0.08)"},
+  workshop:{pipe:"#2a2a28",pipeHi:"#efe9dc",flow:"#e0771e",flowHi:"#e0771e",
+          up:"#5a35a0",upHi:"#7141c9",fconf:"#7141c9",
+          conflict:"#cf2f2a",open:"#b3841c",line:"rgba(90,80,60,0.22)",
+          dim:"#8a8272",preview:"#6b7c8f",subfill:"rgba(42,42,40,0.06)"}
+};
+let COL=PALETTES.carbon;
+const DIRS=["N","E","S","W"];
+const DELTA={N:[-1,0],E:[0,1],S:[1,0],W:[0,-1]};
+const OPP={N:"S",S:"N",E:"W",W:"E",U:"D",D:"U"};
+const CW={N:"E",E:"S",S:"W",W:"N"};
+
+/* ==================================================================
+   PART CATALOGUE (small = single-cell parts)
+   Every port carries io: "in" | "out". dirs are indices into DIRS
+   before rotation; io aligned index-for-index with dirs.
+   streams (when present) = disjoint internal channels, toggled
+   independently; index pairs into the ports array.
+   ================================================================== */
+const CAT={
+  src:   {geo:"cap",    dirs:[0],       io:["out"]},
+  snk:   {geo:"cap",    dirs:[0],       io:["in"]},
+  tsplit: {geo:"tee",   dirs:[0,1,2],   io:["in","out","out"]},          // inlet on the run
+  tsplitb:{geo:"tee",   dirs:[0,1,2],   io:["out","in","out"]},          // inlet on the branch
+  tmerge: {geo:"tee",   dirs:[0,1,2],   io:["in","in","out"]},           // outlet on the run
+  tmergeb:{geo:"tee",   dirs:[0,1,2],   io:["in","out","in"]},           // outlet on the branch
+  xsplit:{geo:"xbranch",dirs:[0,1,2,3], io:["in","out","out","out"]},    // 1 -> 3
+  xmerge:{geo:"xbranch",dirs:[0,1,2,3], io:["out","in","in","in"]},      // 3 -> 1
+  xjunc: {geo:"xcross", dirs:[0,1,2,3], io:["in","out","in","out"]},     // N,S in; E,W out
+  vup:   {geo:"velbow", dirs:[0], io:["in","out"], v:"U"},   // horizontal in, turns UP
+  vdn:   {geo:"velbow", dirs:[0], io:["in","out"], v:"D"},   // horizontal in, turns DOWN
+  riser1:{geo:"riser1", dirs:[],  io:["in","out"]},          // pass-through: one layer, opens both ways
+  riser: {geo:"riser",  dirs:[],  io:["in","out"]},          // D in, U out (upflow base, two layers)
+  riser3:{geo:"riser3", dirs:[],  io:["in","out"]},          // three floors; middle is pure body
+  xover: {geo:"xover",  dirs:[0,1,2,3], io:["in","out","out","in"],      // v: N->S, h: W->E
+          streams:[[0,2],[1,3]]},
+  xbend: {geo:"xbend",  dirs:[0,1,2,3], io:["in","out","out","in"],      // N->E arc, W->S arc
+          streams:[[0,1],[2,3]]}
+};
+const SWAP={src:"snk",snk:"src",vup:"vup",vdn:"vdn",riser:"riser",riser1:"riser1",riser3:"riser3",tsplit:"tmerge",tmerge:"tsplit",tsplitb:"tmergeb",tmergeb:"tsplitb",
+            xsplit:"xmerge",xmerge:"xsplit",xjunc:"xjunc",
+            xover:"xover",xbend:"xbend"};
+const VARCAT={tsplit:"tee",tmerge:"tee",tsplitb:"tee",tmergeb:"tee",
+              xsplit:"cross",xmerge:"cross",xjunc:"cross",xover:"cross",xbend:"cross",
+              src:"cap",snk:"cap"};
+
+const state={rows:8,cols:8,tool:"straight",parts:[],nextId:1,
+             vari:{tee:"tsplit",cross:"xjunc",cap:"src"},pose:{tee:"flat",elbow:"flat",straight:"flat",cross:"flat"},sel:null,lastTool:"straight",theme:"carbon",layer:0,showFoot:false,showGhost:true,
+             showVal:true,drag:null,downCell:null};
+
+/* ---------- subcell occupancy ---------- */
+
+function cellSubs(r,c){
+  const si=2*c, sj=2*r;
+  return [si+","+sj,(si+1)+","+sj,si+","+(sj+1),(si+1)+","+(sj+1)];
+}
+function subsToCells(subs){
+  const seen=new Set(), cells=[];
+  for(const k of subs){ const [si,sj]=k.split(",").map(Number);
+    const key=(sj>>1)+","+(si>>1);
+    if(!seen.has(key)){ seen.add(key); cells.push({r:sj>>1,c:si>>1}); } }
+  return cells;
+}
+
+/* ---------- part builders ---------- */
+
+function makeStraight(r1,c1,r2,c2,axis,flowDir){
+  const cells=[]; let ports;
+  const horiz=(r1===r2&&c1===c2&&axis)?axis==="h":Math.abs(c2-c1)>=Math.abs(r2-r1);
+  if(horiz){
+    const a=Math.min(c1,c2), b=Math.max(c1,c2);
+    for(let c=a;c<=b;c++) cells.push({r:r1,c});
+    ports=[{r:r1,c:a,dir:"W"},{r:r1,c:b,dir:"E"}];
+    if(flowDir!=="E"&&flowDir!=="W") flowDir="E";
+  }else{
+    const a=Math.min(r1,r2), b=Math.max(r1,r2);
+    for(let r=a;r<=b;r++) cells.push({r,c:c1});
+    ports=[{r:a,c:c1,dir:"N"},{r:b,c:c1,dir:"S"}];
+    if(flowDir!=="N"&&flowDir!=="S") flowDir="S";
+  }
+  // flow travels toward flowDir: the port FACING flowDir is the outlet
+  for(const pt of ports) pt.io = (pt.dir===flowDir) ? "out" : "in";
+  const subs=new Set(); for(const cl of cells) for(const k of cellSubs(cl.r,cl.c)) subs.add(k);
+  return {type:"straight",flowDir,cells,ports,subs,layer:state.layer};
+}
+
+function makeSmall(kind,rot,r,c,ioArr,pose){
+  const def=CAT[kind];
+  const io=(ioArr&&ioArr.length===def.io.length)?ioArr.slice():def.io.slice();
+  const L=state.layer;
+  if(def.geo==="riser"){
+    const ports=[{r,c,dir:"D",io:io[0],layer:L},{r,c,dir:"U",io:io[1],layer:L+1}];
+    return {type:"small",kind,geo:"riser",rot:0,r,c,layer:L,layers:[L,L+1],
+            cells:[{r,c}],ports,io,subs:new Set(cellSubs(r,c))};
+  }
+  if(def.geo==="riser3"){
+    const ports=[{r,c,dir:"D",io:io[0],layer:L},{r,c,dir:"U",io:io[1],layer:L+2}];
+    return {type:"small",kind,geo:"riser3",rot:0,r,c,layer:L,layers:[L,L+1,L+2],
+            cells:[{r,c}],ports,io,subs:new Set(cellSubs(r,c))};
+  }
+  if(def.geo==="riser1"){
+    const ports=[{r,c,dir:"D",io:io[0],layer:L},{r,c,dir:"U",io:io[1],layer:L}];
+    return {type:"small",kind,geo:"riser1",rot:0,r,c,layer:L,
+            cells:[{r,c}],ports,io,subs:new Set(cellSubs(r,c))};
+  }
+  const ports=def.dirs.map((di,i)=>({r,c,dir:DIRS[(di+rot)%4],io:io[i]}));
+  if(def.v) ports.push({r,c,dir:def.v,io:io[io.length-1]});
+  const part={type:"small",kind,geo:def.geo,rot:rot%4,r,c,layer:L,cells:[{r,c}],
+          ports,io,subs:new Set(cellSubs(r,c))};
+  if(def.geo==="tee"){                 // pose: the same fitting, twisted about its ports
+    const po=pose||"flat"; part.pose=po;
+    if(po==="up") ports[1].dir="U";                         // branch opens upward
+    else if(po==="dn") ports[1].dir="D";                    // branch opens downward
+    else if(po==="rr"){ ports[0].dir="D"; ports[2].dir="U"; } // run goes vertical (default rising)
+  }
+  else if(XGEOS[def.geo]){             // crosses: one vertical pose, default rising
+    const po=pose||"flat"; part.pose=po;
+    if(po==="vert"){ ports[0].dir="D"; ports[2].dir="U"; }  // 0->D, 2->U (mirrors the tee convention)
+  }
+  return part;
+}
+
+function elbowSubLocal(N){
+  const subs=[], R2=(N-0.5)*(N-0.5), M=2*N;
+  for(let sj=0;sj<M;sj++) for(let si=0;si<M;si++){
+    const near=(si*0.5)*(si*0.5)+(sj*0.5)*(sj*0.5);
+    const far=((si+1)*0.5)*((si+1)*0.5)+((sj+1)*0.5)*((sj+1)*0.5);
+    if(near<=R2 && R2<=far) subs.push([si,sj]);
+  }
+  return subs;
+}
+function rot90sub(si,sj,M){ return [M-1-sj,si]; }
+function elbowPortsLocal(N,rot){
+  let ports=[[N-1,0,"N"],[0,N-1,"W"]];
+  const rc=(i,j)=>[N-1-j,i];
+  for(let k=0;k<rot;k++) ports=ports.map(p=>{const q=rc(p[0],p[1]);return [q[0],q[1],CW[p[2]]];});
+  return ports;
+}
+function makeElbow(N,rot,r,c,inIdx){
+  if(inIdx!==0&&inIdx!==1) inIdx=0;
+  let subs=elbowSubLocal(N);
+  const M=2*N;
+  for(let k=0;k<rot;k++) subs=subs.map(p=>rot90sub(p[0],p[1],M));
+  const ports=elbowPortsLocal(N,rot);
+  const corners=[[0,0],[N,0],[N,N],[0,N]], cc=corners[rot%4];
+  const subSet=new Set(subs.map(p=>(2*c+p[0])+","+(2*r+p[1])));
+  return { layer:state.layer,
+    type:"elbow", span:N, rot:rot%4, r, c, inIdx,
+    subs:subSet,
+    cells:subsToCells(subSet),
+    ports:ports.map((p,i)=>({r:r+p[1],c:c+p[0],dir:p[2],io:i===inIdx?"in":"out"})),
+    arc:{cx:c+cc[0], cy:r+cc[1], N}
+  };
+}
+function elbowByPort(N,rot,portR,portC,inIdx){
+  const prim=elbowPortsLocal(N,rot)[0];
+  let r=portR-prim[1], c=portC-prim[0];
+  r=Math.max(0,Math.min(state.rows-N,r));
+  c=Math.max(0,Math.min(state.cols-N,c));
+  return makeElbow(N,rot,r,c,inIdx);
+}
+/* ---------- port snapping: pressing an empty cell beside an open port
+   anchors the new part, pre-mated, pivoting from that connection ---------- */
+function snapAt(cell,px){
+  if(partAt(cell.r,cell.c)) return null;
+  const pm=portIoMap(), cands=[];
+  for(const d of DIRS){
+    const nr=cell.r+DELTA[d][0], nc=cell.c+DELTA[d][1];
+    if(nr<0||nr>=state.rows||nc<0||nc>=state.cols) continue;
+    const nb=pm.get(state.layer+"|"+nr+","+nc+","+OPP[d]);   // neighbour port facing into this cell
+    if(nb){
+      const xy=portXY({r:nr,c:nc,dir:OPP[d]});   // shared edge midpoint
+      cands.push({d,io:nb.io,x:xy.x,y:xy.y});
+    }
+  }
+  const cx=cell.c*CELL+CELL/2, cy=cell.r*CELL+CELL/2;
+  const below=pm.get((state.layer-1)+"|"+cell.r+","+cell.c+",U");
+  if(below) cands.push({d:"D",io:below.io,x:cx,y:cy});
+  const above=pm.get((state.layer+1)+"|"+cell.r+","+cell.c+",D");
+  if(above) cands.push({d:"U",io:above.io,x:cx,y:cy});
+  if(!cands.length) return null;
+  cands.sort((a,b)=>Math.hypot(a.x-px.x,a.y-px.y)-Math.hypot(b.x-px.x,b.y-px.y));
+  return cands[0];
+}
+const MAXSTRAIGHT=3;
+function segmentStraight(from,to,axis,flowDir){
+  // project the drag onto one axis, then cut into 3s from the press end (remainder lands far)
+  const horiz = axis ? axis==="h" : Math.abs(to.c-from.c)>=Math.abs(to.r-from.r);
+  const r1=from.r, c1=from.c;
+  const r2=horiz?from.r:to.r, c2=horiz?to.c:from.c;
+  const L=horiz?Math.abs(c2-c1)+1:Math.abs(r2-r1)+1;
+  const sr=Math.sign(r2-r1), sc=Math.sign(c2-c1);
+  const segs=[]; let off=0, rem=L;
+  while(rem>0){
+    const k=Math.min(MAXSTRAIGHT,rem);
+    segs.push(makeStraight(r1+sr*off, c1+sc*off,
+                           r1+sr*(off+k-1), c1+sc*(off+k-1),
+                           horiz?"h":"v", flowDir));
+    off+=k; rem-=k;
+  }
+  return segs;
+}
+function placeChain(segs){                       // all-or-nothing
+  for(const sv of segs) if(!fits(sv,null)) return false;
+  for(const sv of segs){ sv.id=state.nextId++; state.parts.push(sv); } return true;
+}
+function straightForSnap(from,toCell,snap){
+  if(snap.d==="U"||snap.d==="D") snap={d:"E",io:snap.io};  // vertical snap: fall back, axis free-ish
+  const horiz=(snap.d==="E"||snap.d==="W");
+  const away=OPP[snap.d], dv=DELTA[away];
+  const K=Math.max(0, horiz ? (toCell.c-from.c)*dv[1] : (toCell.r-from.r)*dv[0]);
+  const end={r:from.r+dv[0]*K, c:from.c+dv[1]*K};
+  const flowDir = snap.io==="out" ? away : snap.d;   // mate the connection
+  return segmentStraight(from,end,horiz?"h":"v",flowDir);   // chain, press end first
+}
+function smallForSnap(kind,cell,snap,dx,dy){
+  const def=CAT[kind], want=snap.io==="in"?"out":"in";
+  const pose=def.geo==="tee"?(state.pose.tee||"flat"):XGEOS[def.geo]?(state.pose.cross||"flat"):"flat";
+  const nudged=Math.abs(dx||0)>=CELL*0.18||Math.abs(dy||0)>=CELL*0.18;
+  const nd=nudged?(Math.abs(dx)>=Math.abs(dy)?(dx>0?"E":"W"):(dy>0?"S":"N")):null;
+  const idx=nd?DIRS.indexOf(nd):0;
+  if(snap.d==="U"||snap.d==="D"){
+    // a vertical snap constrains only the vertical port; the nudge still aims the horizontal one(s)
+    let rot=0;
+    if(def.geo==="velbow"&&nd) rot=idx;                         // horizontal port faces nudge
+    if(def.geo==="tee"&&pose!=="flat"&&nd)
+      rot=(pose==="rr")?(idx+3)%4:(idx+2)%4;                    // rr: branch to nudge; up/dn: flow with drag
+    if(XGEOS[def.geo]&&pose==="vert"&&nd) rot=(idx+3)%4;        // horizontal axis to the nudge
+    if((def.geo==="tee"||XGEOS[def.geo])&&pose!=="flat"){
+      const base=makeSmall(kind,rot,cell.r,cell.c,null,pose);
+      const vi=base.ports.findIndex(pt=>pt.dir===snap.d);
+      if(vi<0) return base;                                     // this pose has no such vertical port
+      if(base.io[vi]===want) return base;
+      const u=UNIQUE_IO[kind];
+      if(u){                                                    // walk the role port among LEGAL slots to mate
+        const other=u==="in"?"out":"in";
+        for(const k of (ROLE_SLOTS[kind]||[])){
+          const io=base.io.map(()=>other); io[k]=u;
+          if(io[vi]===want) return makeSmall(kind,rot,cell.r,cell.c,io,pose);
+        }
+      }
+      return base;                                              // contradictions place anyway + marker
+    }
+    const isR=def.geo==="riser"||def.geo==="riser1"||def.geo==="riser3";
+    const vdir=isR?snap.d:def.v;                                // risers offer both ends
+    if(vdir!==snap.d&&!isR) return makeSmall(kind,rot,cell.r,cell.c);   // can't mate; place plain
+    const vIdx=isR?(snap.d==="D"?0:1):def.io.length-1;
+    let io=def.io.slice();
+    if(io[vIdx]!==want) io=io.map(v=>v==="in"?"out":"in");      // flip whole part to mate
+    return makeSmall(kind,rot,cell.r,cell.c,io);
+  }
+  let best=null;
+  const u=UNIQUE_IO[kind], other=u==="in"?"out":"in";
+  for(let rot=0;rot<4;rot++){
+    const ios=[null];                               // default io first (preferred on ties)
+    if(u) for(const k of (ROLE_SLOTS[kind]||[])){   // ...then LEGAL role-port walks (variant never changes)
+      const io=def.io.map(()=>other); io[k]=u;
+      if(io.join()!==def.io.join()) ios.push(io);
+    }
+    for(const io of ios){
+      const probe=makeSmall(kind,rot,cell.r,cell.c,io,pose);    // pose-mapped ports
+      for(let i=0;i<probe.ports.length;i++){
+        const pt=probe.ports[i];
+        if(pt.dir!==snap.d) continue;
+        const ok=pt.io===want;
+        let nsc=0;                                  // the snap anchors ONE port; the nudge swings the rest
+        if(nd) for(const q of probe.ports){
+          if(q===pt||q.dir==="U"||q.dir==="D") continue;
+          if(q.dir===nd) nsc=Math.max(nsc, q===probe.ports[1]?3:2);   // branch toward nudge wins
+          else if(q.dir!==OPP[nd]) nsc=Math.max(nsc,1);
+        }
+        const sc=(ok?10:0)+nsc;                     // mating always dominates aiming
+        if(!best||sc>best.sc) best={rot,io,sc};
+      }
+    }
+  }
+  return best?makeSmall(kind,best.rot,cell.r,cell.c,best.io,pose):makeSmall(kind,0,cell.r,cell.c,null,pose);
+}
+const MAXSPAN=6;
+function buildElbowAt(A,D1,D2,N){
+  const want0=OPP[D1], want1=D2;
+  for(let rot=0;rot<4;rot++){
+    const pl=elbowPortsLocal(N,rot);
+    for(let k=0;k<2;k++){
+      if(pl[k][2]===want0 && pl[1-k][2]===want1)
+        return makeElbow(N,rot,A.r-pl[k][1],A.c-pl[k][0],k); // press end = inlet
+    }
+  }
+  return null;
+}
+function elbowFromGesture(A,dxPx,dyPx,toCell,D1lock,snap){
+  const adx=Math.abs(dxPx), ady=Math.abs(dyPx);
+  if(!snap && toCell.r===A.r && toCell.c===A.c && Math.max(adx,ady)<CELL*0.18) return null;
+  if(snap&&(snap.d==="U"||snap.d==="D")) snap=null;      // elbows ignore vertical snaps
+  const D1 = snap ? OPP[snap.d]
+           : (D1lock || (adx>=ady ? (dxPx>0?"E":"W") : (dyPx>0?"S":"N")));
+  const perp = (D1==="E"||D1==="W") ? dyPx : dxPx;
+  const D2 = Math.abs(perp)>=2 ? ((D1==="E"||D1==="W") ? (perp>0?"S":"N") : (perp>0?"E":"W"))
+                               : CW[D1];               // undecided curl: default clockwise
+  const proj=(D1==="E"||D1==="W")?adx:ady;        // press-relative travel along the locked axis
+  const T1=CELL*ELBOW_SPAN_DEAD;
+  const N=Math.min(MAXSPAN, proj<T1 ? 1 : 1+Math.ceil((proj-T1)/CELL));
+  let pv=buildElbowAt(A,D1,D2,N);
+  if(pv && snap && snap.io==="in") pv=flippedCopy(pv); // neighbour expects our OUT
+  return pv;
+}
+function smallFromGesture(kind,A,dx,dy){
+  const adx=Math.abs(dx), ady=Math.abs(dy);
+  const nudged=Math.max(adx,ady)>=CELL*0.18;
+  const dir = adx>=ady ? (dx>0?"E":"W") : (dy>0?"S":"N");
+  const idx=DIRS.indexOf(dir);
+  let rot=0, io=null;
+  const xpose=XGEOS[CAT[kind].geo]?(state.pose.cross||"flat"):"flat";
+  if(xpose==="vert"){
+    if(nudged) rot=(idx+3)%4;                        // horizontal axis to the nudge
+    return makeSmall(kind,rot,A.r,A.c,null,poseFor(kind));
+  }
+  if(kind==="xover"){
+    io=CAT.xover.io.slice();
+    if(nudged){
+      if(dir==="W"){ io[1]="in"; io[3]="out"; }        // h: E -> W
+      else if(dir==="N"){ io[0]="out"; io[2]="in"; }   // v: S -> N
+    }
+  }else if(nudged){
+    if(CAT[kind].geo==="riser") rot=0;                            // riser has no orientation
+    else if(CAT[kind].geo==="velbow") rot=idx;                     // horizontal port faces nudge
+    else if(kind==="src"||kind==="snk") rot=idx;                   // port faces nudge
+    else if(CAT[kind].geo==="tee"){
+      const po=state.pose.tee||"flat";
+      rot=(po==="up"||po==="dn")?(idx+2)%4:(idx+3)%4;           // posed: flow travels with drag; flat/rr: branch faces nudge
+    }
+    else if(kind==="xsplit"||kind==="xmerge") rot=idx;            // single-role port faces nudge
+    else if(kind==="xjunc") rot=(idx%2===0)?0:1;                  // in-axis along nudge
+    else rot=idx;                                                 // xbend
+  }
+  return makeSmall(kind,rot,A.r,A.c,io,poseFor(kind));
+}
+
+/* ---------- flow helpers ---------- */
+
+function portLayer(p,pt){ return pt.layer!==undefined?pt.layer:p.layer; }
+function portIoMap(){
+  const m=new Map();
+  for(const p of state.parts) for(const pt of p.ports)
+    m.set(portLayer(p,pt)+"|"+pt.r+","+pt.c+","+pt.dir,{id:p.id,io:pt.io});
+  return m;
+}
+function mateKey(p,pt){                       // where this port's partner would live
+  const L=portLayer(p,pt);
+  if(pt.dir==="U") return (L+1)+"|"+pt.r+","+pt.c+",D";
+  if(pt.dir==="D") return (L-1)+"|"+pt.r+","+pt.c+",U";
+  const [dr,dc]=DELTA[pt.dir];
+  return L+"|"+(pt.r+dr)+","+(pt.c+dc)+","+OPP[pt.dir];
+}
+function flowClashCount(p){
+  const pm=portIoMap(); let n=0;
+  for(const pt of p.ports){
+    const nb=pm.get(mateKey(p,pt));
+    if(nb && nb.id!==p.id && nb.io===pt.io) n++;
+  }
+  return n;
+}
+function flippedCopy(p){
+  if(p.type==="straight"){
+    const a=p.cells[0], b=p.cells[p.cells.length-1];
+    const axis=p.ports[0].dir==="W"?"h":"v";
+    const np=makeStraight(a.r,a.c,b.r,b.c,axis,OPP[p.flowDir]); np.layer=p.layer; return np;
+  }
+  if(p.type==="elbow"){ const np=makeElbow(p.span,p.rot,p.r,p.c,p.inIdx===0?1:0); np.layer=p.layer; return np; }
+  const np=makeSmall(SWAP[p.kind]||p.kind,p.rot,p.r,p.c,p.io.map(v=>v==="in"?"out":"in"),p.pose);
+  return rehome(np,p);
+}
+function rehome(np,p){                        // copies keep the original part's layer(s)
+  np.layer=p.layer;
+  if(np.layers) np.layers=np.layers.map((_,i)=>p.layer+i);
+  if(np.geo==="riser") np.ports.forEach((pt,i)=>pt.layer=p.layer+i);
+  else if(np.geo==="riser3"){ np.ports[0].layer=p.layer; np.ports[1].layer=p.layer+2; }
+  else if(np.geo==="riser1") np.ports.forEach(pt=>pt.layer=p.layer);
+  return np;
+}
+function autoOrient(p){                      // new part bends to an existing neighbour's flow
+  // never override identity: if reversal would be a DIFFERENT catalogue entry
+  // (source->sink, splitter->merger), the user's variant choice stands
+  if(p.type==="small" && SWAP[p.kind]!==p.kind) return p;
+  if(flowClashCount(p)===0) return p;
+  const q=flippedCopy(p);
+  if(flowClashCount(q)===0) return q;
+  return p;                                  // contradictory neighbours: keep gesture, mark it
+}
+const UNIQUE_IO={tsplit:"in",tsplitb:"in",tmerge:"out",tmergeb:"out",xsplit:"in",xmerge:"out"};
+const ROLE_SLOTS={tsplit:[0,2],tmerge:[0,2],        // run-role: walk between run ends only
+                  tsplitb:[1],tmergeb:[1],          // branch-role: pinned
+                  xsplit:[0,1,2,3],xmerge:[0,1,2,3]};   // four identical arms: walking = rotating
+function togglePart(p){                      // trace-mode tap: affects ONLY this part
+  const def=p.type==="small"?CAT[p.kind]:null;
+  let np;
+  if(def&&def.streams){                      // two streams -> step through all 4 patterns
+    let idx=0;
+    def.streams.forEach((st,k)=>{ if(p.io[st[0]]!==def.io[st[0]]) idx|=(1<<k); });
+    const seq=[0,1,3,2];                     // Gray order: one stream flips per tap
+    const next=seq[(seq.indexOf(idx)+1)%4];
+    const io=def.io.slice();
+    def.streams.forEach((st,k)=>{
+      if(next&(1<<k)) for(const i of st) io[i]=io[i]==="in"?"out":"in";
+    });
+    np=makeSmall(p.kind,p.rot,p.r,p.c,io,p.pose);
+  }else if(def&&UNIQUE_IO[p.kind]){          // splitter/merger: the role port walks its LEGAL slots
+    const u=UNIQUE_IO[p.kind], other=u==="in"?"out":"in";
+    const slots=ROLE_SLOTS[p.kind]||p.io.map((_,i)=>i);
+    if(slots.length<2) return p;             // branch-role: pinned; nothing legal to flip
+    const cur=slots.indexOf(p.io.indexOf(u));
+    const io=p.io.map(()=>other);
+    io[slots[(cur+1)%slots.length]]=u;
+    np=makeSmall(p.kind,p.rot,p.r,p.c,io,p.pose);   // kind never changes; variant never changes
+  }else{
+    np=flippedCopy(p);
+  }
+  np.id=p.id;
+  const i=state.parts.indexOf(p);
+  if(i>=0) state.parts[i]=np;
+  return np;
+}
+
+/* ---------- undo / redo ---------- */
+
+const history=[], future=[];
+function serialize(){
+  return JSON.stringify({rows:state.rows,cols:state.cols,
+    parts:state.parts.map(p=> p.type==="straight"
+      ?{t:"s",a:p.cells[0],b:p.cells[p.cells.length-1],x:p.ports[0].dir==="W"?"h":"v",f:p.flowDir,l:p.layer}
+      :p.type==="elbow"?{t:"e",N:p.span,rot:p.rot,r:p.r,c:p.c,fi:p.inIdx,l:p.layer}
+      :{t:"m",k:p.kind,rot:p.rot,r:p.r,c:p.c,io:p.io,l:p.layer,po:(p.pose&&p.pose!=="flat")?p.pose:undefined})});
+}
+function mutate(fn){
+  const pre=serialize(); fn();
+  if(serialize()!==pre){ history.push(pre); if(history.length>60) history.shift();
+    future.length=0; saveLocal(); }
+}
+function restore(json){
+  const s=JSON.parse(json);
+  state.sel=null;
+  state.rows=s.rows; state.cols=s.cols;
+  state.parts=s.parts.map(d=>{ let p;
+    if(d.t==="s") p=makeStraight(d.a.r,d.a.c,d.b.r,d.b.c,d.x,d.f);
+    else if(d.t==="e") p=makeElbow(d.N,d.rot,d.r,d.c,d.fi);
+    else p=makeSmall(d.k,d.rot,d.r,d.c,d.io,d.po);
+    rehome(p,{layer:d.l||0});
+    p.id=state.nextId++; return p; });
+  const vr=document.getElementById("vrow"), vc=document.getElementById("vcol");
+  if(vr) vr.textContent=state.rows;
+  if(vc) vc.textContent=state.cols;
+  render();
+}
+const LS_KEY="pipegrid.board.v1";
+function boardDoc(){                       // schema-stamped envelope around serialize()
+  return JSON.stringify({app:"pipegrid",v:3,theme:state.theme,foot:state.showFoot,ghost:state.showGhost,board:JSON.parse(serialize())});
+}
+function saveLocal(){
+  try{ localStorage.setItem(LS_KEY,boardDoc()); }catch(_){}
+}
+function applyDoc(doc){                    // validate + restore; returns true on success
+  if(!doc||doc.app!=="pipegrid"||typeof doc.v!=="number"||doc.v>3) return false;
+  const b=doc.board;
+  if(!b||!Array.isArray(b.parts)||!(b.rows>=3)||!(b.cols>=3)) return false;
+  restore(JSON.stringify(b));
+  if(typeof doc.foot==="boolean") state.showFoot=doc.foot;
+  if(typeof doc.ghost==="boolean") state.showGhost=doc.ghost;
+  if(doc.theme&&PALETTES[doc.theme]) applyTheme(doc.theme);
+  return true;
+}
+function loadLocal(){
+  try{ const raw=localStorage.getItem(LS_KEY);
+    if(!raw) return false;
+    return applyDoc(JSON.parse(raw));
+  }catch(_){ return false; }
+}
+function exportFile(){
+  const d=new Date(), pad=n=>String(n).padStart(2,"0");
+  const name=`pipegrid-${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}.json`;
+  const blob=new Blob([boardDoc()],{type:"application/json"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url; a.download=name;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(url); },400);
+}
+function importFile(file,btn){
+  const rd=new FileReader();
+  rd.onload=()=>{
+    let ok=false;
+    const pre=serialize();
+    try{ ok=applyDoc(JSON.parse(rd.result)); }catch(_){}
+    if(ok){ history.push(pre); if(history.length>60) history.shift();
+      future.length=0; saveLocal(); }                 // import is one undoable step
+    if(btn){ btn.textContent=ok?"Loaded \u2713":"Invalid file";
+      setTimeout(()=>{ btn.textContent="Load file"; },1500); }
+  };
+  rd.readAsText(file);
+}
+function undo(){ if(!history.length) return; future.push(serialize()); restore(history.pop()); saveLocal(); }
+function redo(){ if(!future.length) return; history.push(serialize()); restore(future.pop()); saveLocal(); }
+
+/* ---------- move ---------- */
+
+function translatePart(p,dr,dc){
+  if(p.type==="straight"){
+    const a=p.cells[0], b=p.cells[p.cells.length-1];
+    const axis=p.ports[0].dir==="W"?"h":"v";
+    const np=makeStraight(a.r+dr,a.c+dc,b.r+dr,b.c+dc,axis,p.flowDir); np.layer=p.layer; return np;
+  }
+  if(p.type==="elbow"){ const np=makeElbow(p.span,p.rot,p.r+dr,p.c+dc,p.inIdx); np.layer=p.layer; return np; }
+  return rehome(makeSmall(p.kind,p.rot,p.r+dr,p.c+dc,p.io,p.pose),p);
+}
+
+/* ---------- collision / lookup ---------- */
+
+function occupies(p,layer){ return (p.layers||[p.layer]).includes(layer); }
+function occSubs(exceptId,layer){
+  const s=new Set();
+  for(const p of state.parts){ if(p.id===exceptId||!occupies(p,layer)) continue;
+    for(const k of p.subs) s.add(k); }
+  return s;
+}
+function inBounds(cells){ return cells.every(cl=>cl.r>=0&&cl.r<state.rows&&cl.c>=0&&cl.c<state.cols); }
+function fits(part,exceptId){
+  if(!inBounds(part.cells)) return false;
+  for(const L of (part.layers||[part.layer])){
+    const o=occSubs(exceptId,L);
+    for(const k of part.subs) if(o.has(k)) return false;
+  }
+  return true;
+}
+function partAt(r,c){
+  const keys=cellSubs(r,c);
+  for(const p of state.parts){ if(!occupies(p,state.layer)) continue;
+    for(const k of keys) if(p.subs.has(k)) return p; }
+  return null;
+}
+
+/* ---------- validation ---------- */
+
+function portMap(){
+  const m=new Map();
+  for(const p of state.parts) for(const pt of p.ports) m.set(pt.r+","+pt.c+","+pt.dir,p.id);
+  return m;
+}
+function facingSubs(r,c,side){
+  const si=2*c, sj=2*r;
+  if(side==="N") return [si+","+sj,(si+1)+","+sj];
+  if(side==="S") return [si+","+(sj+1),(si+1)+","+(sj+1)];
+  if(side==="W") return [si+","+sj,si+","+(sj+1)];
+  return [(si+1)+","+sj,(si+1)+","+(sj+1)];
+}
+function validate(){
+  const pm=portIoMap(), open=[], conflict=[], flow=[];
+  for(const p of state.parts) for(const pt of p.ports){
+    if(pt.dir==="U"||pt.dir==="D"){
+      const L=portLayer(p,pt);
+      const cx=pt.c*CELL+CELL/2, cy=pt.r*CELL+CELL/2;
+      const nb=pm.get(mateKey(p,pt));
+      if(nb){
+        if(nb.io===pt.io && pt.dir==="U")               // dedupe: report from the U side
+          flow.push({x:cx,y:cy,layer:L});
+        continue;
+      }
+      // unmated: blocked if the adjacent floor's cell is occupied without a mating port
+      const adjL=pt.dir==="U"?L+1:L-1;
+      let blocked=false;
+      const keys=cellSubs(pt.r,pt.c);
+      for(const q of state.parts){ if(q.id===p.id||!occupies(q,adjL)) continue;
+        if(keys.some(k=>q.subs.has(k))){ blocked=true; break; } }
+      (blocked?conflict:open).push({x:cx,y:cy,layer:L});
+      continue;
+    }
+    const [dr,dc]=DELTA[pt.dir], nr=pt.r+dr, nc=pt.c+dc, xy=portXY(pt);
+    if(nr<0||nr>=state.rows||nc<0||nc>=state.cols){ open.push({...xy,layer:p.layer}); continue; }
+    const nb=pm.get(p.layer+"|"+nr+","+nc+","+OPP[pt.dir]);
+    if(nb){
+      if(nb.io===pt.io && (pt.dir==="E"||pt.dir==="S"))   // out-out or in-in, dedupe per edge
+        flow.push({x:(pt.dir==="E")?(pt.c+1)*CELL:pt.c*CELL+CELL/2,
+                   y:(pt.dir==="E")?pt.r*CELL+CELL/2:(pt.r+1)*CELL, layer:p.layer});
+      continue;
+    }
+    const facing=facingSubs(nr,nc,OPP[pt.dir]);
+    let blocked=false;
+    for(const q of state.parts){ if(q.id===p.id||q.layer!==p.layer) continue;
+      if(facing.some(k=>q.subs.has(k))){ blocked=true; break; } }
+    (blocked?conflict:open).push({...xy,layer:p.layer});
+  }
+  return {open,conflict,flow};
+}
+
+/* ---------- px geometry ---------- */
+
+function portXY(p){
+  const x=p.c*CELL, y=p.r*CELL;
+  if(p.dir==="N") return {x:x+CELL/2,y};
+  if(p.dir==="S") return {x:x+CELL/2,y:y+CELL};
+  if(p.dir==="E") return {x:x+CELL,y:y+CELL/2};
+  return {x,y:y+CELL/2};
+}
+function arcSeg(CX,CY,R,x1,y1,x2,y2,move){
+  let a1=Math.atan2(y1-CY,x1-CX), a2=Math.atan2(y2-CY,x2-CX), d=a2-a1;
+  while(d>Math.PI)d-=2*Math.PI; while(d<-Math.PI)d+=2*Math.PI;
+  let s="";
+  for(let k=0;k<=12;k++){ const t=a1+d*k/12;
+    s+=((k===0&&move!==false)?"M ":" L ")+(CX+R*Math.cos(t)).toFixed(1)+" "+(CY+R*Math.sin(t)).toFixed(1); }
+  return s;
+}
+function cornerOf(x,y,d1,d2){       // px corner of cell (x,y origin) adjacent to both edges
+  const cx = (d1==="E"||d2==="E") ? x+CELL : x;
+  const cy = (d1==="S"||d2==="S") ? y+CELL : y;
+  return {cx,cy};
+}
+function partPath(p){
+  // Every path is parameterized inlet -> outlet, so the dash animation
+  // travels in the true direction of flow.
+  if(p.type==="straight"){
+    const a=portXY(p.ports.find(t=>t.io==="in"));
+    const b=portXY(p.ports.find(t=>t.io==="out"));
+    return `M ${a.x} ${a.y} L ${b.x} ${b.y}`;
+  }
+  if(p.type==="elbow"){
+    const R=(p.arc.N-0.5)*CELL, CX=p.arc.cx*CELL, CY=p.arc.cy*CELL;
+    const a=portXY(p.ports[p.inIdx]), b=portXY(p.ports[1-p.inIdx]);
+    return arcSeg(CX,CY,R,a.x,a.y,b.x,b.y);
+  }
+  const x=p.c*CELL, y=p.r*CELL, m=CELL/2;
+  const cx=x+m, cy=y+m;
+  const spoke=pt=>{const e=portXY(pt);
+    return pt.io==="in"?`M ${e.x} ${e.y} L ${cx} ${cy}`:`M ${cx} ${cy} L ${e.x} ${e.y}`;};
+  const byDir=d=>p.ports.find(t=>t.dir===d);
+  const g=p.geo;
+  if(g==="riser"||g==="riser3") return "";         // drawn entirely by the glyph pass
+  if(g==="velbow") return spoke(p.ports[0]);       // horizontal stub, flow-ordered
+  if(g==="cap") return spoke(p.ports[0]);
+  if(g==="tee"&&p.pose&&p.pose!=="flat"){
+    // posed tee: vertical ports are the glyph's story; horizontal channels = flow-ordered spokes
+    return p.ports.filter(t=>t.dir!=="U"&&t.dir!=="D").map(spoke).join(" ");
+  }
+  if(g==="tee"){
+    const uRole=UNIQUE_IO[p.kind];
+    const S=p.ports.find(t=>t.io===uRole);
+    if(!S) return p.ports.map(spoke).join(" ");          // malformed io: fall back
+    const U=S.dir, u=portXY(S);
+    const segs=[];
+    for(const pt of p.ports){
+      if(pt===S) continue;
+      const e=portXY(pt);
+      if(pt.dir===OPP[U]){                               // opposite port: straight channel
+        segs.push(S.io==="in" ? `M ${u.x} ${u.y} L ${e.x} ${e.y}`
+                              : `M ${e.x} ${e.y} L ${u.x} ${u.y}`);
+      }else{                                             // adjacent port: quarter arc
+        const co=cornerOf(x,y,U,pt.dir);
+        segs.push(S.io==="in" ? arcSeg(co.cx,co.cy,m,u.x,u.y,e.x,e.y)
+                              : arcSeg(co.cx,co.cy,m,e.x,e.y,u.x,u.y));
+      }
+    }
+    return segs.join(" ");
+  }
+  if(XGEOS[g]&&p.pose==="vert"){
+    if(g==="xbend"){                                 // twin elbows: U-limb here; D-limb lives in the under pass
+      const hU=p.ports[3], e=portXY(hU), v=DELTA[hU.dir];
+      const rx=cx+v[1]*XBEND_OFF, ry=cy+v[0]*XBEND_OFF;
+      return hU.io==="in"?`M ${e.x} ${e.y} L ${rx} ${ry}`:`M ${rx} ${ry} L ${e.x} ${e.y}`;
+    }
+    if(g==="xover"){                                 // the run breaks in a gap straddling the bore
+      const seg=pt=>{const e=portXY(pt), v=DELTA[pt.dir];
+        const gx=cx+v[1]*16, gy=cy+v[0]*16;
+        return pt.io==="in"?`M ${e.x} ${e.y} L ${gx} ${gy}`:`M ${gx} ${gy} L ${e.x} ${e.y}`;};
+      return seg(p.ports[1])+" "+seg(p.ports[3]);
+    }
+    return p.ports.filter(t=>t.dir!=="U"&&t.dir!=="D").map(spoke).join(" ");   // mixing hub
+  }
+  if(g==="xcross") return p.ports.map(spoke).join(" ");
+  if(g==="xbranch"){
+    const uRole=UNIQUE_IO[p.kind]||"in";
+    const S=p.ports.find(t=>t.io===uRole)||p.ports[0];   // the single-role end, wherever it walked
+    const U=S.dir, D=OPP[U];
+    const ui=DIRS.indexOf(U);
+    const Ld=DIRS[(ui+3)%4], Rd=DIRS[(ui+1)%4];
+    const u=portXY(S), d=portXY(byDir(D)), l=portXY(byDir(Ld)), r=portXY(byDir(Rd));
+    const c1=cornerOf(x,y,U,Rd), c2=cornerOf(x,y,U,Ld);
+    if(S.io==="in")                            // splitter: everything runs away from u
+      return `M ${u.x} ${u.y} L ${d.x} ${d.y} `+
+        arcSeg(c1.cx,c1.cy,m,u.x,u.y,r.x,r.y)+" "+
+        arcSeg(c2.cx,c2.cy,m,u.x,u.y,l.x,l.y);
+    return `M ${d.x} ${d.y} L ${u.x} ${u.y} `+  // merger: everything runs toward u
+      arcSeg(c1.cx,c1.cy,m,r.x,r.y,u.x,u.y)+" "+
+      arcSeg(c2.cx,c2.cy,m,l.x,l.y,u.x,u.y);
+  }
+  if(g==="xover"){
+    const N=byDir("N"),S_=byDir("S"),W=byDir("W"),E_=byDir("E");
+    const n=portXY(N),s_=portXY(S_),w=portXY(W),e=portXY(E_);
+    const v = N.io==="in" ? `M ${n.x} ${n.y} L ${s_.x} ${s_.y}`
+                          : `M ${s_.x} ${s_.y} L ${n.x} ${n.y}`;
+    const h = W.io==="in"
+      ? `M ${w.x} ${w.y} L ${cx-9} ${cy} M ${cx+9} ${cy} L ${e.x} ${e.y}`
+      : `M ${e.x} ${e.y} L ${cx+9} ${cy} M ${cx-9} ${cy} L ${w.x} ${w.y}`;
+    return v+" "+h;
+  }
+  if(g==="xbend"){
+    const pair=(d1,d2)=>{
+      const P1=byDir(d1),P2=byDir(d2);
+      const a=portXY(P1),b=portXY(P2);
+      const co=cornerOf(x,y,d1,d2);
+      return P1.io==="in"?arcSeg(co.cx,co.cy,m,a.x,a.y,b.x,b.y)
+                         :arcSeg(co.cx,co.cy,m,b.x,b.y,a.x,a.y);
+    };
+    if(p.rot%2===0) return pair("N","E")+" "+pair("S","W");
+    return pair("E","S")+" "+pair("W","N");
+  }
+  return "";
+}
+
+/* ---- structural glyphs: GEOMETRY semantics ----
+   ⊙ = opens up · under-ring = dives beneath its run · chevrons = vertical pipe,
+   graded: full points along the pipe's body, faint marks the mouth. Marks never read io. */
+function vclass(p){
+  if(p.geo==="velbow") return CAT[p.kind].v==="U"?"up":"dn";
+  if(p.geo==="tee"&&p.pose==="up") return "up";
+  if(p.geo==="tee"&&p.pose==="dn") return "dn";
+  if(p.geo==="tee"&&p.pose==="rr") return "through";
+  if(p.geo==="riser1") return "through";
+  if(XGEOS[p.geo]&&p.pose==="vert") return p.geo==="xbend"?"pair":"through";
+  return null;                                   // multi-floor risers classify per floor
+}
+function riserFloorClass(p){
+  if(p.geo==="riser"){
+    if(p.layer===state.layer) return "bottom";   // pipe above, opens down
+    if(p.layer+1===state.layer) return "top";    // pipe below, opens up
+    return null;
+  }
+  if(p.geo==="riser3"){
+    if(p.layer===state.layer) return "bottom";
+    if(p.layer+1===state.layer) return "through";  // pure body: no port, pipe passes
+    if(p.layer+2===state.layer) return "top";
+    return null;
+  }
+  return null;
+}
+function glyphRing(cx,cy,r){
+  return `<circle cx="${cx}" cy="${cy}" r="${r||10}" fill="${COL.pipeHi}" stroke="${COL.pipe}" stroke-width="5"/>`;
+}
+function chevPair(cx,cy,upOp,dnOp){
+  return `<path d="M ${cx-4} ${cy-1.6} L ${cx} ${cy-5.6} L ${cx+4} ${cy-1.6}" opacity="${upOp}" fill="none" stroke="${COL.pipe}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`
+       + `<path d="M ${cx-4} ${cy+1.6} L ${cx} ${cy+5.6} L ${cx+4} ${cy+1.6}" opacity="${dnOp}" fill="none" stroke="${COL.pipe}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`;
+}
+function structGlyph(p){
+  const cx=p.c*CELL+CELL/2, cy=p.r*CELL+CELL/2;
+  const cls=riserFloorClass(p)||(occupies(p,state.layer)?vclass(p):null);
+  if(!cls||cls==="dn") return "";                // dn drew in the under-ring pass
+  if(cls==="pair"){                              // bend pair: the U-elbow's ring, offset, topmost
+    const v=DELTA[p.ports[3].dir];
+    const ux=cx+v[1]*XBEND_OFF, uy=cy+v[0]*XBEND_OFF;
+    return glyphRing(ux,uy)+`<circle cx="${ux}" cy="${uy}" r="3.2" fill="${COL.pipe}"/>`;
+  }
+  if(cls==="up")      return glyphRing(cx,cy)+`<circle cx="${cx}" cy="${cy}" r="3.2" fill="${COL.pipe}"/>`;
+  if(cls==="through") return glyphRing(cx,cy)+chevPair(cx,cy,1,1);
+  if(cls==="bottom")  return glyphRing(cx,cy)+chevPair(cx,cy,1,GLYPH_FAINT);
+  return glyphRing(cx,cy)+chevPair(cx,cy,GLYPH_FAINT,1);   // top
+}
+function underRing(p){                           // downward opening: painted first, run covers it
+  const cx=p.c*CELL+CELL/2, cy=p.r*CELL+CELL/2;
+  return glyphRing(cx,cy,p.geo==="tee"?12:10);   // O3: full-width runs get the tuned ring
+}
+function xbendUnder(p){                          // the D-elbow: bore in shadow, limb tucking under
+  const cx=p.c*CELL+CELL/2, cy=p.r*CELL+CELL/2;
+  const hD=p.ports[1], e=portXY(hD), v=DELTA[hD.dir];
+  const rx=cx+v[1]*XBEND_OFF, ry=cy+v[0]*XBEND_OFF;
+  const dkC=shade(COL.pipe,XB_DKC), dkL=shade(COL.pipeHi,XB_DKL), pit=shade(COL.pipeHi,XB_PIT);
+  const ic="xg"+p.id+"c", il="xg"+p.id+"l", ir="xg"+p.id+"r";
+  let s=`<defs><linearGradient id="${ic}" gradientUnits="userSpaceOnUse" x1="${e.x}" y1="${e.y}" x2="${rx}" y2="${ry}">`
+    +`<stop offset="0" stop-color="${COL.pipe}"/><stop offset="${XB_RAMP}" stop-color="${dkC}"/><stop offset="1" stop-color="${dkC}"/></linearGradient>`
+    +`<linearGradient id="${il}" gradientUnits="userSpaceOnUse" x1="${e.x}" y1="${e.y}" x2="${rx}" y2="${ry}">`
+    +`<stop offset="0" stop-color="${COL.pipeHi}"/><stop offset="${XB_RAMP}" stop-color="${dkL}"/><stop offset="1" stop-color="${dkL}"/></linearGradient>`
+    +`<radialGradient id="${ir}" gradientUnits="userSpaceOnUse" cx="${rx}" cy="${ry}" r="10">`
+    +`<stop offset="0" stop-color="${pit}"/><stop offset="1" stop-color="${dkL}"/></radialGradient></defs>`;
+  s+=`<circle cx="${rx}" cy="${ry}" r="10" fill="url(#${ir})" stroke="${dkC}" stroke-width="5"/>`;
+  const d=hD.io==="in"?`M ${e.x} ${e.y} L ${rx} ${ry}`:`M ${rx} ${ry} L ${e.x} ${e.y}`;
+  s+=`<path d="${d}" fill="none" stroke="url(#${ic})" stroke-width="20" stroke-linecap="round"/>`;
+  s+=`<path d="${d}" fill="none" stroke="url(#${il})" stroke-width="8" stroke-linecap="round"/>`;
+  return s;
+}
+function traceVMark(p){                          // flow, amber, on top of everything, pulsing
+  const vps=p.ports.filter(pt=>(pt.dir==="U"||pt.dir==="D")&&portLayer(p,pt)===state.layer);
+  if(!vps.length) return "";
+  const cx=p.c*CELL+CELL/2, cy=p.r*CELL+CELL/2, K=COL.flowHi;
+  const rise=pt=>(pt.dir==="U"&&pt.io==="out")||(pt.dir==="D"&&pt.io==="in");
+  if(p.geo==="xbend"&&p.pose==="vert"){           // two independent streams: one mark per bore
+    let s2="";
+    for(const [vi,hi] of [[0,1],[2,3]]){
+      const pt=p.ports[vi], v=DELTA[p.ports[hi].dir];
+      const mx=cx+v[1]*XBEND_OFF, my=cy+v[0]*XBEND_OFF;
+      s2+= rise(pt)?`<circle cx="${mx}" cy="${my}" r="3.2" fill="${K}"/>`
+                   :`<path d="M ${mx-4.6} ${my-4.6} L ${mx+4.6} ${my+4.6} M ${mx-4.6} ${my+4.6} L ${mx+4.6} ${my-4.6}" stroke="${K}" stroke-width="2.6" stroke-linecap="round"/>`;
+    }
+    return `<g class="vpulse">${s2}</g>`;
+  }
+  let inner;
+  if(vps.length===2&&rise(vps[0])!==rise(vps[1]))
+    inner=`<path d="M ${cx-4} ${cy-1.6} L ${cx} ${cy-5.6} L ${cx+4} ${cy-1.6}" fill="none" stroke="${K}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`
+         +`<path d="M ${cx-4} ${cy+1.6} L ${cx} ${cy+5.6} L ${cx+4} ${cy+1.6}" fill="none" stroke="${K}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`;
+  else if(rise(vps[0])) inner=`<circle cx="${cx}" cy="${cy}" r="3.2" fill="${K}"/>`;
+  else inner=`<path d="M ${cx-4.6} ${cy-4.6} L ${cx+4.6} ${cy+4.6} M ${cx-4.6} ${cy+4.6} L ${cx+4.6} ${cy-4.6}" stroke="${K}" stroke-width="2.6" stroke-linecap="round"/>`;
+  return `<g class="vpulse">${inner}</g>`;
+}
+
+/* ---------- render ---------- */
+
+let svgEl=null, sceneEl=null, hitEl=null, statusEl=null, barEl=null;
+
+function arrowSvg(pt){
+  const {x,y}=portXY(pt);
+  const ux=DELTA[pt.dir][1], uy=DELTA[pt.dir][0];
+  const s=pt.io==="out"?1:-1;
+  const ax=x+ux*6*s, ay=y+uy*6*s, bx=x-ux*3*s, by=y-uy*3*s;
+  const px_=-uy, py_=ux;
+  const col=COL.flowHi;
+  return `<path d="M ${bx+px_*5} ${by+py_*5} L ${ax} ${ay} L ${bx-px_*5} ${by-py_*5}" fill="none" stroke="${col}" stroke-width="2.5" stroke-linejoin="round"/>`;
+}
+
+function svgInner(){
+  const W=state.cols*CELL, H=state.rows*CELL; let s="";
+  for(let i=0;i<=state.cols;i++) s+=`<line x1="${i*CELL}" y1="0" x2="${i*CELL}" y2="${H}" stroke="${COL.line}"/>`;
+  for(let i=0;i<=state.rows;i++) s+=`<line x1="0" y1="${i*CELL}" x2="${W}" y2="${i*CELL}" stroke="${COL.line}"/>`;
+  const HS=CELL/2;
+  if(state.showFoot) for(const p of state.parts){ if(p.layer!==state.layer) continue;
+    for(const k of p.subs){
+      const [si,sj]=k.split(",").map(Number);
+      s+=`<rect x="${si*HS+0.5}" y="${sj*HS+0.5}" width="${HS-1}" height="${HS-1}" fill="${COL.subfill}"/>`;
+    }
+  }
+  const traceMode=state.tool==="trace";
+  const ghostSvg=p=>{
+    const dist=Math.abs(p.layer-state.layer);
+    const op=Math.max(0.05,0.50*Math.pow(0.5,dist-1));    // d1 .50, d2 .25, d3 .125, then floor
+    const col=p.layer<state.layer?COL.pipe:COL.preview;   // below warm, above cool
+    return `<path d="${partPath(p)}" fill="none" stroke="${col}" stroke-width="13" stroke-linecap="round" stroke-linejoin="round" opacity="${op}"/>`;
+  };
+  // layers BELOW pass under the active one: deepest first
+  if(state.showGhost)
+    for(const p of state.parts.filter(q=>q.layer<state.layer).sort((a,b)=>a.layer-b.layer))
+      s+=ghostSvg(p);
+  for(const p of state.parts){                   // downward openings dive UNDER their runs
+    if(p.type!=="small"||!occupies(p,state.layer)) continue;
+    const vc=vclass(p);
+    if(vc==="dn") s+=underRing(p);
+    else if(vc==="pair") s+=xbendUnder(p);       // the whole D-elbow, shadow and all
+  }
+  for(const p of state.parts){
+    if(p.layer!==state.layer) continue;
+    const cas=COL.pipe;
+    const lum=traceMode?COL.flowHi:COL.pipeHi;
+    const anim=traceMode?"flow-anim":"";
+    const d=partPath(p);
+    s+=`<path d="${d}" fill="none" stroke="${cas}" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>`;
+    s+=`<path d="${d}" class="${anim}" fill="none" stroke="${lum}" stroke-width="${anim?6:8}" stroke-linecap="round" stroke-linejoin="round"/>`;
+    if(p.geo==="cap"){
+      if(p.kind==="src")
+        s+=`<circle cx="${p.c*CELL+CELL/2}" cy="${p.r*CELL+CELL/2}" r="8" fill="${cas}" stroke="${lum}" stroke-width="3"/>`;
+      else
+        s+=`<circle cx="${p.c*CELL+CELL/2}" cy="${p.r*CELL+CELL/2}" r="8" fill="${lum}" stroke="${cas}" stroke-width="2"/>`;
+    }
+  }
+  if(state.showGhost){
+    const pmh=portIoMap();
+    for(const p of state.parts) for(const pt of p.ports){
+      if(pt.dir!=="U"&&pt.dir!=="D") continue;
+      const L=portLayer(p,pt);
+      const target=pt.dir==="U"?L+1:L-1;
+      if(target!==state.layer) continue;              // opens INTO the active layer
+      if(pmh.get(mateKey(p,pt))) continue;            // already mated
+      const cx=pt.c*CELL+CELL/2, cy=pt.r*CELL+CELL/2;
+      const fromBelow=pt.dir==="U";                 // geometry: the mate placed here opens DOWN
+      s+=`<g opacity="0.55"><circle cx="${cx}" cy="${cy}" r="13" fill="none" stroke="${COL.preview}" stroke-width="2" stroke-dasharray="4 4"/>`;
+      if(fromBelow) s+=`<path d="M ${cx-3.6} ${cy+1} L ${cx} ${cy+4.6} L ${cx+3.6} ${cy+1}" fill="none" stroke="${COL.preview}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+      else s+=`<path d="M ${cx-3.6} ${cy-1} L ${cx} ${cy-4.6} L ${cx+3.6} ${cy-1}" fill="none" stroke="${COL.preview}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+      s+="</g>";
+    }
+  }
+  for(const p of state.parts){                   // structural rings: geometry, io-blind, permanent
+    if(p.type!=="small") continue;
+    s+=structGlyph(p);
+  }
+  // layers ABOVE cross over the active one: nearest first, highest topmost
+  if(state.showGhost)
+    for(const p of state.parts.filter(q=>q.layer>state.layer).sort((a,b)=>a.layer-b.layer))
+      s+=ghostSvg(p);
+  if(traceMode)
+    for(const p of state.parts){ if(!occupies(p,state.layer)&&!(p.geo==="riser"&&riserFloorClass(p))) continue;
+      for(const pt of p.ports){
+        if(pt.dir==="U"||pt.dir==="D") continue;      // amber vertical marks handle those
+        if(portLayer(p,pt)!==state.layer) continue;
+        s+=arrowSvg(pt);
+      }
+      s+=traceVMark(p);                               // flow in amber, over structure
+    }
+  if(state.drag&&state.drag.kind==="straight"&&(state.drag.armed||state.drag.snap)){
+    const g=state.drag, gdx=g.px.x-g.px0.x, gdy=g.px.y-g.px0.y;
+    let segs;
+    if(g.snap) segs=straightForSnap(g.from,g.to,g.snap);
+    else{
+      const ax=(Math.abs(gdy)>Math.abs(gdx)&&Math.abs(gdy)>CELL*0.18)?"v":"h";
+      const fd=ax==="v"?(gdy>0?"S":"N"):(gdx>0?"E":"W");
+      segs=segmentStraight(g.from,g.to,ax,fd);
+    }
+    const ok=segs.every(sv=>fits(sv,null));
+    for(const sv of segs){
+      const a=portXY(sv.ports[0]), b=portXY(sv.ports[1]);
+      const ux=Math.sign(b.x-a.x)*4, uy=Math.sign(b.y-a.y)*4;   // inset = visible seams
+      s+=`<path d="M ${a.x+ux} ${a.y+uy} L ${b.x-ux} ${b.y-uy}" fill="none" stroke="${ok?COL.preview:COL.conflict}" stroke-width="20" stroke-linecap="round" opacity="0.6"/>`;
+    }
+  }
+  if(state.drag&&state.drag.kind==="elbow"){
+    const d=state.drag;
+    const pv=elbowFromGesture(d.from,d.px.x-d.px0.x,d.px.y-d.px0.y,d.to,d.D1,d.snap);
+    if(pv){
+      const ok=fits(pv,null);
+      s+=`<path d="${partPath(pv)}" fill="none" stroke="${ok?COL.preview:COL.conflict}" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>`;
+    }
+  }
+  if(state.drag&&state.drag.kind==="move"){
+    const d=state.drag, dr=d.to.r-d.from.r, dc=d.to.c-d.from.c;
+    if(dr||dc){
+      const pv=translatePart(d.part,dr,dc);
+      const ok=fits(pv,d.part.id);
+      s+=`<path d="${partPath(pv)}" fill="none" stroke="${ok?COL.preview:COL.conflict}" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>`;
+    }
+  }
+  if(state.drag&&state.drag.kind==="small"&&(state.drag.armed||state.drag.snap)&&!partAt(state.drag.from.r,state.drag.from.c)){
+    const d=state.drag;
+    const pv=d.snap ? smallForSnap(kindFor(state.tool),d.from,d.snap,d.px.x-d.px0.x,d.px.y-d.px0.y)
+                    : smallFromGesture(kindFor(state.tool),d.from,d.px.x-d.px0.x,d.px.y-d.px0.y);
+    const ok=fits(pv,null);
+    s+=`<path d="${partPath(pv)}" fill="none" stroke="${ok?COL.preview:COL.conflict}" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>`;
+  }
+  if(state.sel!=null){
+    const sp=state.parts.find(q=>q.id===state.sel);
+    if(sp&&occupies(sp,state.layer)){
+      const d=partPath(sp);
+      if(d) s+=`<path d="${d}" fill="none" stroke="${COL.flow}" stroke-width="26" stroke-linecap="round" stroke-linejoin="round" opacity="0.28"/>`;
+      else s+=`<circle cx="${sp.c*CELL+CELL/2}" cy="${sp.r*CELL+CELL/2}" r="16" fill="none" stroke="${COL.flow}" stroke-width="3" opacity="0.6"/>`;
+    }
+  }
+  if(state.showVal||traceMode){
+    const v=validate();
+    if(state.showVal){
+      v.open.filter(m=>m.layer===state.layer).forEach(m=>s+=`<circle cx="${m.x}" cy="${m.y}" r="5" fill="none" stroke="${COL.open}" stroke-width="2" stroke-dasharray="2 2"/>`);
+      v.conflict.filter(m=>m.layer===state.layer).forEach(m=>s+=`<g transform="translate(${m.x},${m.y}) rotate(45)"><rect x="-5" y="-5" width="10" height="10" fill="${COL.conflict}"/></g>`);
+    }
+    v.flow.filter(m=>m.layer===state.layer).forEach(m=>s+=`<g transform="translate(${m.x},${m.y})"><path d="M -7 -5 L -1 0 L -7 5 Z M 7 -5 L 1 0 L 7 5 Z" fill="${COL.fconf}"/></g>`);
+  }
+  return s;
+}
+function render(){
+  if(!svgEl||!sceneEl) return;
+  const W=state.cols*CELL, H=state.rows*CELL;
+  svgEl.setAttribute("width",Math.round(W*ZOOM)); svgEl.setAttribute("height",Math.round(H*ZOOM));
+  svgEl.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  sceneEl.innerHTML=svgInner();
+  hitEl.setAttribute("width",W);
+  hitEl.setAttribute("height",H);
+  if(statusEl) statusEl.innerHTML=statusHTML();
+  const lr=document.getElementById("lread");
+  if(lr) lr.textContent="L"+state.layer;
+  const vz=document.getElementById("vzoom");
+  if(vz) vz.textContent=Math.round(ZOOM*100)+"%";
+  const chip=document.getElementById("selchip");
+  if(chip){
+    const sp=state.sel!=null?state.parts.find(q=>q.id===state.sel):null;
+    if(sp){ chip.textContent=selInfo(sp); chip.classList.add("open"); }
+    else { chip.classList.remove("open"); if(state.sel!=null) state.sel=null; }
+  }
+  const bp=document.getElementById("bom");
+  if(bp&&bp.classList.contains("open")) bp.innerHTML=bomHTML();
+  syncToolbar();
+}
+
+/* ---------- interaction ---------- */
+
+function poseFor(kind){
+  if(!kind||!CAT[kind]) return undefined;
+  if(CAT[kind].geo==="tee") return state.pose.tee||"flat";
+  if(XGEOS[CAT[kind].geo]) return state.pose.cross||"flat";
+  return undefined;
+}
+function kindFor(tool){                                 // posed base tools resolve to vertical kinds
+  if(tool==="tee"||tool==="cross"||tool==="cap") return state.vari[tool];
+  if(tool==="elbow"){ const po=state.pose.elbow; return po==="up"?"vup":po==="dn"?"vdn":null; }
+  if(tool==="straight"){ const po=state.pose.straight; return po==="r1"?"riser1":po==="r2"?"riser":po==="r3"?"riser3":null; }
+  return null;
+}
+function cellAt(e){
+  const r=svgEl.getBoundingClientRect();
+  let c=Math.floor((e.clientX-r.left)/ZOOM/CELL), rw=Math.floor((e.clientY-r.top)/ZOOM/CELL);
+  c=Math.max(0,Math.min(state.cols-1,c)); rw=Math.max(0,Math.min(state.rows-1,rw));
+  return {r:rw,c};
+}
+function tapOwner(owner){                      // first tap selects; consecutive taps rotate
+  if(state.sel!==owner.id){ state.sel=owner.id; return; }
+  if(owner.type==="small"){
+    const np=makeSmall(owner.kind,(owner.rot+1)%4,owner.r,owner.c,owner.io,owner.pose);
+    np.id=owner.id; Object.assign(owner,np); return;
+  }
+  if(owner.type==="elbow"){
+    const fixed=owner.ports[0];
+    const np=elbowByPort(owner.span,(owner.rot+1)%4,fixed.r,fixed.c,owner.inIdx);
+    np.id=owner.id; if(fits(np,owner.id)) Object.assign(owner,np); return;
+  }
+  if(owner.type==="straight"&&owner.cells.length===1){   // flip H/V, keep forwardness
+    const a=owner.cells[0];
+    const cur=owner.ports[0].dir==="W"?"h":"v";
+    const map={E:"S",S:"E",W:"N",N:"W"};
+    const np=makeStraight(a.r,a.c,a.r,a.c,cur==="h"?"v":"h",map[owner.flowDir]);
+    np.layer=owner.layer;
+    np.id=owner.id; if(fits(np,owner.id)) Object.assign(owner,np);
+  }
+}
+function handleTap(cell,px){
+  const {r,c}=cell, t=state.tool;
+  if(t==="trace"){
+    const p=partAt(r,c);
+    if(p) togglePart(p);                  // flip THIS part only; markers recompute live
+    return;
+  }
+  if(t==="erase"){ const p=partAt(r,c); if(p){ if(state.sel===p.id) state.sel=null; state.parts=state.parts.filter(x=>x!==p); } return; }
+  const owner=partAt(r,c);
+  if(!owner&&state.sel!=null) state.sel=null;          // tap empty: deselect
+  if(t==="elbow"&&!kindFor("elbow")){
+    if(owner){ tapOwner(owner); return; }
+    const np=autoOrient(elbowByPort(1,0,r,c,0));
+    if(fits(np,null)){ np.id=state.nextId++; state.parts.push(np); } return;
+  }
+  const kind=kindFor(t);
+  if(kind){
+    if(owner){ tapOwner(owner); return; }
+    const np=autoOrient(makeSmall(kind,0,r,c,null,poseFor(kind)));
+    if(fits(np,null)){ np.id=state.nextId++; state.parts.push(np); }
+  }
+}
+function commitStraight(from,to,axis,flowDir){
+  if(state.sel!=null&&!partAt(from.r,from.c)) state.sel=null;
+  if(from.r===to.r&&from.c===to.c){
+    const owner=partAt(from.r,from.c);
+    if(owner){ tapOwner(owner); return; }
+    const np=autoOrient(makeStraight(from.r,from.c,from.r,from.c,axis||"h",flowDir));
+    if(fits(np,null)){ np.id=state.nextId++; state.parts.push(np); } return;
+  }
+  let segs=segmentStraight(from,to,axis,flowDir);
+  const ao=autoOrient(makeStraight(segs[0].cells[0].r,segs[0].cells[0].c,
+    segs[0].cells[segs[0].cells.length-1].r,segs[0].cells[segs[0].cells.length-1].c,axis,flowDir));
+  if(ao.flowDir!==flowDir)                      // world context flips the whole chain coherently
+    segs=segmentStraight(from,to,axis,ao.flowDir);
+  placeChain(segs);
+}
+
+function bindSvgOnce(){
+  const pxAt=e=>{const r=svgEl.getBoundingClientRect();return {x:(e.clientX-r.left)/ZOOM,y:(e.clientY-r.top)/ZOOM};};
+  const surfEl=svgEl.closest(".canvas");              // gestures live on the whole canvas
+  const onGrid=e=>{const r=svgEl.getBoundingClientRect();
+    return e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom;};
+  const pointers=new Map(); let pinch=null;
+  let gesture=null;                                   // {t0,maxFingers,moved}
+  const canvasEl0=()=>surfEl;
+  const mid=()=>{const a=[...pointers.values()];
+    return {x:a.reduce((q,p)=>q+p.x,0)/a.length, y:a.reduce((q,p)=>q+p.y,0)/a.length};};
+  surfEl.addEventListener("pointerdown",e=>{
+    e.preventDefault();
+    const sp=document.getElementById("settings");
+    if(sp&&sp.classList.contains("open")) sp.classList.remove("open");
+    const bp=document.getElementById("bom");
+    if(bp&&bp.classList.contains("open")) bp.classList.remove("open");
+    const vm=document.getElementById("viewmenu");
+    if(vm&&vm.classList.contains("open")) vm.classList.remove("open");
+    pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(!gesture) gesture={t0:Date.now(),maxFingers:0,moved:0};
+    gesture.maxFingers=Math.max(gesture.maxFingers,pointers.size);
+    if(pointers.size>=2){                        // 2+ fingers: pinch/pan session
+      state.drag=null; state.downCell=null;
+      const [p1,p2]=[...pointers.values()];
+      const canvas=canvasEl0(), rect=canvas.getBoundingClientRect();
+      const m0=mid(), a0={x:m0.x-rect.left,y:m0.y-rect.top};
+      pinch={d0:Math.hypot(p1.x-p2.x,p1.y-p2.y),z0:ZOOM,
+             w:{x:(canvas.scrollLeft+a0.x-PAD)/ZOOM,       // world point under fingers
+                y:(canvas.scrollTop +a0.y-PAD)/ZOOM}};
+      render(); return;
+    }
+    if(pinch) return;
+    if(surfEl.setPointerCapture){ try{surfEl.setPointerCapture(e.pointerId);}catch(_){}}
+    if(!onGrid(e)){ state.downCell=null; return; }    // gutter press: navigation only
+    const cell=cellAt(e); state.downCell=cell;
+    if(state.tool==="straight"&&!kindFor("straight")){ const p=pxAt(e);
+      state.drag={kind:"straight",from:cell,to:cell,px0:p,px:p,armed:false,snap:snapAt(cell,p)};
+      if(state.drag.snap) render(); }
+    else if(state.tool==="elbow"&&!kindFor("elbow")){
+      const p=pxAt(e);
+      state.drag={kind:"elbow",from:cell,to:cell,px0:p,px:p,armed:false,snap:snapAt(cell,p)};
+      if(state.drag.snap) render();
+    }
+    else if(state.tool==="move"){
+      const p0=partAt(cell.r,cell.c);
+      if(p0){ state.drag={kind:"move",part:p0,from:cell,to:cell}; render(); }
+    }
+    else if(kindFor(state.tool)){
+      const p=pxAt(e);
+      state.drag={kind:"small",from:cell,to:cell,px0:p,px:p,armed:false,snap:snapAt(cell,p)};
+      if(state.drag.snap) render();
+    }
+  });
+  surfEl.addEventListener("pointermove",e=>{
+    if(pointers.has(e.pointerId)){
+      const prev=pointers.get(e.pointerId);
+      if(gesture) gesture.moved+=Math.hypot(e.clientX-prev.x,e.clientY-prev.y);
+      pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    }
+    if(pinch&&pointers.size>=2){
+      e.preventDefault();
+      const [p1,p2]=[...pointers.values()];
+      const d=Math.hypot(p1.x-p2.x,p1.y-p2.y);
+      const m=mid();
+      const canvas=canvasEl0(), rect=canvas.getBoundingClientRect();
+      const zNew=Math.max(0.55,Math.min(2.5,pinch.d0>0?pinch.z0*d/pinch.d0:ZOOM));
+      if(zNew!==ZOOM){ ZOOM=zNew; render(); }
+      const a={x:m.x-rect.left,y:m.y-rect.top};
+      canvas.scrollLeft=PAD+pinch.w.x*ZOOM-a.x;    // one equation: world point
+      canvas.scrollTop =PAD+pinch.w.y*ZOOM-a.y;    // glued under the midpoint
+      return;
+    }
+    if(state.drag){ e.preventDefault(); state.drag.to=cellAt(e);
+      state.drag.px=pxAt(e);
+      if(!state.drag.armed && state.drag.px0){
+        const mvd=Math.hypot(state.drag.px.x-state.drag.px0.x,state.drag.px.y-state.drag.px0.y);
+        if(mvd>=3/ZOOM) state.drag.armed=true;      // ~3 screen px of real intent
+      }
+      if(state.drag.kind==="elbow" && !state.drag.D1 && state.drag.px0){
+        const dx=state.drag.px.x-state.drag.px0.x, dy=state.drag.px.y-state.drag.px0.y;
+        if(Math.hypot(dx,dy)>=CELL*0.15)            // lock travel dir from the opening move
+          state.drag.D1=Math.abs(dx)>=Math.abs(dy)?(dx>0?"E":"W"):(dy>0?"S":"N");
+      }
+      render(); }
+  });
+  surfEl.addEventListener("pointerup",e=>{
+    if(surfEl.releasePointerCapture){ try{surfEl.releasePointerCapture(e.pointerId);}catch(_){}}
+    pointers.delete(e.pointerId);
+    if(pointers.size===0&&gesture){
+      const g=gesture; gesture=null;
+      if(g.maxFingers>=2 && g.moved<12 && Date.now()-g.t0<350){
+        pinch=null;
+        if(g.maxFingers===2) undo(); else redo();   // 2-finger tap / 3-finger tap
+        return;
+      }
+    }
+    if(pinch){ if(pointers.size<2) pinch=null; return; }
+    mutate(()=>{
+      if(state.drag&&state.drag.kind==="straight"){
+        const d=state.drag, p=pxAt(e); state.drag=null;
+        if(d.snap){
+          placeChain(straightForSnap(d.from,cellAt(e),d.snap));    // pre-mated, axis forced
+        }else{
+          const dx=p.x-d.px0.x, dy=p.y-d.px0.y;
+          const axis=(Math.abs(dy)>Math.abs(dx)&&Math.abs(dy)>CELL*0.18)?"v":"h";
+          const fd=axis==="v"?(dy>0?"S":"N"):(dx>0?"E":"W");
+          commitStraight(d.from,cellAt(e),axis,fd);
+        }
+      }
+      else if(state.drag&&state.drag.kind==="elbow"){
+        const d=state.drag, p=pxAt(e); state.drag=null;
+        let pv=elbowFromGesture(d.from,p.x-d.px0.x,p.y-d.px0.y,cellAt(e),d.D1,d.snap);
+        if(pv){ if(state.sel!=null) state.sel=null;
+          if(!d.snap) pv=autoOrient(pv);                     // snap already mated it
+          if(fits(pv,null)){ pv.id=state.nextId++; state.parts.push(pv); } }
+        else if(!d.snap) handleTap(d.from,p);
+      }
+      else if(state.drag&&state.drag.kind==="move"){
+        const d=state.drag; state.drag=null;
+        const to=cellAt(e), dr=to.r-d.from.r, dc=to.c-d.from.c;
+        if(dr||dc){
+          const pv=translatePart(d.part,dr,dc);
+          if(fits(pv,d.part.id)){
+            pv.id=d.part.id;
+            const i=state.parts.indexOf(d.part);
+            if(i>=0) state.parts[i]=pv;
+          }
+        }
+      }
+      else if(state.drag&&state.drag.kind==="small"){
+        const d=state.drag, p=pxAt(e); state.drag=null;
+        const dx=p.x-d.px0.x, dy=p.y-d.px0.y;
+        const owner=partAt(d.from.r,d.from.c);
+        if(owner){
+          if(Math.max(Math.abs(dx),Math.abs(dy))<CELL*0.18) handleTap(d.from,p);
+        }else{
+          if(state.sel!=null) state.sel=null;
+          const pv=d.snap ? smallForSnap(kindFor(state.tool),d.from,d.snap,dx,dy)
+                          : autoOrient(smallFromGesture(kindFor(state.tool),d.from,dx,dy));
+          if(fits(pv,null)){ pv.id=state.nextId++; state.parts.push(pv); }
+        }
+      }
+      else if(state.downCell){ handleTap(state.downCell,pxAt(e)); }
+    });
+    state.downCell=null; render();
+  });
+  surfEl.addEventListener("pointercancel",e=>{ pointers.delete(e.pointerId);
+    if(pointers.size<2) pinch=null;
+    if(pointers.size===0) gesture=null;
+    state.drag=null; state.downCell=null; render(); });
+  const stopTouch=e=>{ e.preventDefault(); };
+  svgEl.addEventListener("touchstart",stopTouch,{passive:false});
+  svgEl.addEventListener("touchmove",stopTouch,{passive:false});
+  const canvasEl=svgEl.closest(".canvas");
+  if(canvasEl){
+    canvasEl.addEventListener("touchstart",stopTouch,{passive:false});
+    canvasEl.addEventListener("touchmove",stopTouch,{passive:false});
+  }
+  document.addEventListener("touchmove",e=>{
+    if(state.drag || (canvasEl && canvasEl.contains(e.target))) e.preventDefault();
+  },{passive:false,capture:true});
+}
+
+/* ---------- icons (A parts + C actions, from the icon board) ---------- */
+
+const IPATH={
+  straight:"M6 22 H38", elbow:"M22 6 A16 16 0 0 0 6 22",
+  tee:"M22 6 V38 M22 22 H38", cross:"M22 6 V38 M6 22 H38", capline:"M6 22 H22",
+  move:"M22 6 V38 M6 22 H38 M22 6 L18 11 M22 6 L26 11 M22 38 L18 33 M22 38 L26 33 M6 22 L11 18 M6 22 L11 26 M38 22 L33 18 M38 22 L33 26",
+  trash:"M12 14 H32 M16 14 V10 H28 V14 M14 14 L16 36 H28 L30 14 M19 19 V31 M25 19 V31",
+  eye:"M6 22 Q22 8 38 22 Q22 36 6 22 Z",
+  eyedot:"M22 22 m-4 0 a4 4 0 1 0 8 0 a4 4 0 1 0 -8 0",
+  mag:"M19 19 m-10 0 a10 10 0 1 0 20 0 a10 10 0 1 0 -20 0 M27 27 L37 37",
+  magplus:"M14 19 H24 M19 14 V24", magminus:"M14 19 H24",
+  theme:"M22 8 A14 14 0 1 0 22 36 Z M22 8 A14 14 0 1 1 22 36",
+  more:"M12 22 h.1 M22 22 h.1 M32 22 h.1"
+};
+function iSvg(inner,sz){ return `<svg width="${sz||30}" height="${sz||30}" viewBox="0 0 44 44">${inner}</svg>`; }
+function iPipe(path,capCircle){
+  let t=`<path d="${path}" fill="none" stroke="var(--icase)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>`;
+  t+=`<path d="${path}" fill="none" stroke="var(--ilum)" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+  if(capCircle) t+=`<circle cx="22" cy="22" r="7" fill="var(--icase)" stroke="var(--ilum)" stroke-width="2.5"/>`;
+  return t;
+}
+function iStroke(paths,w,col){
+  return paths.map(pp=>`<path d="${pp}" fill="none" stroke="${col||'var(--ifg)'}" stroke-width="${w||3.2}" stroke-linecap="round" stroke-linejoin="round"/>`).join("");
+}
+function arcArrow(cx,cy,R,deg1,deg2,w,skewDeg){
+  const a1=deg1*Math.PI/180, a2=deg2*Math.PI/180, N=22;
+  let d="";
+  for(let k=0;k<=N;k++){const t=a1+(a2-a1)*k/N;
+    d+=(k?" L ":"M ")+(cx+R*Math.cos(t)).toFixed(1)+" "+(cy+R*Math.sin(t)).toFixed(1);}
+  const sg=Math.sign(a2-a1);
+  let tx=-Math.sin(a2)*sg, ty=Math.cos(a2)*sg;
+  if(skewDeg){const k=skewDeg*Math.PI/180,c=Math.cos(k),n=Math.sin(k);
+    const rx=tx*c-ty*n, ry=tx*n+ty*c; tx=rx; ty=ry;}
+  const ex=cx+R*Math.cos(a2), ey=cy+R*Math.sin(a2);
+  const px=-ty, py=tx, L=7, Wd=4.6;
+  return `<path d="${d}" fill="none" stroke="var(--ifg)" stroke-width="${w}" stroke-linecap="round"/>`+
+    `<path d="M ${(ex-tx*L+px*Wd).toFixed(1)} ${(ey-ty*L+py*Wd).toFixed(1)} L ${ex.toFixed(1)} ${ey.toFixed(1)} L ${(ex-tx*L-px*Wd).toFixed(1)} ${(ey-ty*L-py*Wd).toFixed(1)}" fill="none" stroke="var(--ifg)" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/>`;
+}
+function iArc(cx,cy,r,a1,a2){                 // sampled corner arc, matches the app's geometry
+  const N=16; let d="";
+  for(let k=0;k<=N;k++){const t=(a1+(a2-a1)*k/N)*Math.PI/180;
+    d+=(k?" L ":"M ")+(cx+r*Math.cos(t)).toFixed(1)+" "+(cy+r*Math.sin(t)).toFixed(1);}
+  return d;
+}
+function iRing(up){
+  let g=`<circle cx="22" cy="22" r="9" fill="none" stroke="var(--icase)" stroke-width="5"/>`;
+  if(up) g+=`<circle cx="22" cy="22" r="3" fill="var(--icase)"/>`;
+  else g+=`<path d="M17.5 17.5 L26.5 26.5 M17.5 26.5 L26.5 17.5" stroke="var(--icase)" stroke-width="2.6" stroke-linecap="round"/>`;
+  return g;
+}
+const PART_ICONS={
+  straight:iPipe(IPATH.straight), elbow:iPipe(iArc(6,6,24,0,90)),
+  tee:iPipe(IPATH.tee), cross:iPipe(IPATH.cross), cap:iPipe(IPATH.capline,true)
+};
+const ACT_ICONS={
+  undo:arcArrow(22,23,11,55,-160,3.4,20),
+  redo:arcArrow(22,23,11,125,340,3.4,-20),
+  move:iStroke([IPATH.move],3),
+  erase:iStroke([IPATH.trash],3),
+  trace:iStroke([IPATH.eye],3)+iStroke([IPATH.eyedot],3,"var(--acc)"),
+  "layer+":iStroke(["M12 27 L22 15 L32 27"],3.6),
+  "layer-":iStroke(["M12 17 L22 29 L32 17"],3.6),
+  "zoom+":iStroke([IPATH.mag,IPATH.magplus],3.2),
+  "zoom-":iStroke([IPATH.mag,IPATH.magminus],3.2),
+  view:iStroke(["M22 8 L36 16 L22 24 L8 16 Z","M8 22 L22 30 L36 22","M8 28 L22 36 L36 28"],3),
+  theme:`<path d="M22 7 A15 15 0 1 0 22 37 A15 15 0 1 0 22 7 Z" fill="none" stroke="var(--ifg)" stroke-width="3"/><path d="M22 7 A15 15 0 0 1 22 37 Z" fill="var(--ifg)"/>`,
+  more:iStroke([IPATH.more],5)
+};
+const VERT_STUB=`<path d="M4 22 H13" fill="none" stroke="var(--icase)" stroke-width="11" stroke-linecap="round"/><path d="M4 22 H13" fill="none" stroke="var(--ilum)" stroke-width="4.5" stroke-linecap="round"/>`;
+const iDot=(x,y)=>`<circle cx="${x}" cy="${y}" r="3.4" fill="var(--acc)"/>`;   // amber = flow enters here
+function iRingBare(cx,cy,r){ return `<circle cx="${cx||22}" cy="${cy||22}" r="${r||9}" fill="none" stroke="var(--icase)" stroke-width="5"/>`; }
+function iFloor(y){ return `<path d="M6 ${y} H16 M28 ${y} H38" fill="none" stroke="var(--ifg)" stroke-width="1.6" stroke-dasharray="3 3"/>`; }
+/* D language: inlet dots only; tee icons in the owner's rotations (run 180°, branch roles 90° CW) */
+const VAR_ICONS={
+  tsplit:iPipe("M22 6 V38 "+iArc(6,38,16,0,-90))+iDot(22,38),
+  tsplitb:iPipe(iArc(38,38,16,180,270)+" "+iArc(6,38,16,0,-90))+iDot(22,38),
+  tmerge:iPipe("M22 6 V38 "+iArc(38,38,16,-90,-180))+iDot(22,6)+iDot(38,22),
+  tmergeb:iPipe(iArc(38,38,16,180,270)+" "+iArc(6,38,16,0,-90))+iDot(38,22)+iDot(6,22),
+  xsplit:iPipe(IPATH.cross)+iDot(22,6),
+  xmerge:iPipe(IPATH.cross)+iDot(38,22)+iDot(22,38)+iDot(6,22),
+  xjunc:iPipe(IPATH.cross)+iDot(22,6)+iDot(22,38),
+  xover:iPipe("M22 6 V38")+iPipe("M6 22 H14 M30 22 H38")+iDot(22,6)+iDot(6,22),
+  xbend:iPipe(iArc(38,6,16,180,90)+" "+iArc(6,38,16,0,-90))+iDot(22,6)+iDot(6,22),
+  src:iPipe(IPATH.capline)+`<circle cx="22" cy="22" r="7" fill="var(--acc)" stroke="var(--ilum)" stroke-width="2.5"/>`,
+  snk:iPipe(IPATH.capline,true)+iDot(6,22)
+};
+const VAR_LIST={tee:["tsplit","tsplitb","tmerge","tmergeb"],cross:["xsplit","xmerge","xjunc","xover","xbend"],cap:["src","snk"],elbow:[],straight:[]};
+function iWedge(up){                       // out-of-plane wedge: GEOMETRY mark, never flow
+  const d=up?"M16 20 L22 10 L28 20 Z":"M16 24 L22 34 L28 24 Z";
+  return `<path class="wg" d="${d}" fill="var(--ifg)" stroke="var(--ifg)" stroke-width="1.6" stroke-linejoin="round"/>`;
+}
+/* pose icons mirror the canvas: over-ring ⊙, UNDER-ring bare, section risers */
+const POSE_DEF={
+  tee:{seq:["flat","up","dn","rr"],
+    icons:{flat:iPipe(IPATH.tee),
+           up:iPipe(IPATH.straight)+iWedge(true),
+           dn:iPipe(IPATH.straight)+iWedge(false),
+           rr:VERT_STUB+iRingBare(24,22,9)},
+    labels:{flat:"Flat",up:"Br \u25b2",dn:"Br \u25bc",rr:"Riser"},
+    titles:{flat:"Flat",up:"Branch up",dn:"Branch down",rr:"Riser run"}},
+  elbow:{seq:["flat","up","dn"],
+    icons:{flat:iPipe(iArc(6,6,24,0,90)),
+           up:VERT_STUB+iRing(true),
+           dn:iRingBare(24,22,9)+VERT_STUB},
+    labels:{flat:"Flat",up:"Up",dn:"Down"},
+    titles:{flat:"Flat",up:"Turns up",dn:"Turns down"}},
+  straight:{seq:["flat","r1","r2","r3"],
+    icons:{flat:iPipe(IPATH.straight),
+           r1:iFloor(15)+iFloor(29)+iPipe("M22 8 V36"),
+           r2:iFloor(12)+iFloor(22)+iFloor(32)+iPipe("M22 5 V39"),
+           r3:iFloor(10)+iFloor(18)+iFloor(26)+iFloor(34)+iPipe("M22 4 V40")},
+    labels:{flat:"Flat",r1:"Riser \u00d71",r2:"Riser \u00d72",r3:"Riser \u00d73"},
+    titles:{flat:"Flat",r1:"Riser \u00d71 \u00b7 one floor",r2:"Riser \u00d72 \u00b7 two floors",r3:"Riser \u00d73 \u00b7 three floors"}},
+  cross:{seq:["flat","vert"],
+    icons:{flat:iPipe(IPATH.cross),
+           vert:iPipe(IPATH.straight)+iRingBare(22,22,9)},
+    labels:{flat:"Flat",vert:"Vert \u21d5"},
+    titles:{flat:"Flat",vert:"Vertical \u00b7 run stands upright"}}
+};
+const TITLES={straight:"Straight",elbow:"Elbow",tee:"Tee",cross:"Cross",cap:"Cap",
+  undo:"Undo",redo:"Redo",move:"Move",erase:"Erase",trace:"Trace","zoom+":"Zoom in","zoom-":"Zoom out",
+  theme:"Theme",more:"Board",view:"View options",vup:"Elbow up",vdn:"Elbow dn",riser:"Riser \u00d72",riser1:"Riser \u00d71",riser3:"Riser \u00d73","layer+":"Layer up","layer-":"Layer down",tsplit:"Split · run",tsplitb:"Split · branch",tmerge:"Merge · run",tmergeb:"Merge · branch",xsplit:"Split 1→3",xmerge:"Merge 3→1",
+  xjunc:"Junction 2-2",xover:"Overpass",xbend:"Bend overpass",src:"Source",snk:"Sink"};
+
+/* ---------- ui builders ---------- */
+
+let svgWrapEl=null;
+
+function rbtn(action,icon,danger){
+  return `<button class="rbtn${danger?' danger':''}" data-action="${action}" title="${TITLES[action.split(':').pop()]||action}">${iSvg(icon)}</button>`;
+}
+const BOM_NAMES={vup:"Elbow up",vdn:"Elbow dn",riser1:"Riser \u00d71",riser:"Riser \u00d72",xsplit:"Cross split 1\u21923",xmerge:"Cross merge 3\u21921",xjunc:"Junction 2\u00b72",
+  xover:"Overpass",xbend:"Bend pass",src:"Source",snk:"Sink"};
+function bomKey(p){
+  if(p.type==="straight") return "Straight-"+p.cells.length;
+  if(p.type==="elbow")    return "Elbow span "+p.span;
+  if(p.geo==="velbow")    return "Elbow span 1";           // the same fitting, twisted
+  if(p.geo==="riser1")    return "Straight-1";             // a riser is a vertical straight
+  if(p.geo==="riser")     return "Straight-2";
+  if(p.geo==="riser3")    return "Straight-3";
+  if(p.geo==="tee"){
+    const u=UNIQUE_IO[p.kind]||"in";
+    const S=p.ports.find(t=>t.io===u);
+    const where=(S&&S===p.ports[1])?"branch":"run";   // index 1 IS the branch, whatever plane it opens into
+    return (u==="in"?"Split":"Merge")+" \u00b7 "+where;
+  }
+  return BOM_NAMES[p.kind]||p.kind;
+}
+const BOM_ORDER=["Straight-1","Straight-2","Straight-3",
+  "Elbow span 1","Elbow span 2","Elbow span 3","Elbow span 4","Elbow span 5","Elbow span 6",
+  "Split \u00b7 run","Split \u00b7 branch","Merge \u00b7 run","Merge \u00b7 branch",
+  BOM_NAMES.xsplit,BOM_NAMES.xmerge,BOM_NAMES.xjunc,BOM_NAMES.xover,BOM_NAMES.xbend,
+  BOM_NAMES.src,BOM_NAMES.snk];
+const POSE_MARK={flat:"flat",up:"\u25b2",dn:"\u25bc",rr:"\u21c5",r1:"\u21c5",r2:"\u21c5",r3:"\u21c5",vert:"\u21d5"};
+const POSE_SEQ=["flat","up","dn","rr","vert","r1","r2","r3"];
+function bomPose(p){                                   // orientation, for layer-level breakdown
+  if(p.type==="small"&&p.geo==="tee") return p.pose||"flat";
+  if(p.type==="small"&&p.geo==="velbow") return CAT[p.kind].v==="U"?"up":"dn";
+  if(p.type==="small"&&p.geo==="riser1") return "r1";
+  if(p.type==="small"&&p.geo==="riser") return "r2";
+  if(p.type==="small"&&p.geo==="riser3") return "r3";
+  if(p.type==="small"&&XGEOS[p.geo]) return p.pose||"flat";
+  if(p.type==="elbow"&&p.span===1) return "flat";
+  if(p.type==="straight") return "flat";
+  return null;
+}
+function bomRows(parts,detail){                        // detail: layer lists carry orientation
+  const m=new Map();
+  for(const p of parts){ const k=bomKey(p);
+    const e=m.get(k)||{n:0,poses:new Map()};
+    e.n++;
+    const po=bomPose(p);
+    if(po) e.poses.set(po,(e.poses.get(po)||0)+1);
+    m.set(k,e); }
+  const sub=e=>(detail&&e.poses.size>1)                // STACK stays a clean bill of materials
+    ? POSE_SEQ.filter(po=>e.poses.has(po)).map(po=>POSE_MARK[po]+" \u00d7"+e.poses.get(po)).join(" \u00b7 ")
+    : null;
+  const rows=[];
+  for(const k of BOM_ORDER) if(m.has(k)){ const e=m.get(k); rows.push([k,e.n,sub(e)]); m.delete(k); }
+  for(const [k,e] of m) rows.push([k,e.n,sub(e)]);     // anything unforeseen still shows
+  return rows;
+}
+function bomLayers(){                                  // occupied layers, ascending
+  return [...new Set(state.parts.map(p=>p.layer))].sort((a,b)=>a-b);
+}
+function bomText(){
+  const layers=bomLayers(), multi=layers.length>1;
+  let t="PIPEGRID cut list \u2014 "+state.rows+"\u00d7"+state.cols+" grid";
+  if(multi) t+=", "+layers.length+" layers";
+  t+="\n";
+  for(const L of layers){
+    if(multi) t+="Layer "+L+":\n";
+    for(const [k,n,sub] of bomRows(state.parts.filter(p=>p.layer===L),true)){
+      t+=(multi?"  ":"")+n+" \u00d7 "+k+"\n";
+      if(sub) t+=(multi?"    ":"  ")+sub+"\n";
+    }
+  }
+  if(multi){
+    t+="Stack totals:\n";
+    for(const [k,n,sub] of bomRows(state.parts)){ t+="  "+n+" \u00d7 "+k+"\n"; if(sub) t+="    "+sub+"\n"; }
+  }
+  t+="Total: "+state.parts.length+" parts";
+  return t;
+}
+function copyText(t){
+  if(navigator.clipboard&&navigator.clipboard.writeText) return navigator.clipboard.writeText(t);
+  const ta=document.createElement("textarea"); ta.value=t;
+  document.body.appendChild(ta); ta.select();
+  try{document.execCommand("copy");}catch(_){}
+  document.body.removeChild(ta); return Promise.resolve();
+}
+function bomHTML(){
+  const layers=bomLayers(), multi=layers.length>1;
+  let h='<div class="lbl" style="width:auto;margin-bottom:8px;letter-spacing:2px">CUT LIST</div>';
+  if(!layers.length) h+='<div class="hint">Nothing placed yet.</div>';
+  for(const L of layers){
+    if(multi) h+=`<div class="lbl" style="width:auto;margin:6px 0 4px;color:var(--acc)">LAYER ${L}</div>`;
+    for(const [k,n,sub] of bomRows(state.parts.filter(p=>p.layer===L),true))
+      h+=`<div class="row" style="margin-bottom:${sub?0:4}px;justify-content:space-between;gap:16px">
+            <span style="font-size:10px">${k}</span><span style="font-size:11px;font-weight:700">\u00d7 ${n}</span></div>`+
+         (sub?`<div style="font-size:9px;color:var(--dim);letter-spacing:.5px;margin:0 0 4px 10px">${sub}</div>`:"");
+  }
+  if(multi){
+    h+=`<div class="lbl" style="width:auto;margin:8px 0 4px;letter-spacing:2px;border-top:1px solid var(--edge);padding-top:8px">STACK</div>`;
+    for(const [k,n,sub] of bomRows(state.parts))
+      h+=`<div class="row" style="margin-bottom:${sub?0:4}px;justify-content:space-between;gap:16px">
+            <span style="font-size:10px">${k}</span><span style="font-size:11px;font-weight:700">\u00d7 ${n}</span></div>`+
+         (sub?`<div style="font-size:9px;color:var(--dim);letter-spacing:.5px;margin:0 0 4px 10px">${sub}</div>`:"");
+  }
+  h+=`<div class="row" style="border-top:1px solid var(--edge);padding-top:6px;margin-top:6px;justify-content:space-between;gap:16px">
+        <span style="font-size:10px;color:var(--dim)">TOTAL</span><span style="font-size:11px;font-weight:700">${state.parts.length}</span></div>`;
+  h+=`<button class="sbtn" data-action="bomcopy" style="margin-top:8px;width:100%">Copy list</button>`;
+  return h;
+}
+function selInfo(p){
+  const name=p.type==="straight"?("Straight-"+p.cells.length)
+            :p.type==="elbow"?("Elbow span "+p.span)
+            :(TITLES[p.kind]||p.kind);
+  let po="";
+  if(p.pose&&p.pose!=="flat") po=" \u00b7 "+POSE_MARK[p.pose];
+  else if(p.geo==="velbow") po=CAT[p.kind].v==="U"?" \u00b7 \u25b2":" \u00b7 \u25bc";
+  return name+po+" \u00b7 L"+p.layer+" \u2014 tap again to rotate";
+}
+function statusHTML(){
+  const v=validate();
+  return `<div class="stat" data-action="bom" style="cursor:pointer"><span class="l">PARTS \u25be</span><span class="v">${state.parts.length}</span></div>
+    <div class="stat"><span class="l">OPEN</span><span class="v" style="color:${COL.open}">${v.open.length}</span></div>
+    <div class="stat"><span class="l">GEO</span><span class="v" style="color:${COL.conflict}">${v.conflict.length}</span></div>
+    <div class="stat"><span class="l">FLOW</span><span class="v" style="color:${COL.fconf}">${v.flow.length}</span></div>
+    <div class="stat"><span class="l">LAYER</span><span class="v" style="color:${COL.flow}">${state.layer}</span></div>
+    <div class="stat"><span class="l">ZOOM</span><span class="v">${Math.round(ZOOM*100)}%</span></div>`;
+}
+function syncToolbar(){
+  if(!barEl) return;
+  const fly=document.getElementById("flyout");
+  const cat=(state.tool==="tee"||state.tool==="cross"||state.tool==="cap"||state.tool==="elbow"||state.tool==="straight")?state.tool:null;
+  if(fly){
+    fly.classList.toggle("open",!!cat);
+    if(cat&&fly.dataset.cat!==cat){
+      fly.dataset.cat=cat;
+      const pd=POSE_DEF[cat];
+      fly.innerHTML=VAR_LIST[cat].map(k=>
+        `<button class="rbtn fly" data-action="var:${k}" title="${TITLES[k]}">${iSvg(VAR_ICONS[k],32)}<span class="flbl">${TITLES[k]}</span></button>`).join("")
+        +(pd
+          ? (VAR_LIST[cat].length?`<div class="fdiv"></div>`:``)+`<div class="fhead">POSE</div><div class="poserow">`
+            +pd.seq.map(po=>`<button class="pbtn" data-action="pose:${cat}:${po}" title="${pd.titles[po]}">${iSvg(pd.icons[po],24)}<span class="flbl">${pd.labels[po]}</span></button>`).join("")
+            +`</div>`
+          : "");
+    }
+  }
+  const tb=document.getElementById("themebtn");
+  if(tb) tb.textContent=state.theme==="carbon"?"Carbon":"Workshop";
+  document.querySelectorAll("[data-action]").forEach(b=>{
+    const a=b.getAttribute("data-action"); let on=false;
+    if(a.indexOf("tool:")===0) on=state.tool===a.slice(5);
+    else if(a.indexOf("var:")===0){
+      const k=a.slice(4);
+      on=state.vari[VARCAT[k]]===k && state.tool===VARCAT[k];
+    }
+    else if(a.indexOf("pose:")===0){
+      const seg=a.split(":");
+      on=state.pose[seg[1]]===seg[2] && state.tool===seg[1];
+    }
+    else if(a==="toggleVal") on=state.showVal;
+    else if(a==="toggleFoot") on=state.showFoot;
+    else if(a==="toggleGhost") on=state.showGhost;
+    b.classList.toggle("on",on);
+  });
+}
+function applyTheme(t){
+  state.theme=t;
+  document.body.dataset.theme=t==="workshop"?"workshop":"";
+  COL=PALETTES[t];
+  render();
+  try{ localStorage.setItem(LS_KEY,boardDoc()); }catch(_){}
+}
+const PAD=1000;                        // free-float gutter around the grid
+function setZoom(z,anchor){
+  const canvas=svgEl?svgEl.closest(".canvas"):null;
+  const old=ZOOM;
+  ZOOM=Math.max(0.55,Math.min(2.5,z));
+  if(canvas&&anchor){                 // keep the world point under `anchor` stationary
+    const wx=(canvas.scrollLeft+anchor.x-PAD)/old, wy=(canvas.scrollTop+anchor.y-PAD)/old;
+    render();
+    canvas.scrollLeft=PAD+wx*ZOOM-anchor.x;
+    canvas.scrollTop=PAD+wy*ZOOM-anchor.y;
+    if(statusEl) statusEl.innerHTML=statusHTML();
+    return;
+  }
+  render();
+}
+function centerView(){
+  const canvas=svgEl?svgEl.closest(".canvas"):null;
+  if(!canvas) return;
+  const W=state.cols*CELL*ZOOM, H=state.rows*CELL*ZOOM;
+  canvas.scrollLeft=PAD-(canvas.clientWidth-W)/2;
+  canvas.scrollTop =PAD-(canvas.clientHeight-H)/2;
+}
+function canvasCentre(){
+  const c=svgEl?svgEl.closest(".canvas"):null;
+  return c?{x:c.clientWidth/2,y:c.clientHeight/2}:null;
+}
+
+function buildShell(){
+  const app=document.getElementById("app");
+  app.innerHTML=
+    `<div class="hdr">
+       <span class="title">PIPEGRID</span>
+       <div class="status" id="status"></div>
+     </div>
+     <div class="main" id="bar">
+       <div class="rail">
+         ${rbtn("tool:straight",PART_ICONS.straight)}
+         ${rbtn("tool:elbow",PART_ICONS.elbow)}
+         ${rbtn("tool:tee",PART_ICONS.tee)}
+         ${rbtn("tool:cross",PART_ICONS.cross)}
+         ${rbtn("tool:cap",PART_ICONS.cap)}
+         <div class="rgap"></div>
+         ${rbtn("undo",ACT_ICONS.undo)}
+         ${rbtn("redo",ACT_ICONS.redo)}
+         ${rbtn("tool:move",ACT_ICONS.move)}
+         ${rbtn("tool:erase",ACT_ICONS.erase)}
+         ${rbtn("tool:trace",ACT_ICONS.trace)}
+         <div class="rgap"></div>
+         ${rbtn("layer+",ACT_ICONS["layer+"])}
+         <div class="lread" id="lread">L0</div>
+         ${rbtn("layer-",ACT_ICONS["layer-"])}
+         <div class="rgap"></div>
+         ${rbtn("view",ACT_ICONS.view)}
+         ${rbtn("more",ACT_ICONS.more)}
+       </div>
+       <div class="flyout" id="flyout"></div>
+       <div class="canvas"><div class="pad"><svg id="pg"><g id="scene"></g><rect id="hit" x="0" y="0" fill="transparent"/></svg></div></div>
+       <div class="settings" id="bom" style="left:14px;top:52px;bottom:auto;max-height:62vh;overflow-y:auto"></div>
+       <div class="selchip" id="selchip"></div>
+       <div class="settings" id="viewmenu" style="bottom:120px">
+         <div class="lbl" style="width:auto;margin-bottom:8px;letter-spacing:2px">VIEW</div>
+         <div class="row"><button class="sbtn" data-action="toggleGhost">Ghost layers</button></div>
+         <div class="row"><button class="sbtn" data-action="toggleFoot">Footprints</button></div>
+         <div class="row"><button class="sbtn" data-action="toggleVal">Validate</button></div>
+         <div class="row" style="border-top:1px solid var(--edge);padding-top:8px"><span class="lbl">ZOOM</span>
+           <span class="step"><button data-action="zoom-">&minus;</button><span class="v" id="vzoom" style="width:38px"></span><button data-action="zoom+">+</button></span></div>
+         <div class="row" style="margin-bottom:0"><span class="lbl">THEME</span>
+           <button class="sbtn" data-action="theme" id="themebtn"></button></div>
+       </div>
+       <div class="settings" id="settings">
+         <div class="lbl" style="width:auto;margin-bottom:8px;letter-spacing:2px">GRID</div>
+         <div class="row"><span class="lbl">ROWS</span>
+           <span class="step"><button data-action="row-">&minus;</button><span class="v" id="vrow"></span><button data-action="row+">+</button></span></div>
+         <div class="row"><span class="lbl">COLS</span>
+           <span class="step"><button data-action="col-">&minus;</button><span class="v" id="vcol"></span><button data-action="col+">+</button></span></div>
+         <div class="lbl" style="width:auto;margin:10px 0 8px;letter-spacing:2px;border-top:1px solid var(--edge);padding-top:10px">FILE</div>
+         <div class="row"><button class="sbtn" data-action="savefile">Save file</button>
+           <button class="sbtn" data-action="loadfile">Load file</button>
+           <input type="file" id="loadinput" accept=".json,application/json" style="display:none"/></div>
+         <div class="lbl" style="width:auto;margin:10px 0 8px;letter-spacing:2px;border-top:1px solid var(--edge);padding-top:10px;color:var(--danger)">DANGER</div>
+         <div class="row"><button class="sbtn danger" data-action="clearlayer">Clear layer</button>
+           <button class="sbtn danger" data-action="clear">Clear</button></div>
+         <div class="hint">Gesture = flow: press upstream, drag the way it runs; nudges aim caps, branches, in-axes. Pose rows twist Straights, Elbows and Tees vertical. Rings are geometry: \u2299 opens up, an under-ring dives beneath its run, chevrons are vertical pipe (strong side = the pipe's body). TRACE shows flow in amber. Tap a placed part to inspect; tap again to rotate. Zoom lives in VIEW, or pinch.</div>
+       </div>
+     </div>`;
+
+  svgEl=document.getElementById("pg");
+  sceneEl=document.getElementById("scene");
+  hitEl=document.getElementById("hit");
+  statusEl=document.getElementById("status");
+  barEl=document.getElementById("bar");
+
+  document.getElementById("app").addEventListener("click",e=>{
+    const b=e.target.closest("[data-action]"); if(!b) return;
+    const a=b.getAttribute("data-action");
+    if(a==="tool:trace"){
+      if(state.tool==="trace"){ state.tool=state.lastTool||"straight"; }
+      else { state.lastTool=state.tool; state.tool="trace"; }
+    }
+    else if(a.indexOf("tool:")===0){ state.tool=a.slice(5); }
+    else if(a.indexOf("var:")===0){
+      const k=a.slice(4); state.vari[VARCAT[k]]=k; state.tool=VARCAT[k];
+    }
+    else if(a.indexOf("pose:")===0){
+      const seg=a.split(":");
+      state.pose[seg[1]]=seg[2]; state.tool=seg[1];
+    }
+    else if(a==="undo"){ undo(); return; }
+    else if(a==="redo"){ redo(); return; }
+    else if(a==="layer+"){ state.layer++; render(); return; }
+    else if(a==="layer-"){ state.layer--; render(); return; }
+    else if(a==="zoom+"){ setZoom(ZOOM*1.2,canvasCentre()); return; }
+    else if(a==="zoom-"){ setZoom(ZOOM/1.2,canvasCentre()); return; }
+    else if(a==="theme"){ applyTheme(state.theme==="carbon"?"workshop":"carbon"); return; }
+    else if(a==="more"){
+      document.getElementById("bom").classList.remove("open");
+      document.getElementById("viewmenu").classList.remove("open");
+      document.getElementById("settings").classList.toggle("open"); return; }
+    else if(a==="view"){
+      document.getElementById("bom").classList.remove("open");
+      document.getElementById("settings").classList.remove("open");
+      document.getElementById("viewmenu").classList.toggle("open"); return; }
+    else if(a==="bom"){
+      document.getElementById("settings").classList.remove("open");
+      document.getElementById("viewmenu").classList.remove("open");
+      const bp=document.getElementById("bom");
+      if(bp.classList.contains("open")) bp.classList.remove("open");
+      else { bp.innerHTML=bomHTML(); bp.classList.add("open"); }
+      return; }
+    else if(a==="savefile"){ exportFile(); return; }
+    else if(a==="loadfile"){
+      const inp=document.getElementById("loadinput");
+      inp.onchange=()=>{ if(inp.files&&inp.files[0]) importFile(inp.files[0],b); inp.value=""; };
+      inp.click(); return; }
+    else if(a==="bomcopy"){
+      copyText(bomText());
+      b.textContent="Copied \u2713";
+      setTimeout(()=>{ b.textContent="Copy list"; },1200);
+      return; }
+    else if(a==="toggleVal"){ state.showVal=!state.showVal; }
+    else if(a==="toggleFoot"){ state.showFoot=!state.showFoot; saveLocal(); }
+    else if(a==="toggleGhost"){ state.showGhost=!state.showGhost; saveLocal(); }
+    else if(a==="clear"){ mutate(()=>{ state.parts=[]; }); }
+    else if(a==="clearlayer"){ mutate(()=>{
+      state.parts=state.parts.filter(p=>!occupies(p,state.layer)); }); }
+    else if(a[0]==="r"||a[0]==="c"){
+      mutate(()=>{
+        if(a==="row+") state.rows=Math.min(24,state.rows+1);
+        if(a==="row-") state.rows=Math.max(3,state.rows-1);
+        if(a==="col+") state.cols=Math.min(28,state.cols+1);
+        if(a==="col-") state.cols=Math.max(3,state.cols-1);
+        state.parts=state.parts.filter(p=>inBounds(p.cells));
+      });
+      document.getElementById("vrow").textContent=state.rows;
+      document.getElementById("vcol").textContent=state.cols;
+    }
+    render();
+  });
+
+  document.getElementById("vrow").textContent=state.rows;
+  document.getElementById("vcol").textContent=state.cols;
+  bindSvgOnce();
+}
+
+/* ---------- seed: a fully valid flow chain + a floating bend overpass ---------- */
+function seed(){
+  const add=p=>{p.id=state.nextId++; state.parts.push(p); return p;};
+  add(makeSmall("src",1,2,0));            // source, port E: flow out east
+  add(makeStraight(2,1,2,3,null,"E"));    // eastward run
+  add(makeElbow(2,0,1,4,1));              // W-port in, N-port out
+  add(makeSmall("snk",2,0,5));            // sink above, port S: flow in
+  add(makeSmall("xbend",0,5,2));          // floating elbow-overpass to inspect
+}
+
+buildShell();
+if(!loadLocal()) seed();
+render();
+requestAnimationFrame(centerView);
+
+window.__pg={state,serialize,validate,makeSmall,togglePart,render};   // debug/testing hook
+
+})();
+</script>
+</body>
+</html>
