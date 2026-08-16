@@ -89,8 +89,8 @@ function rotPt(x,y,z,az,el){
 }
 
 const PAL={
-  carbon:{neutral:"#4a5568",accent:"#e0a14e",ground:"rgba(140,160,185,0.18)",port:"#0e1116",portStroke:"#c7d3e2"},
-  workshop:{neutral:"#6b6355",accent:"#e0771e",ground:"rgba(90,80,60,0.28)",port:"#f3eee2",portStroke:"#2a2a28"}
+  carbon:{neutral:"#4a5568",accent:"#e0a14e",wire:"#c7d3e2",port:"#0e1116",portStroke:"#c7d3e2"},
+  workshop:{neutral:"#6b6355",accent:"#e0771e",wire:"#2a2a28",port:"#f3eee2",portStroke:"#2a2a28"}
 };
 const FACES=[
   {key:"E",n:[1,0,0],  c:[[.47,-.47,-.47],[.47,.47,-.47],[.47,.47,.47],[.47,-.47,.47]]},
@@ -109,11 +109,20 @@ function shade(hex,mult){
 }
 
 const cubes=[];
-for(let x=-1;x<=1;x++) for(let z=-1;z<=1;z++) cubes.push({x,y:0,z,color:"neutral"});
-cubes.push({x:1,y:1,z:1,color:"neutral"});
-cubes.push({x:1,y:1,z:0,color:"neutral"});
-cubes.push({x:0,y:1,z:1,color:"neutral"});
+for(let x=-1;x<=1;x++) for(let z=-1;z<=1;z++) cubes.push({x,y:0,z,color:"empty"});
+cubes.push({x:1,y:1,z:1,color:"empty"});
+cubes.push({x:1,y:1,z:0,color:"empty"});
+cubes.push({x:0,y:1,z:1,color:"empty"});
 cubes.push({x:0,y:1,z:0,color:"accent",ports:true});
+
+function edgesOf(cx,cy,cz,hx,hy,hz){
+  const c=[
+    [cx-hx,cy-hy,cz-hz],[cx+hx,cy-hy,cz-hz],[cx+hx,cy+hy,cz-hz],[cx-hx,cy+hy,cz-hz],
+    [cx-hx,cy-hy,cz+hz],[cx+hx,cy-hy,cz+hz],[cx+hx,cy+hy,cz+hz],[cx-hx,cy+hy,cz+hz]
+  ];
+  const pairs=[[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
+  return pairs.map(([a,b])=>[c[a],c[b]]);
+}
 
 function svgNS(tag){ return document.createElementNS("http://www.w3.org/2000/svg",tag); }
 const rigEl=document.getElementById("rig");
@@ -139,24 +148,9 @@ function svgPointFromClient(clientX,clientY){
 let visiblePorts=[];   // rebuilt every render: [{key, sx, sy}] for the active (ported) cube's front-facing ports
 let throughTarget=null; // rebuilt every render: {sx, sy, el} - the ported cube's own screen center, the "drag through" target
 
-function drawGround(){
-  while(groundG.firstChild) groundG.removeChild(groundG.firstChild);
-  const P=palette(), y=-0.55, n=2;
-  for(let i=-n;i<=n;i++){
-    const a=proj(rotPt(i,y,-n,cam.az,cam.el)), b=proj(rotPt(i,y,n,cam.az,cam.el));
-    const ln=svgNS("line"); ln.setAttribute("x1",a.sx); ln.setAttribute("y1",a.sy);
-    ln.setAttribute("x2",b.sx); ln.setAttribute("y2",b.sy);
-    ln.setAttribute("stroke",P.ground); ln.setAttribute("stroke-width","1"); groundG.appendChild(ln);
-    const a2=proj(rotPt(-n,y,i,cam.az,cam.el)), b2=proj(rotPt(n,y,i,cam.az,cam.el));
-    const ln2=svgNS("line"); ln2.setAttribute("x1",a2.sx); ln2.setAttribute("y1",a2.sy);
-    ln2.setAttribute("x2",b2.sx); ln2.setAttribute("y2",b2.sy);
-    ln2.setAttribute("stroke",P.ground); ln2.setAttribute("stroke-width","1"); groundG.appendChild(ln2);
-  }
-}
-
 function render(){
   const P=palette();
-  drawGround();
+  while(groundG.firstChild) groundG.removeChild(groundG.firstChild);   // no separate floor plane - the wireframe's own edges are the floor, aligned to the cells
   while(sceneG.firstChild) sceneG.removeChild(sceneG.firstChild);
   visiblePorts=[];
   throughTarget=null;
@@ -171,7 +165,20 @@ function render(){
 
   for(const it of items){
     const cu=it.cu;
-    const base = cu.color==="accent" ? P.accent : P.neutral;
+
+    if(cu.color==="empty"){
+      edgesOf(cu.x,cu.y,cu.z,0.47,0.47,0.47).forEach(([a,b])=>{
+        const pa=proj(rotPt(a[0],a[1],a[2],cam.az,cam.el)), pb=proj(rotPt(b[0],b[1],b[2],cam.az,cam.el));
+        const ln=svgNS("line");
+        ln.setAttribute("x1",pa.sx); ln.setAttribute("y1",pa.sy);
+        ln.setAttribute("x2",pb.sx); ln.setAttribute("y2",pb.sy);
+        ln.setAttribute("stroke",P.wire); ln.setAttribute("stroke-width","1"); ln.setAttribute("opacity","0.08");
+        sceneG.appendChild(ln);
+      });
+      continue;
+    }
+
+    const base = P.accent;
     FACES.forEach((f,fi)=>{
       const fv=faceVis[fi];
       if(!fv.visible) return;
