@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>PIPEGRID — port-to-port gesture test</title>
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12151b; --panel2:#0e1116; --edge:#2c313d;
+    --text:#c7d3e2; --dim:#5f6775; --acc:#e0a14e; --acc2:#66e4ff;
+    --cline:rgba(140,160,185,0.18);
+  }
+  body[data-theme="workshop"]{
+    --bg:#e6dfcf; --panel:#efe9dc; --panel2:#f3eee2; --edge:#c9c0aa;
+    --text:#2a2a28; --dim:#8a8272; --acc:#e0771e; --acc2:#5a35a0;
+    --cline:rgba(90,80,60,0.28);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; overscroll-behavior:contain;}
+  body{background:var(--bg);color:var(--text);
+       font-family:ui-monospace,SFMono-Regular,Menlo,monospace;-webkit-text-size-adjust:100%;
+       padding:14px; padding-bottom:60px;}
+  .hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:4px;flex-wrap:wrap;}
+  .title{font-size:15px;font-weight:700;letter-spacing:4px;}
+  .sub{font-size:9px;letter-spacing:1.5px;color:var(--dim);}
+  .themebtn{margin-left:auto;font-family:inherit;font-size:10px;letter-spacing:.5px;text-transform:uppercase;
+        padding:7px 9px;border:1px solid var(--edge);border-radius:4px;background:transparent;
+        color:var(--text);cursor:pointer;}
+  #wrap{max-width:640px;margin:12px auto 0;}
+  .panel{border:1px solid var(--edge);border-radius:8px;background:var(--panel);padding:12px;}
+  .note{font-size:10px;color:var(--dim);line-height:1.6;margin:4px 0 10px;}
+  .note b{color:var(--text);}
+  .rig{position:relative;background:var(--panel2);border:1px solid var(--edge);border-radius:8px;
+       touch-action:none; user-select:none;}
+  .rigsvg{display:block;width:100%;height:auto;}
+  .readout{display:flex;align-items:center;justify-content:space-between;gap:8px;
+            padding:8px 10px;border-top:1px solid var(--edge);font-size:11px;flex-wrap:wrap;}
+  .readout .val{color:var(--acc);font-weight:700;letter-spacing:1px;}
+  .readout .val.wait{color:var(--wait,var(--dim));font-weight:400;}
+  .readout .zoom{color:var(--dim);font-size:10px;}
+  .resetbtn{font-family:inherit;font-size:9px;letter-spacing:.5px;text-transform:uppercase;
+        padding:5px 8px;border:1px solid var(--edge);border-radius:4px;background:transparent;
+        color:var(--dim);cursor:pointer;}
+  .foot{max-width:640px;margin:16px auto 0;font-size:9px;color:var(--dim);line-height:1.7;text-align:center;}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <span class="title">PIPEGRID</span>
+  <span class="sub">PORT-TO-PORT GESTURE TEST · TOUCH ONE OPENING, DRAG TO ANOTHER</span>
+  <button class="themebtn" id="tt">Theme</button>
+</div>
+<div id="wrap">
+  <div class="panel">
+    <div class="note">Placeholder cube, not a real part. The six small rings are its ports (N·S·E·W·UP·DOWN).
+    Touch down on one and drag to another to connect them — that's the entry and exit direction, in one gesture,
+    no path-reading needed. Release on the same port for a single opening. <b>Pinch with two fingers to zoom</b> —
+    try the gesture at normal size first, then zoomed in, and see whether it actually needed the zoom.</div>
+    <div class="rig" id="rig">
+      <div class="readout">
+        <span>Result: <span class="val wait" id="val">Touch a port to begin</span></span>
+        <span class="zoom" id="zoomlabel">100%</span>
+        <button class="resetbtn" id="resetbtn">Reset</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="foot">Not the real app. This tests whether landing precisely on a small port — with and without zoom —<br/>is comfortable on an iPad thumb, and whether the drag-to-connect idea reads correctly.</div>
+
+<script>
+(function(){
+"use strict";
+
+const VB=300;
+const CX=150, CY=155;
+const TW=78, TH=42, LH=56;   // iso spacing, matches the earlier gesture test's proportions
+
+const D3={N:{dr:-1,dc:0,dl:0}, S:{dr:1,dc:0,dl:0}, E:{dr:0,dc:1,dl:0}, W:{dr:0,dc:-1,dl:0},
+          U:{dr:0,dc:0,dl:1}, D:{dr:0,dc:0,dl:-1}};
+const ALL=["N","E","S","W","U","D"];
+function proj(dr,dc,dl){ return { x:(dc-dr)*TW/2, y:(dc+dr)*TH/2 - dl*LH }; }
+const PORT_R=9, CAPTURE_R=15;   // drawn radius vs. how forgiving the touch target is
+
+function svgNS(tag){ return document.createElementNS("http://www.w3.org/2000/svg",tag); }
+
+const rigEl=document.getElementById("rig");
+const svg=svgNS("svg"); svg.setAttribute("class","rigsvg");
+rigEl.insertBefore(svg, rigEl.firstChild);
+
+const g=svgNS("g"); svg.appendChild(g);
+
+// central cube body (just a visual anchor, not touchable)
+const body=svgNS("circle");
+body.setAttribute("cx",CX); body.setAttribute("cy",CY); body.setAttribute("r",30);
+body.setAttribute("fill","none"); body.setAttribute("stroke","var(--cline)"); body.setAttribute("stroke-width","16");
+g.appendChild(body);
+
+for(const k of ALL){
+  const p=proj(D3[k].dr,D3[k].dc,D3[k].dl);
+  const ln=svgNS("line");
+  ln.setAttribute("x1",CX); ln.setAttribute("y1",CY);
+  ln.setAttribute("x2",CX+p.x); ln.setAttribute("y2",CY+p.y);
+  ln.setAttribute("stroke","var(--cline)"); ln.setAttribute("stroke-width","10"); ln.setAttribute("stroke-linecap","round");
+  g.appendChild(ln);
+}
+
+const portEls={};
+for(const k of ALL){
+  const p=proj(D3[k].dr,D3[k].dc,D3[k].dl);
+  const c=svgNS("circle");
+  c.setAttribute("cx",CX+p.x); c.setAttribute("cy",CY+p.y); c.setAttribute("r",PORT_R);
+  c.setAttribute("fill","var(--panel2)"); c.setAttribute("stroke","var(--dim)"); c.setAttribute("stroke-width","2");
+  g.appendChild(c);
+  const t=svgNS("text");
+  t.setAttribute("x",CX+p.x); t.setAttribute("y",CY+p.y-16);
+  t.setAttribute("text-anchor","middle"); t.setAttribute("font-size","9"); t.setAttribute("letter-spacing","1");
+  t.setAttribute("fill","var(--dim)"); t.textContent=k;
+  g.appendChild(t);
+  portEls[k]={circle:c, x:CX+p.x, y:CY+p.y};
+}
+
+function setVal(text,ok){
+  const v=document.getElementById("val");
+  v.textContent=text; v.className="val"+(ok?"":" wait");
+}
+function paintPort(k,col){ portEls[k].circle.setAttribute("fill",col); }
+function clearPorts(){ for(const k of ALL) paintPort(k,"var(--panel2)"); }
+
+function svgPointFromClient(clientX,clientY){
+  const pt=svg.createSVGPoint(); pt.x=clientX; pt.y=clientY;
+  const m=svg.getScreenCTM().inverse();
+  const p=pt.matrixTransform(m);
+  return {x:p.x,y:p.y};
+}
+function nearestPortWithin(x,y,radius){
+  let best=null,bd=Infinity;
+  for(const k of ALL){
+    const d=Math.hypot(x-portEls[k].x, y-portEls[k].y);
+    if(d<bd){ bd=d; best=k; }
+  }
+  return bd<=radius ? best : null;
+}
+
+// ---------- zoom state (viewBox-based, anchored at the cube center) ----------
+let scale=1;
+function applyZoom(){
+  const w=VB/scale, h=VB/scale;
+  svg.setAttribute("viewBox", (CX-w/2)+" "+(CY-h/2)+" "+w+" "+h);
+  document.getElementById("zoomlabel").textContent=Math.round(scale*100)+"%";
+}
+applyZoom();
+
+// ---------- gesture state ----------
+let startPort=null, resetTimer=null;
+function scheduleReset(delay){
+  clearTimeout(resetTimer);
+  resetTimer=setTimeout(()=>{ setVal("Touch a port to begin",false); clearPorts(); },delay||1800);
+}
+
+const pts=new Map();   // active pointerId -> {x,y}
+let pinchStartDist=null, pinchStartScale=1;
+
+svg.addEventListener("pointerdown",e=>{
+  pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  try{svg.setPointerCapture(e.pointerId);}catch(err){}
+  if(pts.size===1){
+    const p=svgPointFromClient(e.clientX,e.clientY);
+    const port=nearestPortWithin(p.x,p.y,CAPTURE_R);
+    if(port){
+      startPort=port; clearPorts(); paintPort(port,"var(--acc2)");
+      setVal(port,true);
+    } else {
+      startPort=null; setVal("Touch a port to begin",false);
+    }
+  } else if(pts.size===2){
+    startPort=null; clearPorts(); setVal("Touch a port to begin",false);  // pinch takes over
+    const ids=Array.from(pts.keys());
+    const a=pts.get(ids[0]), b=pts.get(ids[1]);
+    pinchStartDist=Math.hypot(a.x-b.x,a.y-b.y);
+    pinchStartScale=scale;
+  }
+  e.preventDefault();
+});
+
+svg.addEventListener("pointermove",e=>{
+  if(!pts.has(e.pointerId)) return;
+  pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+
+  if(pts.size>=2){
+    const ids=Array.from(pts.keys());
+    const a=pts.get(ids[0]), b=pts.get(ids[1]);
+    const d=Math.hypot(a.x-b.x,a.y-b.y);
+    if(pinchStartDist){
+      scale=Math.max(0.6, Math.min(4, pinchStartScale*(d/pinchStartDist)));
+      applyZoom();
+    }
+    return;
+  }
+
+  if(!startPort) return;
+  const p=svgPointFromClient(e.clientX,e.clientY);
+  const port=nearestPortWithin(p.x,p.y,CAPTURE_R/scale);
+  clearPorts(); paintPort(startPort,"var(--acc2)");
+  if(!port){ setVal(startPort,true); return; }
+  if(port===startPort){ setVal(startPort,true); return; }
+  paintPort(port,"var(--acc)");
+  setVal(startPort+" → "+port,true);
+});
+
+function up(e){
+  pts.delete(e.pointerId);
+  if(pts.size<2) pinchStartDist=null;
+  if(pts.size===0){
+    if(startPort){
+      const v=document.getElementById("val").textContent;
+      if(v!=="Touch a port to begin") scheduleReset();
+    }
+    startPort=null;
+  }
+}
+svg.addEventListener("pointerup",up);
+svg.addEventListener("pointercancel",up);
+
+document.getElementById("resetbtn").addEventListener("click",()=>{
+  setVal("Touch a port to begin",false); clearPorts();
+  scale=1; applyZoom();
+});
+document.getElementById("tt").addEventListener("click",()=>{
+  const b=document.body; b.setAttribute("data-theme", b.getAttribute("data-theme")==="workshop"?"":"workshop");
+});
+
+})();
+</script>
+</body>
+</html>
