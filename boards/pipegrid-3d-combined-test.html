@@ -216,8 +216,18 @@ function scheduleReset(delay){
   clearTimeout(resetTimer);
   resetTimer=setTimeout(()=>{ setVal("Orbit to find the amber block",false); clearPortPaint(); },delay||1800);
 }
-function midpoint(){ const arr=Array.from(pts.values()); return {x:(arr[0].x+arr[1].x)/2, y:(arr[0].y+arr[1].y)/2}; }
-function pairDist(){ const arr=Array.from(pts.values()); return Math.hypot(arr[0].x-arr[1].x, arr[0].y-arr[1].y); }
+// pinch math works in SVG user-space throughout (via svgPointFromClient), not raw client
+// pixels - the SVG can render at a different pixel size than its viewBox (612px vs 340
+// units here), and feeding client-pixel deltas straight into user-space pan/zoom math
+// silently scales every gesture by that mismatch ratio, which is what read as acceleration.
+function midpoint(){
+  const arr=Array.from(pts.values()).map(v=>svgPointFromClient(v.x,v.y));
+  return {x:(arr[0].x+arr[1].x)/2, y:(arr[0].y+arr[1].y)/2};
+}
+function pairDist(){
+  const arr=Array.from(pts.values()).map(v=>svgPointFromClient(v.x,v.y));
+  return Math.hypot(arr[0].x-arr[1].x, arr[0].y-arr[1].y);
+}
 
 svg.addEventListener("pointerdown",e=>{
   pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
@@ -247,9 +257,14 @@ svg.addEventListener("pointermove",e=>{
 
   if(mode==="pinch" && pts.size>=2){
     const d1=pairDist(), mid1=midpoint();
-    cam.scale=Math.max(0.6, Math.min(4, pinchBase.scale0*(d1/pinchBase.d0)));
-    cam.panX=pinchBase.panX0+(mid1.x-pinchBase.mid0.x);
-    cam.panY=pinchBase.panY0+(mid1.y-pinchBase.mid0.y);
+    const newScale=Math.max(0.6, Math.min(4, pinchBase.scale0*(d1/pinchBase.d0)));
+    const ratio=newScale/pinchBase.scale0;
+    // anchor the zoom at the pinch midpoint (not the fixed screen center) so the point
+    // under your fingers stays under your fingers - otherwise any incidental change in
+    // finger spacing during a pan makes the whole scene drift, which reads as acceleration.
+    cam.panX = mid1.x - CX - ratio*(pinchBase.mid0.x - CX - pinchBase.panX0);
+    cam.panY = mid1.y - CY - ratio*(pinchBase.mid0.y - CY - pinchBase.panY0);
+    cam.scale = newScale;
     render();
     return;
   }
