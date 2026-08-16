@@ -67,6 +67,7 @@ const D3={N:{dr:-1,dc:0,dl:0}, S:{dr:1,dc:0,dl:0}, E:{dr:0,dc:1,dl:0}, W:{dr:0,d
           U:{dr:0,dc:0,dl:1}, D:{dr:0,dc:0,dl:-1}};
 const HORIZ=["N","E","S","W"];
 const ALL=["N","E","S","W","U","D"];
+const OPP6={N:"S",S:"N",E:"W",W:"E",U:"D",D:"U"};
 
 function proj(dr,dc,dl){ return { x:(dc-dr)*TW/2, y:(dc+dr)*TH/2 - dl*LH }; }
 const ANGLE={}; for(const k of ALL){ const p=proj(D3[k].dr,D3[k].dc,D3[k].dl); ANGLE[k]=Math.atan2(p.y,p.x); }
@@ -94,12 +95,13 @@ function markerSvg(){
     g.appendChild(ln);
   }
   // context markers + labels at each candidate
+  const dirCircle={};
   for(const k of ALL){
     const p=proj(D3[k].dr,D3[k].dc,D3[k].dl);
     const c=svgNS("circle");
     c.setAttribute("cx",CX+p.x); c.setAttribute("cy",CY+p.y); c.setAttribute("r", (k==="U"||k==="D")?8:9);
     c.setAttribute("fill","none"); c.setAttribute("stroke","var(--dim)"); c.setAttribute("stroke-width","1.6");
-    g.appendChild(c);
+    g.appendChild(c); dirCircle[k]=c;
     const t=svgNS("text");
     t.setAttribute("x",CX+p.x); t.setAttribute("y",CY+p.y - 16);
     t.setAttribute("text-anchor","middle"); t.setAttribute("font-size","9"); t.setAttribute("letter-spacing","1");
@@ -119,7 +121,7 @@ function markerSvg(){
   hi.setAttribute("stroke-width","3"); hi.setAttribute("opacity","0");
   g.appendChild(hi);
 
-  return {svg,hot,hi,g};
+  return {svg,hot,hi,g,dirCircle};
 }
 
 function setReadout(el,text,ok){
@@ -128,7 +130,7 @@ function setReadout(el,text,ok){
 }
 
 function initRig(container, scheme){
-  const {svg,hot,hi}=markerSvg();
+  const {svg,hot,hi,dirCircle}=markerSvg();
   container.querySelector(".rigsvg-slot").appendChild(svg);
   const readout=container.querySelector(".readout");
   let resetTimer=null;
@@ -140,7 +142,10 @@ function initRig(container, scheme){
   function clearHi(){ hi.setAttribute("opacity","0"); }
   function scheduleReset(delay){
     clearTimeout(resetTimer);
-    resetTimer=setTimeout(()=>{ setReadout(readout,"Drag the amber cube",false); clearHi(); },delay||1600);
+    resetTimer=setTimeout(()=>{
+      setReadout(readout,"Drag the amber cube",false); clearHi();
+      for(const k of ALL) dirCircle[k].setAttribute("fill","none");
+    },delay||1600);
   }
 
   // ---------- Scheme A: snap to nearest of all six, live, with a small deadzone ----------
@@ -166,6 +171,55 @@ function initRig(container, scheme){
       const v=readout.querySelector(".val").textContent;
       if(v!=="…" && v!=="Drag the amber cube") scheduleReset();
       else { setReadout(readout,"Drag the amber cube",false); }
+    });
+  }
+
+  // ---------- Scheme A2: snap to nearest, but a mid-drag change of heading bends it ----------
+  // Mirrors how the real app's flat elbow already works: the opening move locks an entry
+  // direction, then the REST of the same unbroken drag is watched for a fresh heading —
+  // that becomes the exit direction. No modifier finger, no follow-up step.
+  if(scheme==="snapbend"){
+    let active=false,pid=null,startX=0,startY=0,phase="idle",D1=null,lockX=0,lockY=0,D2=null;
+    function clearDirFills(){ for(const k of ALL) dirCircle[k].setAttribute("fill","none"); }
+    function fillDir(k,col){ dirCircle[k].setAttribute("fill",col); }
+    hot.addEventListener("pointerdown",e=>{
+      active=true; pid=e.pointerId; try{hot.setPointerCapture(pid);}catch(err){}
+      startX=e.clientX; startY=e.clientY; phase="seek1"; D1=null; D2=null;
+      clearDirFills(); setReadout(readout,"…",false);
+      e.preventDefault();
+    });
+    svg.addEventListener("pointermove",e=>{
+      if(!active||e.pointerId!==pid) return;
+      const r=svg.getBoundingClientRect(); const sc=280/r.width;
+      if(phase==="seek1"){
+        const dx=(e.clientX-startX)*sc, dy=(e.clientY-startY)*sc;
+        if(Math.hypot(dx,dy)<14){ setReadout(readout,"…",false); return; }
+        D1=nearest(dx,dy,ALL); lockX=e.clientX; lockY=e.clientY; phase="seek2";
+        fillDir(D1,"var(--acc2)"); setReadout(readout,D1,true);
+        return;
+      }
+      if(phase==="seek2"){
+        const dx2=(e.clientX-lockX)*sc, dy2=(e.clientY-lockY)*sc;
+        if(Math.hypot(dx2,dy2)<14){
+          if(D2){ D2=null; fillDir(D2,"none"); setReadout(readout,D1,true); }
+          return;
+        }
+        const allowed=ALL.filter(k=>k!==D1&&k!==OPP6[D1]);
+        const cand=nearest(dx2,dy2,allowed.concat([D1]));
+        if(cand===D1){
+          if(D2){ fillDir(D2,"none"); D2=null; }
+          setReadout(readout,D1,true);
+        } else {
+          if(D2 && D2!==cand) fillDir(D2,"none");
+          D2=cand; fillDir(D2,"var(--acc)");
+          setReadout(readout,D1+" → "+D2+"  (bend)",true);
+        }
+      }
+    });
+    svg.addEventListener("pointerup",e=>{
+      if(!active||e.pointerId!==pid) return; active=false;
+      if(!D1){ setReadout(readout,"Drag the amber cube",false); phase="idle"; return; }
+      scheduleReset(); phase="idle";
     });
   }
 
@@ -277,6 +331,8 @@ function boardHTML(){
   const defs=[
     {id:"snap",label:"A · SNAP TO NEAREST",
      note:"One continuous drag. The gesture snaps live to whichever of the six directions your drag is closest to — release to confirm. No modifiers, no extra steps."},
+    {id:"snapbend",label:"A2 · SNAP, THEN BEND MID-DRAG",
+     note:"Same one continuous drag as A. But keep going after the first direction locks in (the marker lights up blue) — change heading without lifting your finger, and a second, different direction lights up amber: that's the bend. Release to confirm either a straight pick or a bend."},
     {id:"twofinger",label:"B · SECOND FINGER = VERTICAL",
      note:"One finger drags flat (N·E·S·W), same as placing parts today. Press a second finger down at any point to switch that same drag to mean up/down instead."},
     {id:"twostep",label:"C · DRAG, THEN BEND",
@@ -299,7 +355,9 @@ function boardHTML(){
     initRig(el, el.dataset.scheme);
     el.querySelector("[data-reset]").addEventListener("click",()=>{
       setReadout(el.querySelector(".readout"),"Drag the amber cube",false);
-      const hiEl=el.querySelector(".rigsvg circle:nth-of-type(1)");
+      el.querySelectorAll(".rigsvg circle").forEach(c=>{ if(!c.classList.contains("vbtn")) c.setAttribute("fill","none"); });
+      const hiEl=el.querySelector(".rigsvg circle.vbtn ~ circle");
+      if(hiEl) hiEl.setAttribute("opacity","0");
     });
   });
 }
