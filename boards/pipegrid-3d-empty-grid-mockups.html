@@ -183,7 +183,7 @@ function buildRig(container, style){
   }
 
   function render(){
-    drawGround();
+    if(style!=="lattice") drawGround();   // the wireframe's own bottom edges already are the floor, aligned to the cells - a second, differently-spaced grid under it was just confusing
     while(sceneG.firstChild) sceneG.removeChild(sceneG.firstChild);
     const P=palette();
 
@@ -201,7 +201,7 @@ function buildRig(container, style){
 
     for(const it of items){
       if(it.kind==="placed"){ drawSolidBox(it.c, PIPE_F, pipeVis, P.cpipe); continue; }
-      if(style==="lattice") drawEmptyWireframe(it.c, P.text, 0.28);
+      if(style==="lattice") drawEmptyWireframe(it.c, P.text, 0.16);
       else if(style==="ghost") drawGhostFill(it.c, items, cubeVis);
       // "boundary" style draws nothing per-cell - just the outer box, added once below
     }
