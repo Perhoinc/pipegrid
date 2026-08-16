@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>PIPEGRID — combined 3D controls test</title>
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12151b; --panel2:#0e1116; --edge:#2c313d;
+    --text:#c7d3e2; --dim:#5f6775; --acc:#e0a14e; --acc2:#66e4ff;
+    --cline:rgba(140,160,185,0.18);
+  }
+  body[data-theme="workshop"]{
+    --bg:#e6dfcf; --panel:#efe9dc; --panel2:#f3eee2; --edge:#c9c0aa;
+    --text:#2a2a28; --dim:#8a8272; --acc:#e0771e; --acc2:#5a35a0;
+    --cline:rgba(90,80,60,0.28);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; overscroll-behavior:contain;}
+  body{background:var(--bg);color:var(--text);
+       font-family:ui-monospace,SFMono-Regular,Menlo,monospace;-webkit-text-size-adjust:100%;
+       padding:14px; padding-bottom:60px;}
+  .hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:4px;flex-wrap:wrap;}
+  .title{font-size:15px;font-weight:700;letter-spacing:4px;}
+  .sub{font-size:9px;letter-spacing:1.5px;color:var(--dim);}
+  .themebtn{margin-left:auto;font-family:inherit;font-size:10px;letter-spacing:.5px;text-transform:uppercase;
+        padding:7px 9px;border:1px solid var(--edge);border-radius:4px;background:transparent;
+        color:var(--text);cursor:pointer;}
+  #wrap{max-width:640px;margin:12px auto 0;}
+  .panel{border:1px solid var(--edge);border-radius:8px;background:var(--panel);padding:12px;}
+  .note{font-size:10px;color:var(--dim);line-height:1.6;margin:4px 0 10px;}
+  .note b{color:var(--text);}
+  .rig{position:relative;background:var(--panel2);border:1px solid var(--edge);border-radius:8px;
+       touch-action:none; user-select:none;}
+  .rigsvg{display:block;width:100%;height:auto;}
+  .readout{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;
+            padding:8px 10px;border-top:1px solid var(--edge);font-size:11px;}
+  .readout .val{color:var(--acc);font-weight:700;letter-spacing:1px;}
+  .readout .val.wait{color:var(--dim);font-weight:400;}
+  .readout .stat{color:var(--dim);font-size:10px;}
+  .btnrow{display:flex;gap:6px;}
+  .resetbtn{font-family:inherit;font-size:9px;letter-spacing:.5px;text-transform:uppercase;
+        padding:5px 8px;border:1px solid var(--edge);border-radius:4px;background:transparent;
+        color:var(--dim);cursor:pointer;}
+  .foot{max-width:640px;margin:16px auto 0;font-size:9px;color:var(--dim);line-height:1.7;text-align:center;}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <span class="title">PIPEGRID</span>
+  <span class="sub">COMBINED TEST · ORBIT + PAN + ZOOM + PLACE, ALL IN ONE VIEW</span>
+  <button class="themebtn" id="tt">Theme</button>
+</div>
+<div id="wrap">
+  <div class="panel">
+    <div class="note">Same hidden <b style="color:var(--acc)">amber</b> block as the orbit test — it also has ports.
+    <b>Drag empty space or a block to orbit.</b> <b>Two fingers moving together to pan, pinching to zoom</b> (do both
+    at once if you like). Once you've found the amber block and can see one of its ports, <b>drag from one port to
+    another to connect them</b> — same gesture as the port test. The whole point is finding out whether these four
+    controls get in each other's way.</div>
+    <div class="rig" id="rig">
+      <div class="readout">
+        <span>Result: <span class="val wait" id="val">Orbit to find the amber block</span></span>
+        <span class="stat" id="stat">az 35° · el 25° · zoom 100%</span>
+        <div class="btnrow">
+          <button class="resetbtn" id="recenterbtn">Recenter</button>
+          <button class="resetbtn" id="resetbtn">Reset view</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="foot">Not the real app. Testing gesture coexistence only — does starting a drag on a port vs. empty space<br/>reliably pick the right control, and can pan/zoom run alongside orbit without conflicts.</div>
+
+<script>
+(function(){
+"use strict";
+
+const VB=340, CX=170, CY=178, SCALE=34, CAPTURE_R=13;
+
+function rotPt(x,y,z,az,el){
+  const ca=Math.cos(az), sa=Math.sin(az);
+  const x1=x*ca+z*sa, z1=-x*sa+z*ca, y1=y;
+  const ce=Math.cos(el), se=Math.sin(el);
+  const y2=y1*ce-z1*se, z2=y1*se+z1*ce;
+  return {x:x1,y:y2,z:z2};
+}
+
+const PAL={
+  carbon:{neutral:"#4a5568",accent:"#e0a14e",ground:"rgba(140,160,185,0.18)",port:"#0e1116",portStroke:"#c7d3e2"},
+  workshop:{neutral:"#6b6355",accent:"#e0771e",ground:"rgba(90,80,60,0.28)",port:"#f3eee2",portStroke:"#2a2a28"}
+};
+const FACES=[
+  {key:"E",n:[1,0,0],  c:[[.47,-.47,-.47],[.47,.47,-.47],[.47,.47,.47],[.47,-.47,.47]]},
+  {key:"W",n:[-1,0,0], c:[[-.47,-.47,.47],[-.47,.47,.47],[-.47,.47,-.47],[-.47,-.47,-.47]]},
+  {key:"U",n:[0,1,0],  c:[[-.47,.47,-.47],[-.47,.47,.47],[.47,.47,.47],[.47,.47,-.47]]},
+  {key:"D",n:[0,-1,0], c:[[-.47,-.47,.47],[-.47,-.47,-.47],[.47,-.47,-.47],[.47,-.47,.47]]},
+  {key:"S",n:[0,0,1],  c:[[.47,-.47,.47],[.47,.47,.47],[-.47,.47,.47],[-.47,-.47,.47]]},
+  {key:"N",n:[0,0,-1], c:[[-.47,-.47,-.47],[-.47,.47,-.47],[.47,.47,-.47],[.47,-.47,-.47]]}
+];
+const LIGHT=(()=>{ const v=[0.35,0.85,0.3], m=Math.hypot(v[0],v[1],v[2]); return v.map(x=>x/m); })();
+function shade(hex,mult){
+  const n=parseInt(hex.slice(1),16);
+  const r=Math.min(255,Math.round(((n>>16)&255)*mult)), g=Math.min(255,Math.round(((n>>8)&255)*mult)), b=Math.min(255,Math.round((n&255)*mult));
+  return "#"+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
+}
+
+const cubes=[];
+for(let x=-1;x<=1;x++) for(let z=-1;z<=1;z++) cubes.push({x,y:0,z,color:"neutral"});
+cubes.push({x:1,y:1,z:1,color:"neutral"});
+cubes.push({x:1,y:1,z:0,color:"neutral"});
+cubes.push({x:0,y:1,z:1,color:"neutral"});
+cubes.push({x:0,y:1,z:0,color:"accent",ports:true});
+
+function svgNS(tag){ return document.createElementNS("http://www.w3.org/2000/svg",tag); }
+const rigEl=document.getElementById("rig");
+const svg=svgNS("svg"); svg.setAttribute("viewBox","0 0 "+VB+" "+VB); svg.setAttribute("class","rigsvg");
+rigEl.insertBefore(svg, rigEl.firstChild);
+const groundG=svgNS("g"), sceneG=svgNS("g");
+svg.appendChild(groundG); svg.appendChild(sceneG);
+
+function palette(){ return document.body.getAttribute("data-theme")==="workshop"?PAL.workshop:PAL.carbon; }
+
+// ---------- camera ----------
+const cam={az:35*Math.PI/180, el:25*Math.PI/180, scale:1, panX:0, panY:0};
+const DEFAULT_CAM={az:cam.az, el:cam.el};
+
+function proj(p){ return {sx:CX+p.x*SCALE*cam.scale+cam.panX, sy:CY-p.y*SCALE*cam.scale+cam.panY}; }
+function svgPointFromClient(clientX,clientY){
+  const pt=svg.createSVGPoint(); pt.x=clientX; pt.y=clientY;
+  const m=svg.getScreenCTM().inverse();
+  const p=pt.matrixTransform(m);
+  return {x:p.x,y:p.y};
+}
+
+let visiblePorts=[];   // rebuilt every render: [{key, sx, sy}] for the active (ported) cube's front-facing ports
+
+function drawGround(){
+  while(groundG.firstChild) groundG.removeChild(groundG.firstChild);
+  const P=palette(), y=-0.55, n=2;
+  for(let i=-n;i<=n;i++){
+    const a=proj(rotPt(i,y,-n,cam.az,cam.el)), b=proj(rotPt(i,y,n,cam.az,cam.el));
+    const ln=svgNS("line"); ln.setAttribute("x1",a.sx); ln.setAttribute("y1",a.sy);
+    ln.setAttribute("x2",b.sx); ln.setAttribute("y2",b.sy);
+    ln.setAttribute("stroke",P.ground); ln.setAttribute("stroke-width","1"); groundG.appendChild(ln);
+    const a2=proj(rotPt(-n,y,i,cam.az,cam.el)), b2=proj(rotPt(n,y,i,cam.az,cam.el));
+    const ln2=svgNS("line"); ln2.setAttribute("x1",a2.sx); ln2.setAttribute("y1",a2.sy);
+    ln2.setAttribute("x2",b2.sx); ln2.setAttribute("y2",b2.sy);
+    ln2.setAttribute("stroke",P.ground); ln2.setAttribute("stroke-width","1"); groundG.appendChild(ln2);
+  }
+}
+
+function render(){
+  const P=palette();
+  drawGround();
+  while(sceneG.firstChild) sceneG.removeChild(sceneG.firstChild);
+  visiblePorts=[];
+
+  const faceVis=FACES.map(f=>{
+    const rn=rotPt(f.n[0],f.n[1],f.n[2],cam.az,cam.el);
+    return {visible: rn.z < -0.001, rn};
+  });
+
+  const items=cubes.map(cu=>({cu, depth: rotPt(cu.x,cu.y,cu.z,cam.az,cam.el).z}));
+  items.sort((a,b)=>b.depth-a.depth);
+
+  for(const it of items){
+    const cu=it.cu;
+    const base = cu.color==="accent" ? P.accent : P.neutral;
+    FACES.forEach((f,fi)=>{
+      const fv=faceVis[fi];
+      if(!fv.visible) return;
+      const bright = 0.55 + 0.55*Math.max(0, fv.rn.x*LIGHT[0]+fv.rn.y*LIGHT[1]+fv.rn.z*LIGHT[2]);
+      const pts=f.c.map(off=>proj(rotPt(cu.x+off[0],cu.y+off[1],cu.z+off[2],cam.az,cam.el)));
+      const poly=svgNS("polygon");
+      poly.setAttribute("points", pts.map(p=>p.sx.toFixed(1)+","+p.sy.toFixed(1)).join(" "));
+      poly.setAttribute("fill", shade(base,bright));
+      poly.setAttribute("stroke", shade(base,bright*0.7));
+      poly.setAttribute("stroke-width","1");
+      sceneG.appendChild(poly);
+
+      if(cu.ports){
+        const portWorld=[cu.x+f.n[0]*0.47, cu.y+f.n[1]*0.47, cu.z+f.n[2]*0.47];
+        const pp=proj(rotPt(portWorld[0],portWorld[1],portWorld[2],cam.az,cam.el));
+        const ring=svgNS("circle");
+        ring.setAttribute("cx",pp.sx); ring.setAttribute("cy",pp.sy);
+        ring.setAttribute("r", 6*cam.scale);
+        ring.setAttribute("fill",P.port); ring.setAttribute("stroke",P.portStroke); ring.setAttribute("stroke-width","2");
+        ring.setAttribute("data-port",f.key);
+        sceneG.appendChild(ring);
+        visiblePorts.push({key:f.key, sx:pp.sx, sy:pp.sy, el:ring});
+      }
+    });
+  }
+  document.getElementById("stat").textContent=
+    "az "+Math.round(cam.az*180/Math.PI)+"° · el "+Math.round(cam.el*180/Math.PI)+"° · zoom "+Math.round(cam.scale*100)+"%";
+}
+
+function paintPort(key,col){ const p=visiblePorts.find(v=>v.key===key); if(p) p.el.setAttribute("fill",col); }
+function clearPortPaint(){ const P=palette(); visiblePorts.forEach(v=>v.el.setAttribute("fill",P.port)); }
+function setVal(text,ok){ const v=document.getElementById("val"); v.textContent=text; v.className="val"+(ok?"":" wait"); }
+function nearestVisiblePortWithin(x,y,r){
+  let best=null,bd=Infinity;
+  for(const v of visiblePorts){ const d=Math.hypot(x-v.sx,y-v.sy); if(d<bd){bd=d;best=v.key;} }
+  return bd<=r ? best : null;
+}
+
+// ---------- unified gesture handling ----------
+const pts=new Map();
+let mode="none";                       // none | orbit | place | pinch
+let orbitLast=null;
+let startPort=null, lastNear=null, resetTimer=null;
+let pinchBase=null;
+
+function scheduleReset(delay){
+  clearTimeout(resetTimer);
+  resetTimer=setTimeout(()=>{ setVal("Orbit to find the amber block",false); clearPortPaint(); },delay||1800);
+}
+function midpoint(){ const arr=Array.from(pts.values()); return {x:(arr[0].x+arr[1].x)/2, y:(arr[0].y+arr[1].y)/2}; }
+function pairDist(){ const arr=Array.from(pts.values()); return Math.hypot(arr[0].x-arr[1].x, arr[0].y-arr[1].y); }
+
+svg.addEventListener("pointerdown",e=>{
+  pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  try{svg.setPointerCapture(e.pointerId);}catch(err){}
+
+  if(pts.size===1 && mode==="none"){
+    const p=svgPointFromClient(e.clientX,e.clientY);
+    const port=nearestVisiblePortWithin(p.x,p.y,CAPTURE_R);
+    if(port){
+      mode="place"; startPort=port; lastNear=port;
+      clearPortPaint(); paintPort(port,"var(--acc2)");
+      setVal(port,true);
+    } else {
+      mode="orbit"; orbitLast={x:e.clientX,y:e.clientY};
+    }
+  } else if(pts.size===2){
+    if(mode==="place"){ clearPortPaint(); setVal("Orbit to find the amber block",false); startPort=null; }
+    mode="pinch";
+    pinchBase={d0:pairDist(), mid0:midpoint(), scale0:cam.scale, panX0:cam.panX, panY0:cam.panY};
+  }
+  e.preventDefault();
+});
+
+svg.addEventListener("pointermove",e=>{
+  if(!pts.has(e.pointerId)) return;
+  pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+
+  if(mode==="pinch" && pts.size>=2){
+    const d1=pairDist(), mid1=midpoint();
+    cam.scale=Math.max(0.6, Math.min(4, pinchBase.scale0*(d1/pinchBase.d0)));
+    cam.panX=pinchBase.panX0+(mid1.x-pinchBase.mid0.x);
+    cam.panY=pinchBase.panY0+(mid1.y-pinchBase.mid0.y);
+    render();
+    return;
+  }
+  if(mode==="orbit"){
+    const dx=e.clientX-orbitLast.x, dy=e.clientY-orbitLast.y;
+    orbitLast={x:e.clientX,y:e.clientY};
+    cam.az -= dx*0.01;
+    cam.el = Math.max(-1.3, Math.min(1.3, cam.el - dy*0.01));
+    render();
+    return;
+  }
+  if(mode==="place"){
+    const p=svgPointFromClient(e.clientX,e.clientY);
+    const port=nearestVisiblePortWithin(p.x,p.y,CAPTURE_R);
+    if(port) lastNear=port;
+    clearPortPaint(); paintPort(startPort,"var(--acc2)");
+    if(lastNear===startPort){ setVal(startPort,true); return; }
+    paintPort(lastNear,"var(--acc)");
+    setVal(startPort+" → "+lastNear,true);
+    return;
+  }
+});
+
+function up(e){
+  pts.delete(e.pointerId);
+  if(mode==="pinch"){ if(pts.size<2){ mode="none"; pinchBase=null; } return; }
+  if(mode==="orbit"){ if(pts.size===0) mode="none"; return; }
+  if(mode==="place"){
+    if(pts.size===0){
+      if(startPort) scheduleReset();
+      mode="none"; startPort=null;
+    }
+    return;
+  }
+}
+svg.addEventListener("pointerup",up);
+svg.addEventListener("pointercancel",up);
+
+document.getElementById("recenterbtn").addEventListener("click",()=>{
+  cam.panX=0; cam.panY=0; render();
+});
+document.getElementById("resetbtn").addEventListener("click",()=>{
+  cam.az=DEFAULT_CAM.az; cam.el=DEFAULT_CAM.el; cam.scale=1; cam.panX=0; cam.panY=0;
+  setVal("Orbit to find the amber block",false); render();
+});
+document.getElementById("tt").addEventListener("click",()=>{
+  const b=document.body; b.setAttribute("data-theme", b.getAttribute("data-theme")==="workshop"?"":"workshop");
+  render();
+});
+
+render();
+})();
+</script>
+</body>
+</html>
