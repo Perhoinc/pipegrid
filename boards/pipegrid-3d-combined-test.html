@@ -56,8 +56,10 @@
     <div class="note">Same hidden <b style="color:var(--acc)">amber</b> block as the orbit test — it also has ports.
     <b>Drag empty space or a block to orbit.</b> <b>Two fingers moving together to pan, pinching to zoom</b> (do both
     at once if you like). Once you've found the amber block and can see one of its ports, <b>drag from one port to
-    another to connect them</b> — same gesture as the port test. The whole point is finding out whether these four
-    controls get in each other's way.</div>
+    another to connect them</b> — same gesture as the port test. <b>New this time:</b> its opposite port (say, if
+    you're touching N, that's S) is never on screen at the same time — no convex block can show both sides of
+    itself at once. So instead, drag from a port <b>toward the small crosshair at the block's own center</b> to
+    connect it straight through to whichever port is directly opposite, wherever that currently is.</div>
     <div class="rig" id="rig">
       <div class="readout">
         <span>Result: <span class="val wait" id="val">Orbit to find the amber block</span></span>
@@ -98,6 +100,7 @@ const FACES=[
   {key:"S",n:[0,0,1],  c:[[.47,-.47,.47],[.47,.47,.47],[-.47,.47,.47],[-.47,-.47,.47]]},
   {key:"N",n:[0,0,-1], c:[[-.47,-.47,-.47],[-.47,.47,-.47],[.47,.47,-.47],[.47,-.47,-.47]]}
 ];
+const OPP={N:"S",S:"N",E:"W",W:"E",U:"D",D:"U"};
 const LIGHT=(()=>{ const v=[0.35,0.85,0.3], m=Math.hypot(v[0],v[1],v[2]); return v.map(x=>x/m); })();
 function shade(hex,mult){
   const n=parseInt(hex.slice(1),16);
@@ -134,6 +137,7 @@ function svgPointFromClient(clientX,clientY){
 }
 
 let visiblePorts=[];   // rebuilt every render: [{key, sx, sy}] for the active (ported) cube's front-facing ports
+let throughTarget=null; // rebuilt every render: {sx, sy, el} - the ported cube's own screen center, the "drag through" target
 
 function drawGround(){
   while(groundG.firstChild) groundG.removeChild(groundG.firstChild);
@@ -155,6 +159,7 @@ function render(){
   drawGround();
   while(sceneG.firstChild) sceneG.removeChild(sceneG.firstChild);
   visiblePorts=[];
+  throughTarget=null;
 
   const faceVis=FACES.map(f=>{
     const rn=rotPt(f.n[0],f.n[1],f.n[2],cam.az,cam.el);
@@ -191,18 +196,50 @@ function render(){
         visiblePorts.push({key:f.key, sx:pp.sx, sy:pp.sy, el:ring});
       }
     });
+
+    if(cu.ports){
+      // the "drag through" target - the cube's own screen center. Opposite ports (N/S, E/W,
+      // U/D) can never be visible at once on a convex block, so a straight/through connection
+      // can't be made by dragging to a second visible dot - you drag into the middle instead.
+      const cc=proj(rotPt(cu.x,cu.y,cu.z,cam.az,cam.el));
+      const cross=svgNS("g");
+      const a1=svgNS("line"),a2=svgNS("line");
+      a1.setAttribute("x1",cc.sx-5); a1.setAttribute("y1",cc.sy); a1.setAttribute("x2",cc.sx+5); a1.setAttribute("y2",cc.sy);
+      a2.setAttribute("x1",cc.sx); a2.setAttribute("y1",cc.sy-5); a2.setAttribute("x2",cc.sx); a2.setAttribute("y2",cc.sy+5);
+      [a1,a2].forEach(l=>{ l.setAttribute("stroke",P.portStroke); l.setAttribute("stroke-width","1.6"); l.setAttribute("opacity","0.55"); cross.appendChild(l); });
+      sceneG.appendChild(cross);
+      throughTarget={sx:cc.sx, sy:cc.sy, els:[a1,a2]};
+    }
   }
   document.getElementById("stat").textContent=
     "az "+Math.round(cam.az*180/Math.PI)+"° · el "+Math.round(cam.el*180/Math.PI)+"° · zoom "+Math.round(cam.scale*100)+"%";
 }
 
 function paintPort(key,col){ const p=visiblePorts.find(v=>v.key===key); if(p) p.el.setAttribute("fill",col); }
-function clearPortPaint(){ const P=palette(); visiblePorts.forEach(v=>v.el.setAttribute("fill",P.port)); }
+function clearPortPaint(){ const P=palette(); visiblePorts.forEach(v=>v.el.setAttribute("fill",P.port)); paintThrough(false); }
 function setVal(text,ok){ const v=document.getElementById("val"); v.textContent=text; v.className="val"+(ok?"":" wait"); }
 function nearestVisiblePortWithin(x,y,r){
   let best=null,bd=Infinity;
   for(const v of visiblePorts){ const d=Math.hypot(x-v.sx,y-v.sy); if(d<bd){bd=d;best=v.key;} }
   return bd<=r ? best : null;
+}
+function nearestTargetWithin(x,y,r){
+  // like nearestVisiblePortWithin, but also competes against the through-target crosshair
+  let best=null,bd=Infinity;
+  for(const v of visiblePorts){ const d=Math.hypot(x-v.sx,y-v.sy); if(d<bd){bd=d;best=v.key;} }
+  if(throughTarget){
+    const d=Math.hypot(x-throughTarget.sx,y-throughTarget.sy);
+    if(d<bd){bd=d;best="CENTER";}
+  }
+  return bd<=r ? best : null;
+}
+function paintThrough(active){
+  if(!throughTarget) return;
+  const P=palette();
+  throughTarget.els.forEach(l=>{
+    l.setAttribute("stroke", active?"var(--acc)":P.portStroke);
+    l.setAttribute("opacity", active?"1":"0.55");
+  });
 }
 
 // ---------- unified gesture handling ----------
@@ -278,10 +315,15 @@ svg.addEventListener("pointermove",e=>{
   }
   if(mode==="place"){
     const p=svgPointFromClient(e.clientX,e.clientY);
-    const port=nearestVisiblePortWithin(p.x,p.y,CAPTURE_R);
-    if(port) lastNear=port;
+    const target=nearestTargetWithin(p.x,p.y,CAPTURE_R);
+    if(target) lastNear=target;
     clearPortPaint(); paintPort(startPort,"var(--acc2)");
     if(lastNear===startPort){ setVal(startPort,true); return; }
+    if(lastNear==="CENTER"){
+      paintThrough(true);
+      setVal(startPort+" → "+OPP[startPort]+"  (through)",true);
+      return;
+    }
     paintPort(lastNear,"var(--acc)");
     setVal(startPort+" → "+lastNear,true);
     return;
