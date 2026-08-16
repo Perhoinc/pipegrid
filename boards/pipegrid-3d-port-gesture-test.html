@@ -151,7 +151,7 @@ function applyZoom(){
 applyZoom();
 
 // ---------- gesture state ----------
-let startPort=null, resetTimer=null;
+let startPort=null, lastNear=null, resetTimer=null;
 function scheduleReset(delay){
   clearTimeout(resetTimer);
   resetTimer=setTimeout(()=>{ setVal("Touch a port to begin",false); clearPorts(); },delay||1800);
@@ -167,10 +167,10 @@ svg.addEventListener("pointerdown",e=>{
     const p=svgPointFromClient(e.clientX,e.clientY);
     const port=nearestPortWithin(p.x,p.y,CAPTURE_R);
     if(port){
-      startPort=port; clearPorts(); paintPort(port,"var(--acc2)");
+      startPort=port; lastNear=port; clearPorts(); paintPort(port,"var(--acc2)");
       setVal(port,true);
     } else {
-      startPort=null; setVal("Touch a port to begin",false);
+      startPort=null; lastNear=null; setVal("Touch a port to begin",false);
     }
   } else if(pts.size===2){
     startPort=null; clearPorts(); setVal("Touch a port to begin",false);  // pinch takes over
@@ -199,12 +199,12 @@ svg.addEventListener("pointermove",e=>{
 
   if(!startPort) return;
   const p=svgPointFromClient(e.clientX,e.clientY);
-  const port=nearestPortWithin(p.x,p.y,CAPTURE_R/scale);
+  const port=nearestPortWithin(p.x,p.y,CAPTURE_R);
+  if(port) lastNear=port;          // only ever updates when actually near a port — overshooting past it changes nothing
   clearPorts(); paintPort(startPort,"var(--acc2)");
-  if(!port){ setVal(startPort,true); return; }
-  if(port===startPort){ setVal(startPort,true); return; }
-  paintPort(port,"var(--acc)");
-  setVal(startPort+" → "+port,true);
+  if(lastNear===startPort){ setVal(startPort,true); return; }
+  paintPort(lastNear,"var(--acc)");
+  setVal(startPort+" → "+lastNear,true);
 });
 
 function up(e){
