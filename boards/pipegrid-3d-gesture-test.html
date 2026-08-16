@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>PIPEGRID — 3D gesture test</title>
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12151b; --panel2:#0e1116; --edge:#2c313d;
+    --text:#c7d3e2; --dim:#5f6775; --acc:#e0a14e; --acc2:#66e4ff;
+    --cpipe:#4a5568; --clum:#dfe6f0; --cline:rgba(140,160,185,0.18);
+    --ok:#7ee08a; --wait:#5f6775;
+  }
+  body[data-theme="workshop"]{
+    --bg:#e6dfcf; --panel:#efe9dc; --panel2:#f3eee2; --edge:#c9c0aa;
+    --text:#2a2a28; --dim:#8a8272; --acc:#e0771e; --acc2:#5a35a0;
+    --cpipe:#2a2a28; --clum:#efe9dc; --cline:rgba(90,80,60,0.28);
+    --ok:#3f8a49; --wait:#8a8272;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; overscroll-behavior:contain;}
+  body{background:var(--bg);color:var(--text);
+       font-family:ui-monospace,SFMono-Regular,Menlo,monospace;-webkit-text-size-adjust:100%;
+       padding:14px; padding-bottom:60px;}
+  .hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:4px;flex-wrap:wrap;}
+  .title{font-size:15px;font-weight:700;letter-spacing:4px;}
+  .sub{font-size:9px;letter-spacing:1.5px;color:var(--dim);}
+  .themebtn{margin-left:auto;font-family:inherit;font-size:10px;letter-spacing:.5px;text-transform:uppercase;
+        padding:7px 9px;border:1px solid var(--edge);border-radius:4px;background:transparent;
+        color:var(--text);cursor:pointer;}
+  #board{display:flex;flex-direction:column;gap:14px;max-width:640px;margin:12px auto 0;}
+  .panel{border:1px solid var(--edge);border-radius:8px;background:var(--panel);padding:12px;}
+  .plabel{font-size:11px;font-weight:700;letter-spacing:2px;margin-bottom:2px;display:flex;align-items:center;gap:8px;}
+  .plabel .tag{color:var(--acc);border:1px solid var(--acc);border-radius:3px;padding:1px 6px;font-size:10px;}
+  .note{font-size:10px;color:var(--dim);line-height:1.6;margin:4px 0 10px;}
+  .rig{position:relative;background:var(--panel2);border:1px solid var(--edge);border-radius:8px;
+       touch-action:none; user-select:none;}
+  .rigsvg{display:block;width:100%;height:auto;}
+  .readout{display:flex;align-items:center;justify-content:space-between;gap:8px;
+            padding:8px 10px;border-top:1px solid var(--edge);font-size:11px;}
+  .readout .val{color:var(--acc);font-weight:700;letter-spacing:1px;}
+  .readout .val.wait{color:var(--wait);font-weight:400;}
+  .resetbtn{font-family:inherit;font-size:9px;letter-spacing:.5px;text-transform:uppercase;
+        padding:5px 8px;border:1px solid var(--edge);border-radius:4px;background:transparent;
+        color:var(--dim);cursor:pointer;}
+  .vbtn{cursor:pointer;}
+  .foot{max-width:640px;margin:16px auto 0;font-size:9px;color:var(--dim);line-height:1.7;text-align:center;}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <span class="title">PIPEGRID</span>
+  <span class="sub">3D GESTURE TEST · WHICH DRAG SCHEME READS YOUR THUMB CORRECTLY</span>
+  <button class="themebtn" id="tt">Theme</button>
+</div>
+<div id="board"></div>
+<div class="foot">Not the real app — placeholder cubes only. Drag from the amber cube toward any of the six<br/>marked positions (N·S·E·W·UP·DOWN) and see what each scheme thinks you meant.</div>
+
+<script>
+(function(){
+"use strict";
+
+const TW=76, TH=40, LH=52;   // iso diamond width/height, vertical rise per layer
+const CX=140, CY=160;        // screen center of each rig's local origin
+
+const D3={N:{dr:-1,dc:0,dl:0}, S:{dr:1,dc:0,dl:0}, E:{dr:0,dc:1,dl:0}, W:{dr:0,dc:-1,dl:0},
+          U:{dr:0,dc:0,dl:1}, D:{dr:0,dc:0,dl:-1}};
+const HORIZ=["N","E","S","W"];
+const ALL=["N","E","S","W","U","D"];
+
+function proj(dr,dc,dl){ return { x:(dc-dr)*TW/2, y:(dc+dr)*TH/2 - dl*LH }; }
+const ANGLE={}; for(const k of ALL){ const p=proj(D3[k].dr,D3[k].dc,D3[k].dl); ANGLE[k]=Math.atan2(p.y,p.x); }
+
+function angDiff(a,b){ let d=Math.abs(a-b)%(2*Math.PI); if(d>Math.PI) d=2*Math.PI-d; return d; }
+function nearest(dx,dy,allowed){
+  const a=Math.atan2(dy,dx); let best=null,bd=Infinity;
+  for(const k of allowed){ const d=angDiff(a,ANGLE[k]); if(d<bd){bd=d;best=k;} }
+  return best;
+}
+
+function svgNS(tag){ return document.createElementNS("http://www.w3.org/2000/svg",tag); }
+
+function markerSvg(){
+  const svg=svgNS("svg"); svg.setAttribute("viewBox","0 0 280 300"); svg.setAttribute("class","rigsvg");
+  const g=svgNS("g"); svg.appendChild(g);
+
+  // faint guide lines from origin to each of the six candidate spots
+  for(const k of ALL){
+    const p=proj(D3[k].dr,D3[k].dc,D3[k].dl);
+    const ln=svgNS("line");
+    ln.setAttribute("x1",CX); ln.setAttribute("y1",CY);
+    ln.setAttribute("x2",CX+p.x); ln.setAttribute("y2",CY+p.y);
+    ln.setAttribute("stroke","var(--cline)"); ln.setAttribute("stroke-width","10"); ln.setAttribute("stroke-linecap","round");
+    g.appendChild(ln);
+  }
+  // context markers + labels at each candidate
+  for(const k of ALL){
+    const p=proj(D3[k].dr,D3[k].dc,D3[k].dl);
+    const c=svgNS("circle");
+    c.setAttribute("cx",CX+p.x); c.setAttribute("cy",CY+p.y); c.setAttribute("r", (k==="U"||k==="D")?8:9);
+    c.setAttribute("fill","none"); c.setAttribute("stroke","var(--dim)"); c.setAttribute("stroke-width","1.6");
+    g.appendChild(c);
+    const t=svgNS("text");
+    t.setAttribute("x",CX+p.x); t.setAttribute("y",CY+p.y - 16);
+    t.setAttribute("text-anchor","middle"); t.setAttribute("font-size","9"); t.setAttribute("letter-spacing","1");
+    t.setAttribute("fill","var(--dim)"); t.textContent=k;
+    g.appendChild(t);
+  }
+  // the draggable origin cube
+  const hot=svgNS("circle");
+  hot.setAttribute("cx",CX); hot.setAttribute("cy",CY); hot.setAttribute("r",16);
+  hot.setAttribute("fill","var(--acc)"); hot.setAttribute("stroke","var(--panel2)"); hot.setAttribute("stroke-width","3");
+  hot.setAttribute("class","vbtn");
+  g.appendChild(hot);
+
+  // live highlight ring, hidden until dragging
+  const hi=svgNS("circle");
+  hi.setAttribute("r",13); hi.setAttribute("fill","none"); hi.setAttribute("stroke","var(--acc2)");
+  hi.setAttribute("stroke-width","3"); hi.setAttribute("opacity","0");
+  g.appendChild(hi);
+
+  return {svg,hot,hi,g};
+}
+
+function setReadout(el,text,ok){
+  const v=el.querySelector(".val");
+  v.textContent=text; v.className="val"+(ok?"":" wait");
+}
+
+function initRig(container, scheme){
+  const {svg,hot,hi}=markerSvg();
+  container.querySelector(".rigsvg-slot").appendChild(svg);
+  const readout=container.querySelector(".readout");
+  let resetTimer=null;
+
+  function positionHi(k){
+    const p=proj(D3[k].dr,D3[k].dc,D3[k].dl);
+    hi.setAttribute("cx",CX+p.x); hi.setAttribute("cy",CY+p.y); hi.setAttribute("opacity","1");
+  }
+  function clearHi(){ hi.setAttribute("opacity","0"); }
+  function scheduleReset(delay){
+    clearTimeout(resetTimer);
+    resetTimer=setTimeout(()=>{ setReadout(readout,"Drag the amber cube",false); clearHi(); },delay||1600);
+  }
+
+  // ---------- Scheme A: snap to nearest of all six, live, with a small deadzone ----------
+  if(scheme==="snap"){
+    let active=false, startX=0, startY=0, pid=null;
+    hot.addEventListener("pointerdown",e=>{
+      active=true; pid=e.pointerId; try{hot.setPointerCapture(pid);}catch(err){}
+      startX=e.clientX; startY=e.clientY;
+      setReadout(readout,"…",false);
+      e.preventDefault();
+    });
+    svg.addEventListener("pointermove",e=>{
+      if(!active||e.pointerId!==pid) return;
+      const r=svg.getBoundingClientRect(); const sc=280/r.width;
+      const dx=(e.clientX-startX)*sc, dy=(e.clientY-startY)*sc;
+      const mag=Math.hypot(dx,dy);
+      if(mag<14){ setReadout(readout,"…",false); clearHi(); return; }
+      const k=nearest(dx,dy,ALL);
+      setReadout(readout,k,true); positionHi(k);
+    });
+    svg.addEventListener("pointerup",e=>{
+      if(!active||e.pointerId!==pid) return; active=false;
+      const v=readout.querySelector(".val").textContent;
+      if(v!=="…" && v!=="Drag the amber cube") scheduleReset();
+      else { setReadout(readout,"Drag the amber cube",false); }
+    });
+  }
+
+  // ---------- Scheme B: one finger = horizontal, second finger held = vertical ----------
+  if(scheme==="twofinger"){
+    const pts=new Map(); let primary=null;
+    hot.addEventListener("pointerdown",e=>{
+      try{hot.setPointerCapture(e.pointerId);}catch(err){}
+      pts.set(e.pointerId,{x:e.clientX,y:e.clientY,startX:e.clientX,startY:e.clientY});
+      if(primary===null) primary=e.pointerId;
+      setReadout(readout,"…",false);
+      e.preventDefault();
+    });
+    svg.addEventListener("pointerdown",e=>{
+      if(!pts.has(e.pointerId) && pts.size>=1){
+        pts.set(e.pointerId,{x:e.clientX,y:e.clientY,startX:e.clientX,startY:e.clientY});
+        e.preventDefault();
+      }
+    });
+    svg.addEventListener("pointermove",e=>{
+      if(!pts.has(e.pointerId)) return;
+      const p=pts.get(e.pointerId); p.x=e.clientX; p.y=e.clientY;
+      if(primary===null) return;
+      const r=svg.getBoundingClientRect(); const sc=280/r.width;
+      const pr=pts.get(primary);
+      const dx=(pr.x-pr.startX)*sc, dy=(pr.y-pr.startY)*sc;
+      const mag=Math.hypot(dx,dy);
+      if(pts.size>=2){
+        if(Math.abs(dy)<10){ setReadout(readout,"…",false); clearHi(); return; }
+        const k=dy<0?"U":"D";
+        setReadout(readout,k+"  (2-finger)",true); positionHi(k);
+      } else {
+        if(mag<14){ setReadout(readout,"…",false); clearHi(); return; }
+        const k=nearest(dx,dy,HORIZ);
+        setReadout(readout,k,true); positionHi(k);
+      }
+    });
+    function up(e){
+      if(!pts.has(e.pointerId)) return;
+      pts.delete(e.pointerId);
+      if(e.pointerId===primary){
+        const v=readout.querySelector(".val").textContent;
+        if(v!=="…" && v!=="Drag the amber cube") scheduleReset();
+        else setReadout(readout,"Drag the amber cube",false);
+        primary=null; pts.clear();
+      }
+    }
+    svg.addEventListener("pointerup",up);
+    svg.addEventListener("pointercancel",up);
+  }
+
+  // ---------- Scheme C: horizontal drag first, then a follow-up tap to bend it vertical ----------
+  if(scheme==="twostep"){
+    let active=false,startX=0,startY=0,pid=null,phase="idle",horizK=null;
+    let upBtn=null, dnBtn=null, followTimer=null;
+
+    function showFollowUp(){
+      const p=proj(0,0,1); upBtn=svgNS("circle");
+      upBtn.setAttribute("cx",CX+p.x*0.55); upBtn.setAttribute("cy",CY+p.y*0.55); upBtn.setAttribute("r",11);
+      upBtn.setAttribute("fill","var(--panel)"); upBtn.setAttribute("stroke","var(--acc2)"); upBtn.setAttribute("stroke-width","2");
+      upBtn.setAttribute("class","vbtn");
+      const pd=proj(0,0,-1); dnBtn=svgNS("circle");
+      dnBtn.setAttribute("cx",CX+pd.x*0.55); dnBtn.setAttribute("cy",CY+pd.y*0.55); dnBtn.setAttribute("r",11);
+      dnBtn.setAttribute("fill","var(--panel)"); dnBtn.setAttribute("stroke","var(--acc2)"); dnBtn.setAttribute("stroke-width","2");
+      dnBtn.setAttribute("class","vbtn");
+      svg.appendChild(upBtn); svg.appendChild(dnBtn);
+      upBtn.addEventListener("pointerdown",ev=>{ ev.stopPropagation(); ev.preventDefault(); finish("U",true); });
+      dnBtn.addEventListener("pointerdown",ev=>{ ev.stopPropagation(); ev.preventDefault(); finish("D",true); });
+      followTimer=setTimeout(()=>finish(horizK,false),1800);
+    }
+    function clearFollowUp(){
+      clearTimeout(followTimer);
+      if(upBtn){ upBtn.remove(); upBtn=null; } if(dnBtn){ dnBtn.remove(); dnBtn=null; }
+    }
+    function finish(k,bent){
+      clearFollowUp();
+      setReadout(readout, k+(bent?"  (bent)":""), true); positionHi(k);
+      phase="idle"; scheduleReset();
+    }
+
+    hot.addEventListener("pointerdown",e=>{
+      if(phase!=="idle") return;
+      active=true; pid=e.pointerId; try{hot.setPointerCapture(pid);}catch(err){}
+      startX=e.clientX; startY=e.clientY; phase="drag";
+      setReadout(readout,"…",false);
+      e.preventDefault();
+    });
+    svg.addEventListener("pointermove",e=>{
+      if(!active||e.pointerId!==pid||phase!=="drag") return;
+      const r=svg.getBoundingClientRect(); const sc=280/r.width;
+      const dx=(e.clientX-startX)*sc, dy=(e.clientY-startY)*sc;
+      const mag=Math.hypot(dx,dy);
+      if(mag<14){ setReadout(readout,"…",false); clearHi(); return; }
+      const k=nearest(dx,dy,HORIZ);
+      setReadout(readout,k,true); positionHi(k);
+    });
+    svg.addEventListener("pointerup",e=>{
+      if(!active||e.pointerId!==pid||phase!=="drag") return; active=false;
+      const v=readout.querySelector(".val").textContent;
+      if(v==="…"||v==="Drag the amber cube"){ setReadout(readout,"Drag the amber cube",false); phase="idle"; return; }
+      horizK=v; phase="followup";
+      setReadout(readout,v+"  — tap ▲/▼ to bend, or wait",true);
+      showFollowUp();
+    });
+  }
+}
+
+function boardHTML(){
+  const defs=[
+    {id:"snap",label:"A · SNAP TO NEAREST",
+     note:"One continuous drag. The gesture snaps live to whichever of the six directions your drag is closest to — release to confirm. No modifiers, no extra steps."},
+    {id:"twofinger",label:"B · SECOND FINGER = VERTICAL",
+     note:"One finger drags flat (N·E·S·W), same as placing parts today. Press a second finger down at any point to switch that same drag to mean up/down instead."},
+    {id:"twostep",label:"C · DRAG, THEN BEND",
+     note:"Drag flat first, exactly like today's app. Right after you lift your finger, two small buttons appear briefly — tap one to bend the result up or down, or do nothing and the flat direction stands."}
+  ];
+  let h="";
+  for(const d of defs){
+    h+=`<div class="panel">
+      <div class="plabel"><span class="tag">${d.label.split(" · ")[0]}</span> ${d.label.split(" · ")[1]}</div>
+      <div class="note">${d.note}</div>
+      <div class="rig" data-scheme="${d.id}">
+        <div class="rigsvg-slot"></div>
+        <div class="readout"><span>Result: <span class="val wait">Drag the amber cube</span></span>
+          <button class="resetbtn" data-reset>Reset</button></div>
+      </div>
+    </div>`;
+  }
+  document.getElementById("board").innerHTML=h;
+  document.querySelectorAll(".rig").forEach(el=>{
+    initRig(el, el.dataset.scheme);
+    el.querySelector("[data-reset]").addEventListener("click",()=>{
+      setReadout(el.querySelector(".readout"),"Drag the amber cube",false);
+      const hiEl=el.querySelector(".rigsvg circle:nth-of-type(1)");
+    });
+  });
+}
+
+document.getElementById("tt").addEventListener("click",()=>{
+  const b=document.body; b.setAttribute("data-theme", b.getAttribute("data-theme")==="workshop"?"":"workshop");
+});
+boardHTML();
+
+})();
+</script>
+</body>
+</html>
