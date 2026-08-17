@@ -49,7 +49,7 @@ same shape if some rotation of the cube maps one onto the other.
 | 1 | 1 | Cap — a single opening | existing (`src`/`snk`) |
 | 2 | 2 | **Straight** — an opposite pair | existing |
 | 2 | ↑ | **Elbow** — an adjacent pair | existing |
-| 3 | 2 | **T** — an opposite pair plus one more (a run with a branch) | existing |
+| 3 | 2 | **T** — one shape, two port roles: a "run" (two ports opposite each other) plus a "branch" (the third, perpendicular to both) | existing |
 | 3 | ↑ | **Corner** — three mutually perpendicular ports, no opposite pair, meeting at a cube vertex | **new** (owner-confirmed 2026-08-17) |
 | 4 | 2 | **Cross** — all four ports of one flat plane (two full opposite pairs) | existing |
 | 4 | ↑ | **Corner-through** — a corner fitting with one of its three arms extended straight out the far side | **new** |
