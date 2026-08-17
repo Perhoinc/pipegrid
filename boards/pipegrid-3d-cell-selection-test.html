@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>PIPEGRID — cell selection test</title>
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12151b; --panel2:#0e1116; --edge:#2c313d;
+    --text:#c7d3e2; --dim:#5f6775; --acc:#e0a14e; --acc2:#66e4ff;
+    --cline:rgba(140,160,185,0.18);
+  }
+  body[data-theme="workshop"]{
+    --bg:#e6dfcf; --panel:#efe9dc; --panel2:#f3eee2; --edge:#c9c0aa;
+    --text:#2a2a28; --dim:#8a8272; --acc:#e0771e; --acc2:#5a35a0;
+    --cline:rgba(90,80,60,0.28);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; overscroll-behavior:contain;}
+  body{background:var(--bg);color:var(--text);
+       font-family:ui-monospace,SFMono-Regular,Menlo,monospace;-webkit-text-size-adjust:100%;
+       padding:14px; padding-bottom:60px;}
+  .hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:4px;flex-wrap:wrap;}
+  .title{font-size:15px;font-weight:700;letter-spacing:4px;}
+  .sub{font-size:9px;letter-spacing:1.5px;color:var(--dim);}
+  .themebtn{margin-left:auto;font-family:inherit;font-size:10px;letter-spacing:.5px;text-transform:uppercase;
+        padding:7px 9px;border:1px solid var(--edge);border-radius:4px;background:transparent;
+        color:var(--text);cursor:pointer;}
+  #wrap{max-width:640px;margin:12px auto 0;}
+  .panel{border:1px solid var(--edge);border-radius:8px;background:var(--panel);padding:12px;}
+  .note{font-size:10px;color:var(--dim);line-height:1.6;margin:4px 0 10px;}
+  .note b{color:var(--text);}
+  .rig{position:relative;background:var(--panel2);border:1px solid var(--edge);border-radius:8px;
+       touch-action:none; user-select:none;}
+  .rigsvg{display:block;width:100%;height:auto;}
+  .readout{display:flex;flex-direction:column;gap:4px;
+            padding:8px 10px;border-top:1px solid var(--edge);font-size:11px;}
+  .readout .row{display:flex;justify-content:space-between;gap:8px;}
+  .readout .lbl{color:var(--dim);font-size:9px;text-transform:uppercase;letter-spacing:.5px;}
+  .readout .val{color:var(--acc);font-weight:700;letter-spacing:1px;}
+  .readout .val.disagree{color:#ff6b6b;}
+  .readout .val.wait{color:var(--dim);font-weight:400;}
+  .btnrow{display:flex;gap:6px;justify-content:flex-end;margin-top:2px;}
+  .resetbtn{font-family:inherit;font-size:9px;letter-spacing:.5px;text-transform:uppercase;
+        padding:5px 8px;border:1px solid var(--edge);border-radius:4px;background:transparent;
+        color:var(--dim);cursor:pointer;}
+  .foot{max-width:640px;margin:16px auto 0;font-size:9px;color:var(--dim);line-height:1.7;text-align:center;}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <span class="title">PIPEGRID</span>
+  <span class="sub">CELL SELECTION TEST · WHICH CELL DID YOU ACTUALLY TAP</span>
+  <button class="themebtn" id="tt">Theme</button>
+</div>
+<div id="wrap">
+  <div class="panel">
+    <div class="note">A denser grid this time — two full layers, most cells empty (wireframe), a few
+    <b style="color:var(--text)">solid</b> ones scattered in as stand-ins for placed parts. <b>Tap once</b> to select
+    a cell (drag to orbit, two fingers to pan/zoom as before). Two answers are shown for every tap: what
+    <b>nearest-center</b> picks versus what <b>shape + depth</b> picks. Usually they agree. Orbit to a shallow angle
+    so cells start lining up behind each other, then tap where two overlap — <b>watch for the two answers to
+    disagree</b>, and judge which one actually matches what you meant to tap.</div>
+    <div class="rig" id="rig">
+      <div class="readout">
+        <div class="row"><span class="lbl">Nearest-center picks</span><span class="val wait" id="valCenter">Tap a cell</span></div>
+        <div class="row"><span class="lbl">Shape + depth picks</span><span class="val wait" id="valShape">Tap a cell</span></div>
+        <div class="row"><span class="lbl" id="statlbl">az 35° · el 25° · zoom 100%</span>
+          <div class="btnrow">
+            <button class="resetbtn" id="recenterbtn">Recenter</button>
+            <button class="resetbtn" id="resetbtn">Reset view</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="foot">Not the real app. Isolating one question: when several cells are close together or stacked behind<br/>each other on screen, does tap resolve to the one you actually meant?</div>
+
+<script>
+(function(){
+"use strict";
+
+const VB=340, CX=170, CY=178, SCALE=30;
+
+function rotPt(x,y,z,az,el){
+  const ca=Math.cos(az), sa=Math.sin(az);
+  const x1=x*ca+z*sa, z1=-x*sa+z*ca, y1=y;
+  const ce=Math.cos(el), se=Math.sin(el);
+  const y2=y1*ce-z1*se, z2=y1*se+z1*ce;
+  return {x:x1,y:y2,z:z2};
+}
+
+const PAL={
+  carbon:{empty:"#c7d3e2", placed:"#4a5568", sel:"#e0a14e"},
+  workshop:{empty:"#2a2a28", placed:"#6b6355", sel:"#e0771e"}
+};
+function palette(){ return document.body.getAttribute("data-theme")==="workshop"?PAL.workshop:PAL.carbon; }
+function shade(hex,mult){
+  const n=parseInt(hex.slice(1),16);
+  const r=Math.min(255,Math.round(((n>>16)&255)*mult)), g=Math.min(255,Math.round(((n>>8)&255)*mult)), b=Math.min(255,Math.round((n&255)*mult));
+  return "#"+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
+}
+
+// ---------- scene: 3x3, two full layers, a handful marked "placed" (solid) ----------
+const cells=[];
+for(let y=0;y<=1;y++) for(let x=-1;x<=1;x++) for(let z=-1;z<=1;z++) cells.push({x,y,z,placed:false});
+[[0,0,0],[1,1,0],[-1,0,1],[0,1,-1]].forEach(([x,y,z])=>{
+  const c=cells.find(c=>c.x===x&&c.y===y&&c.z===z); if(c) c.placed=true;
+});
+
+function svgNS(tag){ return document.createElementNS("http://www.w3.org/2000/svg",tag); }
+const rigEl=document.getElementById("rig");
+const svg=svgNS("svg"); svg.setAttribute("viewBox","0 0 "+VB+" "+VB); svg.setAttribute("class","rigsvg");
+rigEl.insertBefore(svg, rigEl.firstChild);
+const sceneG=svgNS("g"); svg.appendChild(sceneG);
+
+const cam={az:35*Math.PI/180, el:25*Math.PI/180, scale:1, panX:0, panY:0};
+const DEFAULT_CAM={az:cam.az, el:cam.el};
+function proj(p){ return {sx:CX+p.x*SCALE*cam.scale+cam.panX, sy:CY-p.y*SCALE*cam.scale+cam.panY}; }
+function svgPointFromClient(clientX,clientY){
+  const pt=svg.createSVGPoint(); pt.x=clientX; pt.y=clientY;
+  const m=svg.getScreenCTM().inverse();
+  return pt.matrixTransform(m);
+}
+
+function cornersOf(c){
+  const h=0.47, s=[-1,1], pts=[];
+  for(const sx of s) for(const sy of s) for(const sz of s) pts.push([c.x+sx*h, c.y+sy*h, c.z+sz*h]);
+  return pts;
+}
+function edgesOf(c){
+  const h=0.47;
+  const p=[
+    [c.x-h,c.y-h,c.z-h],[c.x+h,c.y-h,c.z-h],[c.x+h,c.y+h,c.z-h],[c.x-h,c.y+h,c.z-h],
+    [c.x-h,c.y-h,c.z+h],[c.x+h,c.y-h,c.z+h],[c.x+h,c.y+h,c.z+h],[c.x-h,c.y+h,c.z+h]
+  ];
+  const pairs=[[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
+  return pairs.map(([a,b])=>[p[a],p[b]]);
+}
+
+// ---------- convex hull (monotone chain) + point-in-polygon ----------
+function convexHull(points){
+  const pts=points.slice().sort((a,b)=> a.x-b.x || a.y-b.y);
+  const cross=(o,a,b)=>(a.x-o.x)*(b.y-o.y)-(a.y-o.y)*(b.x-o.x);
+  const lower=[];
+  for(const p of pts){
+    while(lower.length>=2 && cross(lower[lower.length-2],lower[lower.length-1],p)<=0) lower.pop();
+    lower.push(p);
+  }
+  const upper=[];
+  for(let i=pts.length-1;i>=0;i--){
+    const p=pts[i];
+    while(upper.length>=2 && cross(upper[upper.length-2],upper[upper.length-1],p)<=0) upper.pop();
+    upper.push(p);
+  }
+  upper.pop(); lower.pop();
+  return lower.concat(upper);
+}
+function pointInPoly(pt, poly){
+  let inside=false;
+  for(let i=0,j=poly.length-1;i<poly.length;j=i++){
+    const xi=poly[i].x, yi=poly[i].y, xj=poly[j].x, yj=poly[j].y;
+    const hit = ((yi>pt.y)!==(yj>pt.y)) && (pt.x < (xj-xi)*(pt.y-yi)/(yj-yi)+xi);
+    if(hit) inside=!inside;
+  }
+  return inside;
+}
+
+// ---------- per-frame cell geometry cache, rebuilt in render() ----------
+let cellGeo=[];   // [{cell, sx, sy, depth, hull:[{x,y}...]}]
+
+function render(){
+  const P=palette();
+  while(sceneG.firstChild) sceneG.removeChild(sceneG.firstChild);
+  cellGeo=[];
+
+  const items=cells.map(c=>{
+    const center=rotPt(c.x,c.y,c.z,cam.az,cam.el);
+    const pcs=cornersOf(c).map(([x,y,z])=>proj(rotPt(x,y,z,cam.az,cam.el)));
+    const hull=convexHull(pcs.map(p=>({x:p.sx,y:p.sy})));
+    const pc=proj(center);
+    return {cell:c, sx:pc.sx, sy:pc.sy, depth:center.z, hull};
+  });
+  items.sort((a,b)=>b.depth-a.depth);
+  cellGeo=items;
+
+  for(const it of items){
+    const c=it.cell;
+    const isSel = selected===c;
+    if(!c.placed){
+      edgesOf(c).forEach(([a,b])=>{
+        const pa=proj(rotPt(a[0],a[1],a[2],cam.az,cam.el)), pb=proj(rotPt(b[0],b[1],b[2],cam.az,cam.el));
+        const ln=svgNS("line");
+        ln.setAttribute("x1",pa.sx); ln.setAttribute("y1",pa.sy);
+        ln.setAttribute("x2",pb.sx); ln.setAttribute("y2",pb.sy);
+        ln.setAttribute("stroke", isSel?P.sel:P.empty);
+        ln.setAttribute("stroke-width", isSel?"2":"1");
+        ln.setAttribute("opacity", isSel?"0.9":"0.1");
+        sceneG.appendChild(ln);
+      });
+    } else {
+      const poly=svgNS("polygon");
+      poly.setAttribute("points", it.hull.map(p=>p.x.toFixed(1)+","+p.y.toFixed(1)).join(" "));
+      poly.setAttribute("fill", shade(P.placed, isSel?1.3:1));
+      poly.setAttribute("stroke", isSel?P.sel:shade(P.placed,0.7));
+      poly.setAttribute("stroke-width", isSel?"2.5":"1");
+      sceneG.appendChild(poly);
+    }
+  }
+  document.getElementById("statlbl").textContent=
+    "az "+Math.round(cam.az*180/Math.PI)+"° · el "+Math.round(cam.el*180/Math.PI)+"° · zoom "+Math.round(cam.scale*100)+"%";
+}
+
+// ---------- the two picking algorithms under comparison ----------
+function pickByCenter(pt){
+  let best=null,bd=Infinity;
+  for(const it of cellGeo){ const d=Math.hypot(pt.x-it.sx, pt.y-it.sy); if(d<bd){bd=d;best=it;} }
+  return best;
+}
+function pickByShapeDepth(pt){
+  let best=null,bd=Infinity;
+  for(const it of cellGeo){
+    if(!pointInPoly(pt, it.hull)) continue;
+    if(it.depth<bd){ bd=it.depth; best=it; }
+  }
+  return best;
+}
+function label(it){ return it ? "("+it.cell.x+","+it.cell.y+","+it.cell.z+")"+(it.cell.placed?" solid":"") : "miss"; }
+
+let selected=null;
+
+// ---------- gesture handling: tap to select, drag to orbit, two fingers to pan/zoom ----------
+const pts=new Map();
+let mode="none", orbitLast=null, downPt=null, pinchBase=null;
+function midpoint(){ const arr=Array.from(pts.values()).map(v=>svgPointFromClient(v.x,v.y)); return {x:(arr[0].x+arr[1].x)/2,y:(arr[0].y+arr[1].y)/2}; }
+function pairDist(){ const arr=Array.from(pts.values()).map(v=>svgPointFromClient(v.x,v.y)); return Math.hypot(arr[0].x-arr[1].x,arr[0].y-arr[1].y); }
+
+svg.addEventListener("pointerdown",e=>{
+  pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  try{svg.setPointerCapture(e.pointerId);}catch(err){}
+  if(pts.size===1){
+    mode="maybe-tap"; downPt={x:e.clientX,y:e.clientY}; orbitLast={x:e.clientX,y:e.clientY};
+  } else if(pts.size===2){
+    mode="pinch";
+    pinchBase={d0:pairDist(), mid0:midpoint(), scale0:cam.scale, panX0:cam.panX, panY0:cam.panY};
+  }
+  e.preventDefault();
+});
+
+svg.addEventListener("pointermove",e=>{
+  if(!pts.has(e.pointerId)) return;
+  pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+
+  if(mode==="pinch" && pts.size>=2){
+    const d1=pairDist(), mid1=midpoint();
+    const newScale=Math.max(0.6, Math.min(4, pinchBase.scale0*(d1/pinchBase.d0)));
+    const ratio=newScale/pinchBase.scale0;
+    cam.panX = mid1.x - CX - ratio*(pinchBase.mid0.x - CX - pinchBase.panX0);
+    cam.panY = mid1.y - CY - ratio*(pinchBase.mid0.y - CY - pinchBase.panY0);
+    cam.scale = newScale;
+    render();
+    return;
+  }
+  if(mode==="maybe-tap" || mode==="orbit"){
+    const mv=Math.hypot(e.clientX-downPt.x, e.clientY-downPt.y);
+    if(mode==="maybe-tap" && mv<6) return;
+    mode="orbit";
+    const dx=e.clientX-orbitLast.x, dy=e.clientY-orbitLast.y;
+    orbitLast={x:e.clientX,y:e.clientY};
+    cam.az -= dx*0.01;
+    cam.el = Math.max(-1.3, Math.min(1.3, cam.el - dy*0.01));
+    render();
+  }
+});
+
+function up(e){
+  pts.delete(e.pointerId);
+  if(mode==="pinch"){ if(pts.size<2){ mode="none"; pinchBase=null; } return; }
+  if(mode==="maybe-tap" && pts.size===0){
+    const p=svgPointFromClient(e.clientX,e.clientY);
+    const byCenter=pickByCenter(p), byShape=pickByShapeDepth(p);
+    const vC=document.getElementById("valCenter"), vS=document.getElementById("valShape");
+    vC.textContent=label(byCenter); vC.className="val";
+    vS.textContent=label(byShape); vS.className="val";
+    if(label(byCenter)!==label(byShape)){ vC.classList.add("disagree"); vS.classList.add("disagree"); }
+    selected = byShape ? byShape.cell : null;
+    render();
+    mode="none";
+    return;
+  }
+  if(pts.size===0) mode="none";
+}
+svg.addEventListener("pointerup",up);
+svg.addEventListener("pointercancel",up);
+
+document.getElementById("recenterbtn").addEventListener("click",()=>{ cam.panX=0; cam.panY=0; render(); });
+document.getElementById("resetbtn").addEventListener("click",()=>{
+  cam.az=DEFAULT_CAM.az; cam.el=DEFAULT_CAM.el; cam.scale=1; cam.panX=0; cam.panY=0;
+  selected=null;
+  document.getElementById("valCenter").textContent="Tap a cell"; document.getElementById("valCenter").className="val wait";
+  document.getElementById("valShape").textContent="Tap a cell"; document.getElementById("valShape").className="val wait";
+  render();
+});
+document.getElementById("tt").addEventListener("click",()=>{
+  const b=document.body; b.setAttribute("data-theme", b.getAttribute("data-theme")==="workshop"?"":"workshop");
+  render();
+});
+
+render();
+})();
+</script>
+</body>
+</html>
