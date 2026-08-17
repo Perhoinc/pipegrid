@@ -61,14 +61,63 @@ four do not (corner, corner-through, five-way, six-way). Per the owner's 2026-08
 direction, all nine are wanted — completeness across every port-count tier is the goal, not
 a curated subset.
 
+## Policy: enumerate everything, activate selectively
+
+Owner-decreed 2026-08-17, applies to every flow-topology pass below: work out the *complete*
+set of mathematically distinct flow topologies for a shape, then mark each one active,
+inactive, or uncertain. Inactive entries stay fully specified, just not offered as buildable
+parts yet — turning one on later is a status change, not a rediscovery. Nothing gets left out
+of the spec just because it isn't wanted for fabrication right now.
+
+## Flow topology, by connectivity pattern
+
+Method: for a shape's ports, work out (a) how many genuinely different in/out role-splits
+exist given the shape's *own* rotational symmetry (not the full 24 — only the rotations that
+map the shape back onto itself), and (b) for split counts of 4+ where two separate streams
+could pass through without mixing, whether keeping them separate is itself a distinct,
+further variant. Validated first against the three shapes whose answers are already known
+from the existing catalogue.
+
+- **Straight** — 1 flow topology. Flipping which end is in/out doesn't change the 1-in/1-out
+  count, so it's a placement detail, not a separate catalogue entry. Matches existing.
+- **Elbow** — 1 flow topology, same reasoning. Matches existing.
+- **T** — 4 flow topologies: split with the inlet on the run vs. on the branch, merge with the
+  outlet on the run vs. on the branch (`tsplit`/`tsplitb`/`tmerge`/`tmergeb`). The run's two
+  ends are interchangeable with each other but not with the branch, which is what produces
+  exactly these four and no more. Matches existing.
+- **Corner** — 2 flow topologies: split (one in, two out) and merge (two in, one out). All
+  three ports are interchangeable with each other (unlike the T), so unlike the T there's no
+  further "which port" distinction — just the count-split. Both **active**.
+- **Cross** — 7 flow topologies, not the 5 currently built:
+  - Split 1→3 (`xsplit`) — **active**, existing.
+  - Merge 3→1 (`xmerge`) — **active**, existing.
+  - General (mixing) junction, the two inlets opposite each other (`xjunc`) — **active**,
+    existing.
+  - General (mixing) junction, the two inlets *adjacent* to each other instead — **active**,
+    new. Owner-confirmed wanted 2026-08-17. Not reachable from `xjunc` by any rotation; it's
+    a structurally different shape, same as corner is from T.
+  - Two full straight runs crossing without mixing (`xover`) — **inactive** (known,
+    fabrication not wanted right now), existing.
+  - Twin elbows curving in opposite rotational senses (`xbend`) — **inactive**, existing.
+  - Twin elbows curving in the *same* rotational sense (a "pinwheel," vs. `xbend`'s
+    figure-eight) — **uncertain**. Structurally distinct from `xbend`, confirmed by the same
+    symmetry method, but unclear whether it's physically buildable as a compact single
+    fitting, and unclear from description alone what it even looks like. Needs a picture
+    before it can be marked active/inactive/dropped.
+- **Corner-through** — at least 4 flow topologies identified so far (1-in-3-out /
+  3-in-1-out layer only; the 2-in-2-out layer, which by analogy with cross likely has both
+  mixing and non-mixing variants, has not been worked out yet):
+  - Split, the straight-stem end is the inlet — flow continues out the far stem end *and*
+    branches down both corner arms.
+  - Split, a corner arm is the inlet — flow exits the *other* corner arm and *both* stem
+    ends at once.
+  - Merge — the mirror of each of the above.
+  All four are new (the shape itself is new); status not yet assigned.
+
 ## Open / deferred
 
-- **Flow-topology limitations.** The owner has indicated there will be limitations placed on
-  which flow-topology variants are actually offered within some of these connectivity
-  patterns (i.e., not necessarily every mathematically possible in/out and stream-pairing
-  arrangement for the busier shapes will become a real catalogue entry). Not yet specified —
-  deferred to a later pass, once the flow-topology enumeration itself is on the table to
-  react to. Noted here so it isn't lost.
+- **Cross pinwheel** — needs a visual before it can be classified. See above.
+- **Corner-through, 2-in-2-out layer** — not yet worked out.
 - **Manufacturability sanity check.** Five-way and six-way fittings are real hardware but
   less common than the smaller shapes — worth confirming on the iPad later that they still
   read as "real kit" and not just combinatorics for its own sake.
@@ -80,8 +129,5 @@ a curated subset.
 
 ## Next
 
-Flow-topology pass, one connectivity pattern at a time — for a given shape, how many
-genuinely different ways flow can move through its ports. Start with the smaller/simpler
-shapes already partly explored (straight, elbow, T) to confirm the method, then the busier
-new ones (corner, cross, corner-through, five-way, six-way) where there's more room for flow
-to vary.
+Continuing the flow-topology pass: corner-through's 2-in-2-out layer, then five-way and
+six-way, which haven't been touched at all yet.
