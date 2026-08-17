@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>PIPEGRID — layer selector test</title>
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12151b; --panel2:#0e1116; --edge:#2c313d;
+    --text:#c7d3e2; --dim:#5f6775; --acc:#e0a14e; --acc2:#66e4ff;
+    --cline:rgba(140,160,185,0.18);
+  }
+  body[data-theme="workshop"]{
+    --bg:#e6dfcf; --panel:#efe9dc; --panel2:#f3eee2; --edge:#c9c0aa;
+    --text:#2a2a28; --dim:#8a8272; --acc:#e0771e; --acc2:#5a35a0;
+    --cline:rgba(90,80,60,0.28);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; overscroll-behavior:contain;}
+  body{background:var(--bg);color:var(--text);
+       font-family:ui-monospace,SFMono-Regular,Menlo,monospace;-webkit-text-size-adjust:100%;
+       padding:14px; padding-bottom:60px;}
+  .hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:4px;flex-wrap:wrap;}
+  .title{font-size:15px;font-weight:700;letter-spacing:4px;}
+  .sub{font-size:9px;letter-spacing:1.5px;color:var(--dim);}
+  .themebtn{margin-left:auto;font-family:inherit;font-size:10px;letter-spacing:.5px;text-transform:uppercase;
+        padding:7px 9px;border:1px solid var(--edge);border-radius:4px;background:transparent;
+        color:var(--text);cursor:pointer;}
+  #wrap{max-width:640px;margin:12px auto 0;}
+  .panel{border:1px solid var(--edge);border-radius:8px;background:var(--panel);padding:12px;}
+  .note{font-size:10px;color:var(--dim);line-height:1.6;margin:4px 0 10px;}
+  .note b{color:var(--text);}
+  .rigrow{display:flex;gap:8px;}
+  .layerbar{display:flex;flex-direction:column;gap:6px;justify-content:center;}
+  .layerbtn{font-family:inherit;font-size:10px;letter-spacing:.5px;
+        padding:10px 8px;border:1px solid var(--edge);border-radius:4px;background:var(--panel2);
+        color:var(--dim);cursor:pointer;min-width:52px;}
+  .layerbtn.active{border-color:var(--acc);color:var(--acc);background:var(--panel);font-weight:700;}
+  .rig{position:relative;background:var(--panel2);border:1px solid var(--edge);border-radius:8px;flex:1;
+       touch-action:none; user-select:none;}
+  .rigsvg{display:block;width:100%;height:auto;}
+  .readout{display:flex;flex-direction:column;gap:4px;
+            padding:8px 10px;border-top:1px solid var(--edge);font-size:11px;}
+  .readout .row{display:flex;justify-content:space-between;gap:8px;align-items:center;}
+  .readout .lbl{color:var(--dim);font-size:9px;text-transform:uppercase;letter-spacing:.5px;}
+  .readout .val{color:var(--acc);font-weight:700;letter-spacing:1px;}
+  .readout .val.wait{color:var(--dim);font-weight:400;}
+  .btnrow{display:flex;gap:6px;}
+  .resetbtn{font-family:inherit;font-size:9px;letter-spacing:.5px;text-transform:uppercase;
+        padding:5px 8px;border:1px solid var(--edge);border-radius:4px;background:transparent;
+        color:var(--dim);cursor:pointer;}
+  .foot{max-width:640px;margin:16px auto 0;font-size:9px;color:var(--dim);line-height:1.7;text-align:center;}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <span class="title">PIPEGRID</span>
+  <span class="sub">LAYER SELECTOR TEST · CAN YOU REACH THE BURIED CENTER CELL NOW</span>
+  <button class="themebtn" id="tt">Theme</button>
+</div>
+<div id="wrap">
+  <div class="panel">
+    <div class="note">A fully packed 3×3×3 block this time — worst case, every cell filled, nothing empty.
+    <b>Pick a layer on the left first</b> — only that layer's cells are selectable; the rest dim out of the way.
+    <b>Tap</b> selects within the active layer (shape+depth still decides ties, same rule as before, just scoped
+    to one layer now). Layer 0 is the middle slice — it contains the one cell buried on all six sides with no
+    clear line of sight from any angle. Confirm you can actually select it now.</div>
+    <div class="rigrow">
+      <div class="layerbar" id="layerbar"></div>
+      <div class="rig" id="rig">
+        <div class="readout">
+          <div class="row"><span class="lbl">Selected</span><span class="val wait" id="valSel">Tap a cell</span></div>
+          <div class="row"><span class="lbl" id="statlbl">az 35° · el 25° · zoom 100%</span>
+            <div class="btnrow">
+              <button class="resetbtn" id="recenterbtn">Recenter</button>
+              <button class="resetbtn" id="resetbtn">Reset view</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="foot">Not the real app. The center cell (0,0,0) has a neighbor on every one of its six faces -<br/>no orbit angle alone can ever make it the frontmost thing on screen.</div>
+
+<script>
+(function(){
+"use strict";
+
+const VB=340, CX=170, CY=178, SCALE=30;
+
+function rotPt(x,y,z,az,el){
+  const ca=Math.cos(az), sa=Math.sin(az);
+  const x1=x*ca+z*sa, z1=-x*sa+z*ca, y1=y;
+  const ce=Math.cos(el), se=Math.sin(el);
+  const y2=y1*ce-z1*se, z2=y1*se+z1*ce;
+  return {x:x1,y:y2,z:z2};
+}
+
+const PAL={
+  carbon:{base:"#4a5568", sel:"#e0a14e"},
+  workshop:{base:"#6b6355", sel:"#e0771e"}
+};
+function palette(){ return document.body.getAttribute("data-theme")==="workshop"?PAL.workshop:PAL.carbon; }
+function shade(hex,mult){
+  const n=parseInt(hex.slice(1),16);
+  const r=Math.min(255,Math.round(((n>>16)&255)*mult)), g=Math.min(255,Math.round(((n>>8)&255)*mult)), b=Math.min(255,Math.round((n&255)*mult));
+  return "#"+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
+}
+
+const FACES=[
+  {n:[1,0,0],  c:[[.47,-.47,-.47],[.47,.47,-.47],[.47,.47,.47],[.47,-.47,.47]]},
+  {n:[-1,0,0], c:[[-.47,-.47,.47],[-.47,.47,.47],[-.47,.47,-.47],[-.47,-.47,-.47]]},
+  {n:[0,1,0],  c:[[-.47,.47,-.47],[-.47,.47,.47],[.47,.47,.47],[.47,.47,-.47]]},
+  {n:[0,-1,0], c:[[-.47,-.47,.47],[-.47,-.47,-.47],[.47,-.47,-.47],[.47,-.47,.47]]},
+  {n:[0,0,1],  c:[[.47,-.47,.47],[.47,.47,.47],[-.47,.47,.47],[-.47,-.47,.47]]},
+  {n:[0,0,-1], c:[[-.47,-.47,-.47],[-.47,.47,-.47],[.47,.47,-.47],[.47,-.47,-.47]]}
+];
+const LIGHT=(()=>{ const v=[0.35,0.85,0.3], m=Math.hypot(v[0],v[1],v[2]); return v.map(x=>x/m); })();
+
+// ---------- scene: fully dense 3x3x3, no empty cells ----------
+const cells=[];
+for(let x=-1;x<=1;x++) for(let y=-1;y<=1;y++) for(let z=-1;z<=1;z++) cells.push({x,y,z});
+
+let activeLayer=0;
+
+function svgNS(tag){ return document.createElementNS("http://www.w3.org/2000/svg",tag); }
+const rigEl=document.getElementById("rig");
+const svg=svgNS("svg"); svg.setAttribute("viewBox","0 0 "+VB+" "+VB); svg.setAttribute("class","rigsvg");
+rigEl.insertBefore(svg, rigEl.firstChild);
+const sceneG=svgNS("g"); svg.appendChild(sceneG);
+
+const cam={az:35*Math.PI/180, el:25*Math.PI/180, scale:1, panX:0, panY:0};
+const DEFAULT_CAM={az:cam.az, el:cam.el};
+function proj(p){ return {sx:CX+p.x*SCALE*cam.scale+cam.panX, sy:CY-p.y*SCALE*cam.scale+cam.panY}; }
+function svgPointFromClient(clientX,clientY){
+  const pt=svg.createSVGPoint(); pt.x=clientX; pt.y=clientY;
+  const m=svg.getScreenCTM().inverse();
+  const p=pt.matrixTransform(m);
+  return {x:p.x,y:p.y};
+}
+
+function cornersOf(c){
+  const h=0.47, s=[-1,1], pts=[];
+  for(const sx of s) for(const sy of s) for(const sz of s) pts.push([c.x+sx*h, c.y+sy*h, c.z+sz*h]);
+  return pts;
+}
+function convexHull(points){
+  const pts=points.slice().sort((a,b)=> a.x-b.x || a.y-b.y);
+  const cross=(o,a,b)=>(a.x-o.x)*(b.y-o.y)-(a.y-o.y)*(b.x-o.x);
+  const lower=[]; for(const p of pts){ while(lower.length>=2 && cross(lower[lower.length-2],lower[lower.length-1],p)<=0) lower.pop(); lower.push(p); }
+  const upper=[]; for(let i=pts.length-1;i>=0;i--){ const p=pts[i]; while(upper.length>=2 && cross(upper[upper.length-2],upper[upper.length-1],p)<=0) upper.pop(); upper.push(p); }
+  upper.pop(); lower.pop(); return lower.concat(upper);
+}
+function pointInPoly(pt, poly){
+  let inside=false;
+  for(let i=0,j=poly.length-1;i<poly.length;j=i++){
+    const xi=poly[i].x, yi=poly[i].y, xj=poly[j].x, yj=poly[j].y;
+    const hit = ((yi>pt.y)!==(yj>pt.y)) && (pt.x < (xj-xi)*(pt.y-yi)/(yj-yi)+xi);
+    if(hit) inside=!inside;
+  }
+  return inside;
+}
+
+let cellGeo=[];   // rebuilt every render: [{cell, depth, hull}] for ALL cells (used for rendering + picking)
+let selected=null;
+
+function render(){
+  const P=palette();
+  while(sceneG.firstChild) sceneG.removeChild(sceneG.firstChild);
+  cellGeo=[];
+
+  const faceVis=FACES.map(f=>{
+    const rn=rotPt(f.n[0],f.n[1],f.n[2],cam.az,cam.el);
+    return {visible: rn.z<-0.001, rn};
+  });
+
+  const items=cells.map(c=>({c, depth: rotPt(c.x,c.y,c.z,cam.az,cam.el).z}));
+  items.sort((a,b)=>b.depth-a.depth);
+
+  for(const it of items){
+    const c=it.c;
+    const inLayer = c.y===activeLayer;
+    const isSel = selected===c;
+    const pcs=cornersOf(c).map(([x,y,z])=>proj(rotPt(x,y,z,cam.az,cam.el)));
+    const hull=convexHull(pcs.map(p=>({x:p.sx,y:p.sy})));
+    cellGeo.push({cell:c, depth:it.depth, hull, inLayer});
+
+    FACES.forEach((f,fi)=>{
+      const fv=faceVis[fi];
+      if(!fv.visible) return;
+      const bright = 0.55 + 0.55*Math.max(0, fv.rn.x*LIGHT[0]+fv.rn.y*LIGHT[1]+fv.rn.z*LIGHT[2]);
+      const pts=f.c.map(off=>proj(rotPt(c.x+off[0],c.y+off[1],c.z+off[2],cam.az,cam.el)));
+      const poly=svgNS("polygon");
+      poly.setAttribute("points", pts.map(p=>p.sx.toFixed(1)+","+p.sy.toFixed(1)).join(" "));
+      const base = isSel ? P.sel : P.base;
+      poly.setAttribute("fill", shade(base,bright));
+      poly.setAttribute("stroke", shade(base,bright*0.7));
+      poly.setAttribute("stroke-width", isSel?"2":"1");
+      poly.setAttribute("opacity", inLayer ? "1" : "0.12");
+      sceneG.appendChild(poly);
+    });
+  }
+  document.getElementById("statlbl").textContent=
+    "az "+Math.round(cam.az*180/Math.PI)+"° · el "+Math.round(cam.el*180/Math.PI)+"° · zoom "+Math.round(cam.scale*100)+"%";
+}
+
+function pickInActiveLayer(pt){
+  let best=null,bd=Infinity;
+  for(const it of cellGeo){
+    if(!it.inLayer) continue;              // the whole point - other layers are not even candidates
+    if(!pointInPoly(pt, it.hull)) continue;
+    if(it.depth<bd){ bd=it.depth; best=it; }
+  }
+  return best;
+}
+function label(it){ return it ? "("+it.cell.x+","+it.cell.y+","+it.cell.z+")" : "miss"; }
+
+function buildLayerBar(){
+  const bar=document.getElementById("layerbar");
+  bar.innerHTML="";
+  [1,0,-1].forEach(y=>{   // top to bottom, reads naturally
+    const b=document.createElement("button");
+    b.className="layerbtn"+(y===activeLayer?" active":"");
+    b.textContent = y===1?"Top":y===0?"Mid":"Bottom";
+    b.addEventListener("click",()=>{
+      activeLayer=y; selected=null;
+      document.getElementById("valSel").textContent="Tap a cell"; document.getElementById("valSel").className="val wait";
+      buildLayerBar(); render();
+    });
+    bar.appendChild(b);
+  });
+}
+
+// ---------- gesture handling: tap to select (active layer only), drag to orbit, two fingers pan/zoom ----------
+const pts=new Map();
+let mode="none", orbitLast=null, downPt=null, pinchBase=null;
+function midpoint(){ const arr=Array.from(pts.values()).map(v=>svgPointFromClient(v.x,v.y)); return {x:(arr[0].x+arr[1].x)/2,y:(arr[0].y+arr[1].y)/2}; }
+function pairDist(){ const arr=Array.from(pts.values()).map(v=>svgPointFromClient(v.x,v.y)); return Math.hypot(arr[0].x-arr[1].x,arr[0].y-arr[1].y); }
+
+svg.addEventListener("pointerdown",e=>{
+  pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  try{svg.setPointerCapture(e.pointerId);}catch(err){}
+  if(pts.size===1){ mode="maybe-tap"; downPt={x:e.clientX,y:e.clientY}; orbitLast={x:e.clientX,y:e.clientY}; }
+  else if(pts.size===2){ mode="pinch"; pinchBase={d0:pairDist(), mid0:midpoint(), scale0:cam.scale, panX0:cam.panX, panY0:cam.panY}; }
+  e.preventDefault();
+});
+
+svg.addEventListener("pointermove",e=>{
+  if(!pts.has(e.pointerId)) return;
+  pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(mode==="pinch" && pts.size>=2){
+    const d1=pairDist(), mid1=midpoint();
+    const newScale=Math.max(0.6, Math.min(4, pinchBase.scale0*(d1/pinchBase.d0)));
+    const ratio=newScale/pinchBase.scale0;
+    cam.panX = mid1.x - CX - ratio*(pinchBase.mid0.x - CX - pinchBase.panX0);
+    cam.panY = mid1.y - CY - ratio*(pinchBase.mid0.y - CY - pinchBase.panY0);
+    cam.scale = newScale;
+    render();
+    return;
+  }
+  if(mode==="maybe-tap" || mode==="orbit"){
+    const mv=Math.hypot(e.clientX-downPt.x, e.clientY-downPt.y);
+    if(mode==="maybe-tap" && mv<6) return;
+    mode="orbit";
+    const dx=e.clientX-orbitLast.x, dy=e.clientY-orbitLast.y;
+    orbitLast={x:e.clientX,y:e.clientY};
+    cam.az -= dx*0.01;
+    cam.el = Math.max(-1.3, Math.min(1.3, cam.el - dy*0.01));
+    render();
+  }
+});
+
+function up(e){
+  pts.delete(e.pointerId);
+  if(mode==="pinch"){ if(pts.size<2){ mode="none"; pinchBase=null; } return; }
+  if(mode==="maybe-tap" && pts.size===0){
+    const p=svgPointFromClient(e.clientX,e.clientY);
+    const hit=pickInActiveLayer(p);
+    const v=document.getElementById("valSel");
+    v.textContent=label(hit); v.className="val"+(hit?"":" wait");
+    selected = hit ? hit.cell : null;
+    render();
+    mode="none";
+    return;
+  }
+  if(pts.size===0) mode="none";
+}
+svg.addEventListener("pointerup",up);
+svg.addEventListener("pointercancel",up);
+
+document.getElementById("recenterbtn").addEventListener("click",()=>{ cam.panX=0; cam.panY=0; render(); });
+document.getElementById("resetbtn").addEventListener("click",()=>{
+  cam.az=DEFAULT_CAM.az; cam.el=DEFAULT_CAM.el; cam.scale=1; cam.panX=0; cam.panY=0;
+  selected=null;
+  document.getElementById("valSel").textContent="Tap a cell"; document.getElementById("valSel").className="val wait";
+  render();
+});
+document.getElementById("tt").addEventListener("click",()=>{
+  const b=document.body; b.setAttribute("data-theme", b.getAttribute("data-theme")==="workshop"?"":"workshop");
+  render();
+});
+
+buildLayerBar();
+render();
+})();
+</script>
+</body>
+</html>
