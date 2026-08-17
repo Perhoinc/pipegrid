@@ -69,6 +69,41 @@ inactive, or uncertain. Inactive entries stay fully specified, just not offered 
 parts yet — turning one on later is a status change, not a rediscovery. Nothing gets left out
 of the spec just because it isn't wanted for fabrication right now.
 
+## Construction rule: straight vs. elbow (confirmed against the existing 2D renderer)
+
+For any flow topology with exactly one port in the minority role — one inlet against
+multiple outlets, or one outlet against multiple inlets; every split and merge variant, but
+not balanced flows like `xjunc` — the existing renderer already applies one simple, uniform
+rule, confirmed by reading it directly (`geo:"tee"` path, `index.html`): call the
+minority-role port the anchor. For every other port, draw a straight channel to it if that
+port sits directly opposite the anchor, and draw a quarter-arc (an elbow) to it if it's
+merely adjacent. This isn't a per-part design choice made by hand — it's mechanical, and it
+already produces every tee shape in the current app.
+
+Consequence, confirmed against the code and the owner's sketch (2026-08-18): this one rule
+automatically decides whether a split/merge variant reads as a **T** (a straight run with an
+elbow tap) or a **Y** (two elbows, no straight segment at all) — nobody chooses between those
+two shape-families by hand, it falls out of which specific port ends up as the anchor.
+
+- **T-shaped**: happens whenever the anchor's directly-opposite port is *also* one of the
+  shape's other ports. `tsplit`/`tmerge` (anchor = one end of the run) are T-shaped — the
+  run's other end is opposite the anchor, so it draws as a straight; the branch is merely
+  adjacent, so it draws as an elbow.
+- **Y-shaped**: happens whenever *none* of the shape's other ports is directly opposite the
+  anchor. `tsplitb`/`tmergeb` (anchor = the branch) are Y-shaped — the branch's opposite
+  direction isn't a port on this shape at all, so both connections come out as elbows, with
+  no straight segment anywhere.
+- **Corner is always Y-shaped by this rule, no exceptions** — it has no opposite pair among
+  its three ports at all, so any anchor's two connections are always both elbows. It doesn't
+  read as a flat Y, though: corner's three arms point in three mutually perpendicular
+  directions rather than two roughly-opposing ones plus a stem, so the same construction rule
+  produces a genuinely different-looking result — a true 3D corner joint, not a Y.
+
+Scope: this only covers the single-anchor case. Balanced flows (`xjunc` and its like) have no
+single port in the minority role and are built differently in the existing code — open
+question, noted below, whether the newer balanced splits (the adjacent-inlet cross junction,
+corner-through's eventual 2-in-2-out layer) need their own version of this same kind of rule.
+
 ## Flow topology, by connectivity pattern
 
 Method: for a shape's ports, work out (a) how many genuinely different in/out role-splits
@@ -84,10 +119,13 @@ from the existing catalogue.
 - **T** — 4 flow topologies: split with the inlet on the run vs. on the branch, merge with the
   outlet on the run vs. on the branch (`tsplit`/`tsplitb`/`tmerge`/`tmergeb`). The run's two
   ends are interchangeable with each other but not with the branch, which is what produces
-  exactly these four and no more. Matches existing.
+  exactly these four and no more. Matches existing. Per the construction rule above,
+  `tsplit`/`tmerge` are T-shaped and `tsplitb`/`tmergeb` are Y-shaped — two visually distinct
+  families sharing the same four-topology count.
 - **Corner** — 2 flow topologies: split (one in, two out) and merge (two in, one out). All
   three ports are interchangeable with each other (unlike the T), so unlike the T there's no
-  further "which port" distinction — just the count-split. Both **active**.
+  further "which port" distinction — just the count-split. Both **active**. Always Y-shaped
+  by construction (see above), reading as a 3D corner joint rather than a flat Y.
 - **Cross** — 7 flow topologies, not the 5 currently built:
   - Split 1→3 (`xsplit`) — **active**, existing.
   - Merge 3→1 (`xmerge`) — **active**, existing.
@@ -106,18 +144,28 @@ from the existing catalogue.
     before it can be marked active/inactive/dropped.
 - **Corner-through** — at least 4 flow topologies identified so far (1-in-3-out /
   3-in-1-out layer only; the 2-in-2-out layer, which by analogy with cross likely has both
-  mixing and non-mixing variants, has not been worked out yet):
+  mixing and non-mixing variants, has not been worked out yet). Construction rule applied to
+  all four:
   - Split, the straight-stem end is the inlet — flow continues out the far stem end *and*
-    branches down both corner arms.
+    branches down both corner arms. The far stem end is opposite the anchor, so this is
+    **T-shaped**: one straight through-segment plus two elbow taps (an "elaborated T" with a
+    branch on each side instead of one).
   - Split, a corner arm is the inlet — flow exits the *other* corner arm and *both* stem
-    ends at once.
-  - Merge — the mirror of each of the above.
+    ends at once. Nothing in this shape is opposite a corner arm, so this is **Y-shaped**,
+    but a three-way one: all three connections are elbows, no straight segment — a tripod
+    off the one inlet.
+  - Merge — the mirror of each of the above, same shapes.
   All four are new (the shape itself is new); status not yet assigned.
 
 ## Open / deferred
 
 - **Cross pinwheel** — needs a visual before it can be classified. See above.
 - **Corner-through, 2-in-2-out layer** — not yet worked out.
+- **Construction rule for balanced (no-single-anchor) flows** — the straight/elbow rule above
+  only covers splits and merges with one minority-role port. `xjunc` and its kin already have
+  their own hand-built rendering in the existing code; not yet checked whether that
+  generalizes the same way, or needs its own version of the rule, once the newer balanced
+  variants (adjacent-inlet cross junction, corner-through's 2-in-2-out layer) get worked out.
 - **Manufacturability sanity check.** Five-way and six-way fittings are real hardware but
   less common than the smaller shapes — worth confirming on the iPad later that they still
   read as "real kit" and not just combinatorics for its own sake.
