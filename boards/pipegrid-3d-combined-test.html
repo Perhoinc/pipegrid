@@ -199,7 +199,7 @@ function render(){
         const pp=proj(rotPt(portWorld[0],portWorld[1],portWorld[2],cam.az,cam.el));
         const ring=svgNS("circle");
         ring.setAttribute("cx",pp.sx); ring.setAttribute("cy",pp.sy);
-        ring.setAttribute("r", 6*cam.scale);
+        ring.setAttribute("r", 4.5*cam.scale);
         ring.setAttribute("fill",P.port); ring.setAttribute("stroke",P.portStroke); ring.setAttribute("stroke-width","2");
         ring.setAttribute("opacity", fv.visible ? "1" : "0.35");
         ring.setAttribute("data-port",f.key);
