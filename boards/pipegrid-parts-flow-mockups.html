@@ -71,6 +71,13 @@ centre; there's no straight/elbow question when nothing stays separate.</div>
 shown here so "inactive" is an informed choice, not a guess.</div>
 <div id="board-nonmix"></div>
 
+<div class="grouphdr">CROSS — TWIN-ELBOW COMPARISON</div>
+<div class="groupnote"><b>xbend</b> (existing, already inactive) pairs N-E and W-S, the two elbows curving
+<b>opposite</b> rotational senses — a figure-eight. The <b>pinwheel</b> is the same N-E/S-W pairing with the second
+elbow's direction flipped, so both curves turn the <b>same</b> way. Same construction, same port pairing — the only
+difference is which way the second stream flows.</div>
+<div id="board-pinwheel"></div>
+
 <div class="foot">Not the real app. Placeholder geometry only — judging shape and plausibility, not finished
 rendering.</div>
 
@@ -249,7 +256,15 @@ const nonmix=[
    streams:[{type:"elbow",from:"E",to:"D"},{type:"elbow",from:"S",to:"W"}]}
 ];
 
-[["board-ref",ref],["board-sm",sm],["board-mix",mix],["board-nonmix",nonmix]].forEach(([id,list])=>{
+// ---------- cross: xbend vs. pinwheel ----------
+const pinwheel=[
+  {label:"<b>xbend</b> (existing) — opposite senses", ports:["N","E","S","W"], roles:{N:"in",E:"out",W:"in",S:"out"},
+   streams:[{type:"elbow",from:"N",to:"E"},{type:"elbow",from:"W",to:"S"}]},
+  {label:"<b>Pinwheel</b> (new) — same sense", ports:["N","E","S","W"], roles:{N:"in",E:"out",S:"in",W:"out"},
+   streams:[{type:"elbow",from:"N",to:"E"},{type:"elbow",from:"S",to:"W"}]}
+];
+
+[["board-ref",ref],["board-sm",sm],["board-mix",mix],["board-nonmix",nonmix],["board-pinwheel",pinwheel]].forEach(([id,list])=>{
   const el=document.getElementById(id);
   list.forEach(cfg=>buildCell(el,cfg));
 });
