@@ -142,10 +142,9 @@ from the existing catalogue.
     symmetry method, but unclear whether it's physically buildable as a compact single
     fitting, and unclear from description alone what it even looks like. Needs a picture
     before it can be marked active/inactive/dropped.
-- **Corner-through** — at least 4 flow topologies identified so far (1-in-3-out /
-  3-in-1-out layer only; the 2-in-2-out layer, which by analogy with cross likely has both
-  mixing and non-mixing variants, has not been worked out yet). Construction rule applied to
-  all four:
+- **Corner-through** — 16 flow topologies total, all new (the shape itself is new).
+  1-in-3-out / 3-in-1-out layer (4, all **active**, owner-confirmed 2026-08-18 via mockup
+  board):
   - Split, the straight-stem end is the inlet — flow continues out the far stem end *and*
     branches down both corner arms. The far stem end is opposite the anchor, so this is
     **T-shaped**: one straight through-segment plus two elbow taps (an "elaborated T" with a
@@ -155,12 +154,24 @@ from the existing catalogue.
     but a three-way one: all three connections are elbows, no straight segment — a tripod
     off the one inlet.
   - Merge — the mirror of each of the above, same shapes.
-  All four are new (the shape itself is new); status not yet assigned.
+
+  2-in-2-out layer (12, all **inactive** — owner-judged non-viable on inspection via mockup
+  board, 2026-08-18, no specific reason logged):
+  - 4 mixing variants: stem-in/arms-out, arms-in/stem-out, and the two ways to pair one stem
+    end with one arm as the inlets.
+  - 8 non-mixing variants, less symmetric than cross's equivalent layer so more of them stay
+    distinct rather than collapsing into each other: 2 from pairing the stem together and the
+    arms together (one has a genuine straight run through the stem plus a separate elbow
+    between the arms), and 3 each from the two ways of pairing a stem end with an arm
+    (all-elbow, no straight segment, differing only in which specific ports feed which).
+
+  Net result for this shape: the simpler single-anchor splits and merges hold up as real
+  parts; the busier balanced-flow layer, once actually visible, didn't.
 
 ## Open / deferred
 
-- **Cross pinwheel** — needs a visual before it can be classified. See above.
-- **Corner-through, 2-in-2-out layer** — not yet worked out.
+- **Cross pinwheel** — needs a visual before it can be classified. See above; the mockup-board
+  method used for corner-through's 2-in-2-out layer is the natural way to resolve this too.
 - **Construction rule for balanced (no-single-anchor) flows** — the straight/elbow rule above
   only covers splits and merges with one minority-role port. `xjunc` and its kin already have
   their own hand-built rendering in the existing code; not yet checked whether that
@@ -177,5 +188,5 @@ from the existing catalogue.
 
 ## Next
 
-Continuing the flow-topology pass: corner-through's 2-in-2-out layer, then five-way and
-six-way, which haven't been touched at all yet.
+Five-way and six-way, which haven't been touched at all yet. The cross pinwheel is also still
+open and can be resolved the same mockup-board way whenever it's convenient.
