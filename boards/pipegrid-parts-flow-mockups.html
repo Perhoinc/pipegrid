@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>PIPEGRID — flow-topology mockups</title>
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12151b; --panel2:#0e1116; --edge:#2c313d;
+    --text:#c7d3e2; --dim:#5f6775; --acc:#e0a14e; --acc2:#66e4ff;
+    --cline:rgba(140,160,185,0.18); --wire:#c7d3e2; --pout:#0e1116; --poutstroke:#5f6775;
+  }
+  body[data-theme="workshop"]{
+    --bg:#e6dfcf; --panel:#efe9dc; --panel2:#f3eee2; --edge:#c9c0aa;
+    --text:#2a2a28; --dim:#8a8272; --acc:#e0771e; --acc2:#5a35a0;
+    --cline:rgba(90,80,60,0.28); --wire:#2a2a28; --pout:#f3eee2; --poutstroke:#8a8272;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; overscroll-behavior:contain;}
+  body{background:var(--bg);color:var(--text);
+       font-family:ui-monospace,SFMono-Regular,Menlo,monospace;-webkit-text-size-adjust:100%;
+       padding:14px; padding-bottom:60px;}
+  .hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:4px;flex-wrap:wrap;}
+  .title{font-size:15px;font-weight:700;letter-spacing:4px;}
+  .sub{font-size:9px;letter-spacing:1.5px;color:var(--dim);}
+  .themebtn{margin-left:auto;font-family:inherit;font-size:10px;letter-spacing:.5px;text-transform:uppercase;
+        padding:7px 9px;border:1px solid var(--edge);border-radius:4px;background:transparent;
+        color:var(--text);cursor:pointer;}
+  #brief{max-width:900px;margin:10px auto 6px;font-size:10px;color:var(--dim);line-height:1.7;}
+  #brief b{color:var(--text);}
+  .legend{display:flex;gap:14px;align-items:center;font-size:9px;color:var(--dim);margin:6px 0 14px;}
+  .legend .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:-1px;}
+  .grouphdr{max-width:900px;margin:22px auto 4px;font-size:11px;font-weight:700;letter-spacing:1.5px;color:var(--acc);}
+  .groupnote{max-width:900px;margin:0 auto 10px;font-size:9px;color:var(--dim);line-height:1.5;}
+  #board{display:flex;flex-wrap:wrap;gap:10px;max-width:900px;margin:0 auto;}
+  .cell{width:150px;border:1px solid var(--edge);border-radius:8px;background:var(--panel);overflow:hidden;}
+  .cellsvg{display:block;width:100%;height:150px;touch-action:none;user-select:none;background:var(--panel2);}
+  .cellcap{font-size:8px;color:var(--dim);padding:5px 6px;line-height:1.35;min-height:26px;}
+  .cellcap b{color:var(--text);}
+  .foot{max-width:900px;margin:16px auto 0;font-size:9px;color:var(--dim);line-height:1.7;text-align:center;}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <span class="title">PIPEGRID</span>
+  <span class="sub">FLOW-TOPOLOGY MOCKUPS · SAME PORTS, DIFFERENT SHAPES</span>
+  <button class="themebtn" id="tt">Theme</button>
+</div>
+<div id="brief">Every small square is one placeholder part, drag any one to orbit it. <b>Amber ring = inlet, dark ring
+= outlet.</b> Straight segments and elbow arcs are drawn by the same rule throughout: a channel between two ports is
+straight only if they're directly opposite each other, otherwise it's an elbow. First row answers last message's
+question directly — T-split and Y use the <b>identical three ports</b>, only which one is the inlet differs.</div>
+<div class="legend"><span><span class="dot" style="background:var(--acc)"></span>inlet</span>
+<span><span class="dot" style="background:var(--pout);border:1px solid var(--poutstroke)"></span>outlet</span></div>
+
+<div class="grouphdr">REFERENCE — WHY T AND Y AREN'T DIFFERENT CONNECTIVITY PATTERNS</div>
+<div class="groupnote">Same three ports both times. Only the inlet moves.</div>
+<div id="board-ref"></div>
+
+<div class="grouphdr">CORNER-THROUGH — SPLIT / MERGE (4)</div>
+<div class="groupnote">One port is the odd-one-out; the other three follow from it. Already logged in the spec.</div>
+<div id="board-sm"></div>
+
+<div class="grouphdr">CORNER-THROUGH — 2-IN-2-OUT, MIXING (4)</div>
+<div class="groupnote">No stream separation — everything blends in a shared chamber. Drawn as plain spokes to the
+centre; there's no straight/elbow question when nothing stays separate.</div>
+<div id="board-mix"></div>
+
+<div class="grouphdr">CORNER-THROUGH — 2-IN-2-OUT, NON-MIXING (8)</div>
+<div class="groupnote">Two independent streams, never touching. Per your policy these default to <b>inactive</b> —
+shown here so "inactive" is an informed choice, not a guess.</div>
+<div id="board-nonmix"></div>
+
+<div class="foot">Not the real app. Placeholder geometry only — judging shape and plausibility, not finished
+rendering.</div>
+
+<script>
+(function(){
+"use strict";
+
+const DIRVEC={N:[0,0,-1],S:[0,0,1],E:[1,0,0],W:[-1,0,0],U:[0,1,0],D:[0,-1,0]};
+const OPP={N:"S",S:"N",E:"W",W:"E",U:"D",D:"U"};
+const PR=0.47;
+
+function rotPt(x,y,z,az,el){
+  const ca=Math.cos(az), sa=Math.sin(az);
+  const x1=x*ca+z*sa, z1=-x*sa+z*ca, y1=y;
+  const ce=Math.cos(el), se=Math.sin(el);
+  const y2=y1*ce-z1*se, z2=y1*se+z1*ce;
+  return {x:x1,y:y2,z:z2};
+}
+function svgNS(tag){ return document.createElementNS("http://www.w3.org/2000/svg",tag); }
+
+function edgesOf(){
+  const h=PR, s=[-1,1];
+  const c=[
+    [-h,-h,-h],[h,-h,-h],[h,h,-h],[-h,h,-h],
+    [-h,-h,h],[h,-h,h],[h,h,h],[-h,h,h]
+  ];
+  const pairs=[[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
+  return pairs.map(([a,b])=>[c[a],c[b]]);
+}
+
+function elbowPts(fromDir,toDir,steps){
+  const a=DIRVEC[fromDir], b=DIRVEC[toDir];
+  const pts=[];
+  for(let i=0;i<=steps;i++){
+    const t=(i/steps)*(Math.PI/2), s=Math.sin(t), c=Math.cos(t);
+    pts.push([
+      PR*(a[0]+b[0]) - PR*(s*a[0]+c*b[0]),
+      PR*(a[1]+b[1]) - PR*(s*a[1]+c*b[1]),
+      PR*(a[2]+b[2]) - PR*(s*a[2]+c*b[2])
+    ]);
+  }
+  return pts;
+}
+function straightPts(fromDir,toDir){
+  return [DIRVEC[fromDir].map(v=>v*PR), DIRVEC[toDir].map(v=>v*PR)];
+}
+
+function buildCell(container, cfg){
+  const wrap=document.createElement("div"); wrap.className="cell";
+  const svg=svgNS("svg"); svg.setAttribute("viewBox","0 0 150 150"); svg.setAttribute("class","cellsvg");
+  wrap.appendChild(svg);
+  const cap=document.createElement("div"); cap.className="cellcap"; cap.innerHTML=cfg.label;
+  wrap.appendChild(cap);
+  container.appendChild(wrap);
+
+  const g=svgNS("g"); svg.appendChild(g);
+  const CX=75, CY=78, SCALE=54;
+  const st={az:35*Math.PI/180, el:25*Math.PI/180};
+  function proj(p){ return {x:CX+p.x*SCALE, y:CY-p.y*SCALE}; }
+  function R(p){ return rotPt(p[0],p[1],p[2],st.az,st.el); }
+
+  function render(){
+    while(g.firstChild) g.removeChild(g.firstChild);
+    edgesOf().forEach(([a,b])=>{
+      const pa=proj(R(a)), pb=proj(R(b));
+      const ln=svgNS("line");
+      ln.setAttribute("x1",pa.x); ln.setAttribute("y1",pa.y);
+      ln.setAttribute("x2",pb.x); ln.setAttribute("y2",pb.y);
+      ln.setAttribute("stroke","var(--wire)"); ln.setAttribute("stroke-width","1"); ln.setAttribute("opacity","0.12");
+      g.appendChild(ln);
+    });
+
+    if(cfg.streams){
+      cfg.streams.forEach(seg=>{
+        const pts3d = seg.type==="straight" ? straightPts(seg.from,seg.to) : elbowPts(seg.from,seg.to,12);
+        const pts2d = pts3d.map(p=>proj(R(p)));
+        const path=svgNS("path");
+        const d="M "+pts2d.map(p=>p.x.toFixed(1)+" "+p.y.toFixed(1)).join(" L ");
+        path.setAttribute("d",d);
+        path.setAttribute("fill","none"); path.setAttribute("stroke","var(--text)");
+        path.setAttribute("stroke-width","6"); path.setAttribute("stroke-linecap","round");
+        path.setAttribute("opacity","0.55");
+        g.appendChild(path);
+      });
+    } else {
+      // mixing: plain spokes to the centre, no straight/elbow distinction
+      cfg.ports.forEach(dir=>{
+        const e=proj(R(DIRVEC[dir].map(v=>v*PR))), c=proj(R([0,0,0]));
+        const ln=svgNS("line");
+        ln.setAttribute("x1",e.x); ln.setAttribute("y1",e.y);
+        ln.setAttribute("x2",c.x); ln.setAttribute("y2",c.y);
+        ln.setAttribute("stroke","var(--text)"); ln.setAttribute("stroke-width","6");
+        ln.setAttribute("stroke-linecap","round"); ln.setAttribute("opacity","0.4");
+        g.appendChild(ln);
+      });
+      const cc=proj(R([0,0,0]));
+      const chamber=svgNS("circle");
+      chamber.setAttribute("cx",cc.x); chamber.setAttribute("cy",cc.y); chamber.setAttribute("r","5");
+      chamber.setAttribute("fill","var(--text)"); chamber.setAttribute("opacity","0.3");
+      g.appendChild(chamber);
+    }
+
+    cfg.ports.forEach(dir=>{
+      const p=proj(R(DIRVEC[dir].map(v=>v*PR)));
+      const ring=svgNS("circle");
+      ring.setAttribute("cx",p.x); ring.setAttribute("cy",p.y); ring.setAttribute("r","7");
+      const isIn = cfg.roles[dir]==="in";
+      ring.setAttribute("fill", isIn?"var(--acc)":"var(--pout)");
+      ring.setAttribute("stroke", isIn?"var(--acc)":"var(--poutstroke)");
+      ring.setAttribute("stroke-width","2");
+      g.appendChild(ring);
+    });
+  }
+
+  let dragging=false,lastX=0,lastY=0,pid=null;
+  svg.addEventListener("pointerdown",e=>{ dragging=true; pid=e.pointerId; try{svg.setPointerCapture(pid);}catch(err){} lastX=e.clientX; lastY=e.clientY; e.preventDefault(); });
+  svg.addEventListener("pointermove",e=>{
+    if(!dragging||e.pointerId!==pid) return;
+    const dx=e.clientX-lastX, dy=e.clientY-lastY; lastX=e.clientX; lastY=e.clientY;
+    st.az-=dx*0.012; st.el=Math.max(-1.3,Math.min(1.3,st.el-dy*0.012));
+    render(); e.preventDefault();
+  });
+  function stop(e){ if(e.pointerId===pid){ dragging=false; pid=null; } }
+  svg.addEventListener("pointerup",stop); svg.addEventListener("pointercancel",stop);
+
+  render();
+}
+
+// ---------- reference: T-split, T-splitb(Y), corner ----------
+const ref=[
+  {label:"<b>T-split</b> — N in", ports:["N","E","S"], roles:{N:"in",E:"out",S:"out"},
+   streams:[{type:"straight",from:"N",to:"S"},{type:"elbow",from:"N",to:"E"}]},
+  {label:"<b>Y (tsplitb)</b> — E in, same 3 ports", ports:["N","E","S"], roles:{E:"in",N:"out",S:"out"},
+   streams:[{type:"elbow",from:"E",to:"N"},{type:"elbow",from:"E",to:"S"}]},
+  {label:"<b>Corner</b> — N in", ports:["N","E","U"], roles:{N:"in",E:"out",U:"out"},
+   streams:[{type:"elbow",from:"N",to:"E"},{type:"elbow",from:"N",to:"U"}]}
+];
+
+// ---------- corner-through split/merge (4) ----------
+const sm=[
+  {label:"Split, stem end in (E)", ports:["E","W","S","D"], roles:{E:"in",W:"out",S:"out",D:"out"},
+   streams:[{type:"straight",from:"E",to:"W"},{type:"elbow",from:"E",to:"S"},{type:"elbow",from:"E",to:"D"}]},
+  {label:"Split, arm in (S)", ports:["E","W","S","D"], roles:{S:"in",E:"out",W:"out",D:"out"},
+   streams:[{type:"elbow",from:"S",to:"E"},{type:"elbow",from:"S",to:"W"},{type:"elbow",from:"S",to:"D"}]},
+  {label:"Merge, stem end out (E)", ports:["E","W","S","D"], roles:{E:"out",W:"in",S:"in",D:"in"},
+   streams:[{type:"straight",from:"E",to:"W"},{type:"elbow",from:"E",to:"S"},{type:"elbow",from:"E",to:"D"}]},
+  {label:"Merge, arm out (S)", ports:["E","W","S","D"], roles:{S:"out",E:"in",W:"in",D:"in"},
+   streams:[{type:"elbow",from:"S",to:"E"},{type:"elbow",from:"S",to:"W"},{type:"elbow",from:"S",to:"D"}]}
+];
+
+// ---------- corner-through 2-in-2-out mixing (4) ----------
+const mix=[
+  {label:"Stem in, arms out", ports:["E","W","S","D"], roles:{E:"in",W:"in",S:"out",D:"out"}, streams:null},
+  {label:"Arms in, stem out", ports:["E","W","S","D"], roles:{S:"in",D:"in",E:"out",W:"out"}, streams:null},
+  {label:"E+S in, W+D out", ports:["E","W","S","D"], roles:{E:"in",S:"in",W:"out",D:"out"}, streams:null},
+  {label:"E+D in, W+S out", ports:["E","W","S","D"], roles:{E:"in",D:"in",W:"out",S:"out"}, streams:null}
+];
+
+// ---------- corner-through 2-in-2-out non-mixing (8) ----------
+const nonmix=[
+  {label:"Stem straight, arms elbow (a)", ports:["E","W","S","D"], roles:{E:"in",W:"out",S:"in",D:"out"},
+   streams:[{type:"straight",from:"E",to:"W"},{type:"elbow",from:"S",to:"D"}]},
+  {label:"Stem straight, arms elbow (b)", ports:["E","W","S","D"], roles:{E:"in",W:"out",D:"in",S:"out"},
+   streams:[{type:"straight",from:"E",to:"W"},{type:"elbow",from:"D",to:"S"}]},
+  {label:"Twin elbow, E-S/W-D (a)", ports:["E","W","S","D"], roles:{E:"in",S:"out",W:"in",D:"out"},
+   streams:[{type:"elbow",from:"E",to:"S"},{type:"elbow",from:"W",to:"D"}]},
+  {label:"Twin elbow, E-S/W-D (b)", ports:["E","W","S","D"], roles:{S:"in",E:"out",D:"in",W:"out"},
+   streams:[{type:"elbow",from:"S",to:"E"},{type:"elbow",from:"D",to:"W"}]},
+  {label:"Twin elbow, E-S/W-D (c)", ports:["E","W","S","D"], roles:{E:"in",S:"out",D:"in",W:"out"},
+   streams:[{type:"elbow",from:"E",to:"S"},{type:"elbow",from:"D",to:"W"}]},
+  {label:"Twin elbow, E-D/W-S (a)", ports:["E","W","S","D"], roles:{E:"in",D:"out",W:"in",S:"out"},
+   streams:[{type:"elbow",from:"E",to:"D"},{type:"elbow",from:"W",to:"S"}]},
+  {label:"Twin elbow, E-D/W-S (b)", ports:["E","W","S","D"], roles:{D:"in",E:"out",S:"in",W:"out"},
+   streams:[{type:"elbow",from:"D",to:"E"},{type:"elbow",from:"S",to:"W"}]},
+  {label:"Twin elbow, E-D/W-S (c)", ports:["E","W","S","D"], roles:{E:"in",D:"out",S:"in",W:"out"},
+   streams:[{type:"elbow",from:"E",to:"D"},{type:"elbow",from:"S",to:"W"}]}
+];
+
+[["board-ref",ref],["board-sm",sm],["board-mix",mix],["board-nonmix",nonmix]].forEach(([id,list])=>{
+  const el=document.getElementById(id);
+  list.forEach(cfg=>buildCell(el,cfg));
+});
+
+document.getElementById("tt").addEventListener("click",()=>{
+  const b=document.body; b.setAttribute("data-theme", b.getAttribute("data-theme")==="workshop"?"":"workshop");
+});
+})();
+</script>
+</body>
+</html>
