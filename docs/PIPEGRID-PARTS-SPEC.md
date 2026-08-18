@@ -284,14 +284,15 @@ nothing.
 
 ## Open / deferred
 
-- **Manufacturability sanity check.** Five-way and six-way fittings are real hardware but
-  less common than the smaller shapes — worth confirming on the iPad later that they still
-  read as "real kit" and not just combinatorics for its own sake.
+- ~~Manufacturability sanity check~~ — **resolved 2026-08-18, moot.** This was framed around
+  whether five-way/six-way fittings read as "real kit" next to commercial hardware. The owner
+  manufactures every part himself, so there's no external catalogue to match against — every
+  flow topology marked active in this document is, by definition, available to manufacture.
+  Nothing left to check here.
 - **Pose mechanics.** Not yet designed: how a shape's canonical local directions actually map
   through the 24-rotation pose system in code (today's `rot` field only spans 4 flat
-  rotations plus a couple of hand-built vertical exceptions). Comes after the shape/flow
-  enumeration is settled, since it needs to serve whatever the final shape count turns out
-  to be.
+  rotations plus a couple of hand-built vertical exceptions). Now the only deferred item left
+  — the shape/flow enumeration it was waiting on is complete.
 
 ## Next
 
