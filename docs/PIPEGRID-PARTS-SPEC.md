@@ -137,11 +137,19 @@ from the existing catalogue.
   - Two full straight runs crossing without mixing (`xover`) — **inactive** (known,
     fabrication not wanted right now), existing.
   - Twin elbows curving in opposite rotational senses (`xbend`) — **inactive**, existing.
+    Reconfirmed 2026-08-18 via mockup board, with a reason this time (see below).
   - Twin elbows curving in the *same* rotational sense (a "pinwheel," vs. `xbend`'s
-    figure-eight) — **uncertain**. Structurally distinct from `xbend`, confirmed by the same
-    symmetry method, but unclear whether it's physically buildable as a compact single
-    fitting, and unclear from description alone what it even looks like. Needs a picture
-    before it can be marked active/inactive/dropped.
+    figure-eight) — **inactive**. Resolved 2026-08-18: structurally distinct from `xbend`
+    (confirmed by the same symmetry method) and now confirmed buildable and legible once
+    actually rendered, but judged not wanted.
+
+  **Owner's stated reasoning (2026-08-18), on why both of the above are inactive:** they
+  read as *two* independent parts sharing a cell, not one physical fitting — each elbow is
+  its own self-contained thing, and the fact that they happen to occupy the same space
+  doesn't make them a single part. Worth treating as a working hypothesis for every
+  non-mixing, multi-stream variant going forward, not just this pair — it's the same shape
+  of judgment that already rejected `xover` and all twelve of corner-through's non-mixing
+  layer, even though no reason was logged for those at the time.
 - **Corner-through** — 16 flow topologies total, all new (the shape itself is new).
   1-in-3-out / 3-in-1-out layer (4, all **active**, owner-confirmed 2026-08-18 via mockup
   board):
@@ -170,8 +178,9 @@ from the existing catalogue.
 
 ## Open / deferred
 
-- **Cross pinwheel** — needs a visual before it can be classified. See above; the mockup-board
-  method used for corner-through's 2-in-2-out layer is the natural way to resolve this too.
+- **"Two parts, not one" as a general filter.** Working hypothesis logged above — apply it
+  when judging any future non-mixing, multi-stream variant (five-way and six-way will likely
+  produce some), not just re-derive the same objection each time from scratch.
 - **Construction rule for balanced (no-single-anchor) flows** — the straight/elbow rule above
   only covers splits and merges with one minority-role port. `xjunc` and its kin already have
   their own hand-built rendering in the existing code; not yet checked whether that
@@ -188,5 +197,4 @@ from the existing catalogue.
 
 ## Next
 
-Five-way and six-way, which haven't been touched at all yet. The cross pinwheel is also still
-open and can be resolved the same mockup-board way whenever it's convenient.
+Cross is now fully resolved. Five-way and six-way haven't been touched at all yet.
