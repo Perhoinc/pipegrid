@@ -210,6 +210,55 @@ from the existing catalogue.
   - Non-mixing variants also exist in this layer (multiple ways two inflows could feed
     different non-touching subsets of the three outflows) but weren't built — Rule 1 rejects
     them regardless of the exact count, so there's nothing to gain from a mockup there.
+- **Six-way** — every direction open, the maximum port count. Every port is equivalent to
+  every other under the shape's own symmetry (the full 24-rotation group acts transitively on
+  the six directions), so — unlike five-way, which has a distinguished apex — there's no
+  special port to single out at the connectivity-pattern level.
+
+  1-in-5-out / 5-in-1-out layer (2, **active**, owner-confirmed 2026-08-18 via mockup board):
+  - Split or merge, any port as anchor — every other tier's single-anchor layer had to
+    distinguish "run" vs. "branch" ports or "flat" vs. "apex" ports; six-way doesn't, because
+    every port has the same relationship to the anchor. The anchor's opposite is always
+    present (all six directions exist), so it's always one straight segment plus four elbows,
+    regardless of which port is chosen as anchor — a single flow topology per direction, not
+    several.
+
+  2-in-4-out / 4-in-2-out mixing layer (4, **active**, owner-confirmed 2026-08-18, built with
+  the extended construction rule from the start):
+  - Opposite pair in (e.g. N,S) — no opposite relationship crosses the in/out split, so all
+    eight inlet-to-outlet connections are elbows.
+  - Adjacent pair in (e.g. N,E) — each inlet's opposite now sits on the outlet side, so two of
+    the eight connections come out straight (N–S and E–W), the other six elbows.
+  - Merge — the mirror of each of the above, same shapes.
+
+  3-in-3-out mixing layer (2, **active**, owner-confirmed 2026-08-18, new territory — the
+  first genuinely balanced split in the whole catalogue):
+  - **T-type** inlets — the three inlets include one full opposite pair plus one more (e.g.
+    N,S,E in). One straight segment (the third inlet to its opposite, which sits on the
+    outlet side) plus eight elbows — nine connections total, the busiest single panel built so
+    far.
+  - **Corner-type** inlets — the three inlets are mutually perpendicular, one from each
+    opposite pair, no pair among them (e.g. N,E,U in — the same "one from each axis" pattern
+    as the corner connectivity pattern itself). Here *every* inlet's opposite lands on the
+    outlet side, so all three activate as straight segments — three straight plus six elbow,
+    still nine connections, but a different mix than T-type.
+  - **No separate merge variant for either** — confirmed algebraically, not just by
+    inspection: for both T-type and corner-type, the complement of the inlet set (swap every
+    in to out and vice versa) is a set of the *same* type, and there's a proper rotation of
+    the cube that maps one onto the other exactly, port-by-port, role-consistent. That means
+    "T-type-in" and its complementary "T-type-out" are literally the same flow topology, just
+    posed differently — not two catalogue entries. This is new: every other tier's split/merge
+    pair has *different* port counts on each side (1 vs. 5, 2 vs. 4, 1 vs. 2...), which is
+    exactly what makes split and merge distinct there — a rotation can't turn a 1-port set
+    into a 5-port set. Six-way's 3-in-3-out is the only balanced split in the whole catalogue,
+    and that balance is what makes the self-complementary rotation possible.
+
+  Non-mixing variants also exist in both mixing layers (inlets and outlets pairing off into
+  independent through-streams that don't touch) but weren't built — Rule 1 rejects them
+  regardless of the exact count, same as every other tier's non-mixing layer.
+
+  Eight flow topologies total, all **active** — the entire connectivity pattern resolved
+  without a single rejection, the only tier where that's true.
 
 ## Rules of thumb (owner-confirmed 2026-08-18, apply going forward without re-deriving)
 
@@ -227,10 +276,11 @@ from the existing catalogue.
    with the extended construction rule from the start; there's no shape-level reason left to
    expect a rejection on sight the way rule 1 still gives one for non-mixing variants.
 
-Rule 1 still matters for **six-way**, next up — expect its non-mixing layer to fail the same
-way everything else's has. Its mixing layer should just be built correctly the first time
-with the extended construction rule rather than needing a reject-then-redraw pass like
-corner-through and five-way both did.
+Confirmed on **six-way** (2026-08-18): its mixing layers were drawn correctly the first time
+with the extended construction rule, no reject-then-redraw pass needed — the only tier that
+didn't need at least one round of correction. Its non-mixing layer wasn't even built, since
+Rule 1's rejection was confirmed decisively enough by every prior tier that a mockup would add
+nothing.
 
 ## Open / deferred
 
@@ -245,4 +295,7 @@ corner-through and five-way both did.
 
 ## Next
 
-Cross and five-way are now fully resolved. Six-way is the last connectivity pattern left.
+All nine connectivity patterns are now fully resolved — every flow topology across every
+port-count tier (1 through 6) has been enumerated and given a verdict. What's left: the two
+deferred items above (manufacturability sanity check, pose mechanics), plus the actual work of
+bringing this catalogue into `index.html` to replace the current hand-built one.
