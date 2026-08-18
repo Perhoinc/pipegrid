@@ -78,6 +78,17 @@ elbow's direction flipped, so both curves turn the <b>same</b> way. Same constru
 difference is which way the second stream flows.</div>
 <div id="board-pinwheel"></div>
 
+<div class="grouphdr">FIVE-WAY — SINGLE-ANCHOR LAYER (4)</div>
+<div class="groupnote">A complete flat cross (N/E/S/W) plus one extra port (U) with nothing opposite it. Same
+construction rule as everything above — quick check that the pattern still holds up with a fifth port added.</div>
+<div id="board-5way-sm"></div>
+
+<div class="grouphdr">FIVE-WAY — 2-IN-3-OUT / 3-IN-2-OUT, MIXING (6)</div>
+<div class="groupnote">Genuinely uncertain this time. The third pattern (two <i>adjacent</i> flat ports as the
+minority side) is structurally close to the adjacent-inlet cross junction already active — but with U added in,
+unclear whether that still reads as clean mixing or reintroduces the right-angle problem.</div>
+<div id="board-5way-mix"></div>
+
 <div class="foot">Not the real app. Placeholder geometry only — judging shape and plausibility, not finished
 rendering.</div>
 
@@ -264,7 +275,30 @@ const pinwheel=[
    streams:[{type:"elbow",from:"N",to:"E"},{type:"elbow",from:"S",to:"W"}]}
 ];
 
-[["board-ref",ref],["board-sm",sm],["board-mix",mix],["board-nonmix",nonmix],["board-pinwheel",pinwheel]].forEach(([id,list])=>{
+// ---------- five-way: single-anchor layer (4) ----------
+const fiveSM=[
+  {label:"Split, apex in (U) — starfish", ports:["N","E","S","W","U"], roles:{U:"in",N:"out",E:"out",S:"out",W:"out"},
+   streams:[{type:"elbow",from:"U",to:"N"},{type:"elbow",from:"U",to:"E"},{type:"elbow",from:"U",to:"S"},{type:"elbow",from:"U",to:"W"}]},
+  {label:"Split, flat port in (N) — elaborated T", ports:["N","E","S","W","U"], roles:{N:"in",E:"out",S:"out",W:"out",U:"out"},
+   streams:[{type:"straight",from:"N",to:"S"},{type:"elbow",from:"N",to:"E"},{type:"elbow",from:"N",to:"W"},{type:"elbow",from:"N",to:"U"}]},
+  {label:"Merge, apex out (U)", ports:["N","E","S","W","U"], roles:{U:"out",N:"in",E:"in",S:"in",W:"in"},
+   streams:[{type:"elbow",from:"U",to:"N"},{type:"elbow",from:"U",to:"E"},{type:"elbow",from:"U",to:"S"},{type:"elbow",from:"U",to:"W"}]},
+  {label:"Merge, flat port out (N)", ports:["N","E","S","W","U"], roles:{N:"out",E:"in",S:"in",W:"in",U:"in"},
+   streams:[{type:"straight",from:"N",to:"S"},{type:"elbow",from:"N",to:"E"},{type:"elbow",from:"N",to:"W"},{type:"elbow",from:"N",to:"U"}]}
+];
+
+// ---------- five-way: 2-in-3-out / 3-in-2-out mixing (6) ----------
+const fiveMix=[
+  {label:"Apex + one flat in (U,N)", ports:["N","E","S","W","U"], roles:{U:"in",N:"in",E:"out",S:"out",W:"out"}, streams:null},
+  {label:"Two opposite flat in (N,S)", ports:["N","E","S","W","U"], roles:{N:"in",S:"in",E:"out",W:"out",U:"out"}, streams:null},
+  {label:"Two adjacent flat in (N,E)", ports:["N","E","S","W","U"], roles:{N:"in",E:"in",S:"out",W:"out",U:"out"}, streams:null},
+  {label:"Apex + one flat out (U,N)", ports:["N","E","S","W","U"], roles:{U:"out",N:"out",E:"in",S:"in",W:"in"}, streams:null},
+  {label:"Two opposite flat out (N,S)", ports:["N","E","S","W","U"], roles:{N:"out",S:"out",E:"in",W:"in",U:"in"}, streams:null},
+  {label:"Two adjacent flat out (N,E)", ports:["N","E","S","W","U"], roles:{N:"out",E:"out",S:"in",W:"in",U:"in"}, streams:null}
+];
+
+[["board-ref",ref],["board-sm",sm],["board-mix",mix],["board-nonmix",nonmix],["board-pinwheel",pinwheel],
+ ["board-5way-sm",fiveSM],["board-5way-mix",fiveMix]].forEach(([id,list])=>{
   const el=document.getElementById(id);
   list.forEach(cfg=>buildCell(el,cfg));
 });
