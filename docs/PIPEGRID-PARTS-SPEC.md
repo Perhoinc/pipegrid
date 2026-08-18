@@ -99,10 +99,15 @@ two shape-families by hand, it falls out of which specific port ends up as the a
   directions rather than two roughly-opposing ones plus a stem, so the same construction rule
   produces a genuinely different-looking result — a true 3D corner joint, not a Y.
 
-Scope: this only covers the single-anchor case. Balanced flows (`xjunc` and its like) have no
-single port in the minority role and are built differently in the existing code — open
-question, noted below, whether the newer balanced splits (the adjacent-inlet cross junction,
-corner-through's eventual 2-in-2-out layer) need their own version of this same kind of rule.
+**Extended to balanced/mixing flows (resolved 2026-08-18, owner's own sketch):** a mixing
+junction — several ports sharing the in role, several sharing out, everything blending
+together — is drawn the exact same way, just with more pairs: connect *every* inlet to
+*every* outlet, straight if that specific pair is directly opposite, elbow if merely adjacent.
+Mixing isn't a separate rendering case with its own logic; it's the same per-pair rule with no
+single anchor to route through, so it routes through all of them. This wasn't a new rule
+layered on top of the old one — it's the same rule finally applied everywhere it should have
+been from the start. Retired the standalone "plain spokes to a shared centre point" technique
+entirely; nothing in the spec uses it anymore.
 
 ## Flow topology, by connectivity pattern
 
@@ -162,50 +167,73 @@ from the existing catalogue.
     off the one inlet.
   - Merge — the mirror of each of the above, same shapes.
 
-  2-in-2-out layer (12, all **inactive**, owner-judged via mockup board, reasoning logged
-  2026-08-18 — two different reasons for the two halves, not one blanket verdict):
+  2-in-2-out layer (12 total, mixed verdict — see revision below):
   - 4 mixing variants (stem-in/arms-out, arms-in/stem-out, and the two ways to pair one stem
-    end with one arm as the inlets) — rejected for **aesthetics, not physical validity**: the
-    arms meet the shared chamber at a hard right angle to the stem's own axis, which reads as
-    awkward branching rather than a clean mixing junction. This is specific to shapes like
-    corner-through that have a distinguished straight axis *plus* separate perpendicular
-    arms — cross's mixing junctions don't have this problem because all four of its ports are
-    equivalent to begin with, so nothing branches off anything at a jarring angle. See Rules
-    of thumb below.
+    end with one arm as the inlets) — **active**, owner-confirmed 2026-08-18. Originally
+    rejected as aesthetically broken (arms meeting a shared chamber at a hard right angle).
+    That verdict was on the *rendering*, not the shape: it was drawn as plain spokes into one
+    shared centre point, which really does look bad for a shape with a distinguished stem
+    plus separate perpendicular arms. Redrawn per the owner's sketch using the extended
+    construction rule (every inlet to every outlet, straight/elbow per pair) instead of a
+    shared centre, and all four read as legitimate parts. Two of the four come out all-elbow
+    (stem-in/arms-out and its mirror); the other two pick up one straight segment where an
+    opposite relationship spans the in/out split.
   - 8 non-mixing variants (2 from pairing the stem together and the arms together — one has a
     genuine straight run through the stem plus a separate elbow between the arms — and 3 each
     from the two ways of pairing a stem end with an arm, all-elbow, no straight segment) —
-    rejected under the same "two parts, not one" rule as `xover`/`xbend`/the pinwheel.
+    still **inactive**, unaffected by the above. Rejected under the "two parts, not one" rule
+    (separate non-touching streams reading as two parts), which is a different problem with a
+    different fix — not a rendering-technique issue, so the elbow-based redraw doesn't apply
+    here and doesn't need to.
 
-  Net result for this shape: the simpler single-anchor splits and merges hold up as real
-  parts; the busier balanced-flow layer, once actually visible, didn't — for two genuinely
-  different reasons depending on which half you're looking at.
+  Net result for this shape: single-anchor splits/merges and mixing junctions all hold up as
+  real parts; only the non-mixing layer is rejected, and for a reason specific to it.
+- **Five-way** — a complete flat cross (N/E/S/W, all mutually equivalent) plus one extra port
+  (the "apex," here called U) with nothing opposite it — structurally, cross plus one more.
+  1-in-4-out / 4-in-1-out layer (4, all **active**, owner-confirmed 2026-08-18 via mockup
+  board):
+  - Split, apex is the inlet — nothing opposes the apex, so all four connections down to the
+    flat ports are elbows: a four-way starfish, no straight segment.
+  - Split, a flat port is the inlet — its opposite flat port gets a straight segment, the
+    other two flat ports plus the apex all get elbow taps: an elaborated T with three
+    branches instead of one.
+  - Merge — the mirror of each of the above, same shapes.
+
+  2-in-3-out / 3-in-2-out layer (mixing half resolved; non-mixing half not built):
+  - 6 mixing variants — **active**, owner-confirmed 2026-08-18, drawn with the extended
+    construction rule from the start (every inlet to every outlet), not the retired spoke
+    technique. Three distinct ways to pick the minority side: apex + one flat port (1 straight
+    segment, 5 elbow), two opposite flat ports (all 6 elbow — the one opposite relationship in
+    play stays entirely on one side of the in/out split), two adjacent flat ports (2 straight,
+    4 elbow — now *both* flat-port opposite relationships get split across in and out). Split
+    and merge of each share the same shape, mirrored.
+  - Non-mixing variants also exist in this layer (multiple ways two inflows could feed
+    different non-touching subsets of the three outflows) but weren't built — Rule 1 rejects
+    them regardless of the exact count, so there's nothing to gain from a mockup there.
 
 ## Rules of thumb (owner-confirmed 2026-08-18, apply going forward without re-deriving)
 
 1. **Two parts, not one.** Any non-mixing, multi-stream variant — separate streams that never
    touch, just happening to share a cell — reads as two independent parts occupying the same
    space, not a single fitting. Reject on sight; don't wait for a mockup to confirm.
-2. **No right-angle branching into a mixing chamber.** A mixing junction is only aesthetically
-   sound when its ports are all equivalent to each other (like cross's four flat ports). If a
-   shape has a distinguished straight-through axis *plus* separate perpendicular arms (like
-   corner-through's stem-and-arms), its mixing variants will read as arms jutting into the
-   chamber at a jarring angle, not clean blending — likely reject, worth a mockup to confirm
-   on shapes not yet checked.
+2. ~~No right-angle branching into a mixing chamber~~ — **retracted 2026-08-18.** This was
+   never a fact about the shapes; it was an artifact of one specific rendering technique
+   (every port as a plain spoke into one shared centre point), which genuinely does look bad
+   for a shape with a distinguished axis plus separate perpendicular arms. The fix wasn't to
+   reject those shapes, it was to stop drawing mixing junctions that way — see the
+   construction rule's extension above (every inlet to every outlet, straight/elbow per pair,
+   no shared centre). Once corner-through's and five-way's mixing variants were redrawn with
+   that method, all ten read as legitimate parts. **Current rule:** draw every mixing junction
+   with the extended construction rule from the start; there's no shape-level reason left to
+   expect a rejection on sight the way rule 1 still gives one for non-mixing variants.
 
-Both rules matter for **five-way and six-way**, next up: five-way keeps that same
-stem-plus-odd-port asymmetry (two full axes plus one more), so expect rule 2 to bite some of
-its mixing variants. Six-way is fully symmetric (three complete axes, nothing distinguished),
-closer to cross's situation — worth checking whether rule 2 actually doesn't apply there, not
-assuming it automatically clears.
+Rule 1 still matters for **six-way**, next up — expect its non-mixing layer to fail the same
+way everything else's has. Its mixing layer should just be built correctly the first time
+with the extended construction rule rather than needing a reject-then-redraw pass like
+corner-through and five-way both did.
 
 ## Open / deferred
 
-- **Construction rule for balanced (no-single-anchor) flows** — the straight/elbow rule above
-  only covers splits and merges with one minority-role port. `xjunc` and its kin already have
-  their own hand-built rendering in the existing code; not yet checked whether that
-  generalizes the same way, or needs its own version of the rule, once the newer balanced
-  variants (adjacent-inlet cross junction, corner-through's 2-in-2-out layer) get worked out.
 - **Manufacturability sanity check.** Five-way and six-way fittings are real hardware but
   less common than the smaller shapes — worth confirming on the iPad later that they still
   read as "real kit" and not just combinatorics for its own sake.
@@ -217,4 +245,4 @@ assuming it automatically clears.
 
 ## Next
 
-Cross is now fully resolved. Five-way and six-way haven't been touched at all yet.
+Cross and five-way are now fully resolved. Six-way is the last connectivity pattern left.
