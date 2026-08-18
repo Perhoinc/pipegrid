@@ -62,8 +62,9 @@ question directly — T-split and Y use the <b>identical three ports</b>, only w
 <div id="board-sm"></div>
 
 <div class="grouphdr">CORNER-THROUGH — 2-IN-2-OUT, MIXING (4)</div>
-<div class="groupnote">No stream separation — everything blends in a shared chamber. Drawn as plain spokes to the
-centre; there's no straight/elbow question when nothing stays separate.</div>
+<div class="groupnote">Redrawn per your sketch: every inlet connects to every outlet, same straight-if-opposite /
+elbow-if-adjacent rule as every other panel on this board — no shared centre point, no spokes. Originally rejected
+for right-angle branching into a chamber; judge these fresh.</div>
 <div id="board-mix"></div>
 
 <div class="grouphdr">CORNER-THROUGH — 2-IN-2-OUT, NON-MIXING (8)</div>
@@ -84,9 +85,9 @@ construction rule as everything above — quick check that the pattern still hol
 <div id="board-5way-sm"></div>
 
 <div class="grouphdr">FIVE-WAY — 2-IN-3-OUT / 3-IN-2-OUT, MIXING (6)</div>
-<div class="groupnote">Genuinely uncertain this time. The third pattern (two <i>adjacent</i> flat ports as the
-minority side) is structurally close to the adjacent-inlet cross junction already active — but with U added in,
-unclear whether that still reads as clean mixing or reintroduces the right-angle problem.</div>
+<div class="groupnote">Same fix applied: every inlet to every outlet, straight only where a pair happens to be
+directly opposite. Two of the six pick up straight segments where an opposite relationship spans the in/out split;
+the other four end up all-elbow.</div>
 <div id="board-5way-mix"></div>
 
 <div class="foot">Not the real app. Placeholder geometry only — judging shape and plausibility, not finished
@@ -161,35 +162,17 @@ function buildCell(container, cfg){
       g.appendChild(ln);
     });
 
-    if(cfg.streams){
-      cfg.streams.forEach(seg=>{
-        const pts3d = seg.type==="straight" ? straightPts(seg.from,seg.to) : elbowPts(seg.from,seg.to,12);
-        const pts2d = pts3d.map(p=>proj(R(p)));
-        const path=svgNS("path");
-        const d="M "+pts2d.map(p=>p.x.toFixed(1)+" "+p.y.toFixed(1)).join(" L ");
-        path.setAttribute("d",d);
-        path.setAttribute("fill","none"); path.setAttribute("stroke","var(--text)");
-        path.setAttribute("stroke-width","6"); path.setAttribute("stroke-linecap","round");
-        path.setAttribute("opacity","0.55");
-        g.appendChild(path);
-      });
-    } else {
-      // mixing: plain spokes to the centre, no straight/elbow distinction
-      cfg.ports.forEach(dir=>{
-        const e=proj(R(DIRVEC[dir].map(v=>v*PR))), c=proj(R([0,0,0]));
-        const ln=svgNS("line");
-        ln.setAttribute("x1",e.x); ln.setAttribute("y1",e.y);
-        ln.setAttribute("x2",c.x); ln.setAttribute("y2",c.y);
-        ln.setAttribute("stroke","var(--text)"); ln.setAttribute("stroke-width","6");
-        ln.setAttribute("stroke-linecap","round"); ln.setAttribute("opacity","0.4");
-        g.appendChild(ln);
-      });
-      const cc=proj(R([0,0,0]));
-      const chamber=svgNS("circle");
-      chamber.setAttribute("cx",cc.x); chamber.setAttribute("cy",cc.y); chamber.setAttribute("r","5");
-      chamber.setAttribute("fill","var(--text)"); chamber.setAttribute("opacity","0.3");
-      g.appendChild(chamber);
-    }
+    cfg.streams.forEach(seg=>{
+      const pts3d = seg.type==="straight" ? straightPts(seg.from,seg.to) : elbowPts(seg.from,seg.to,12);
+      const pts2d = pts3d.map(p=>proj(R(p)));
+      const path=svgNS("path");
+      const d="M "+pts2d.map(p=>p.x.toFixed(1)+" "+p.y.toFixed(1)).join(" L ");
+      path.setAttribute("d",d);
+      path.setAttribute("fill","none"); path.setAttribute("stroke","var(--text)");
+      path.setAttribute("stroke-width","5"); path.setAttribute("stroke-linecap","round");
+      path.setAttribute("opacity","0.45");
+      g.appendChild(path);
+    });
 
     cfg.ports.forEach(dir=>{
       const p=proj(R(DIRVEC[dir].map(v=>v*PR)));
@@ -239,12 +222,16 @@ const sm=[
    streams:[{type:"elbow",from:"S",to:"E"},{type:"elbow",from:"S",to:"W"},{type:"elbow",from:"S",to:"D"}]}
 ];
 
-// ---------- corner-through 2-in-2-out mixing (4) ----------
+// ---------- corner-through 2-in-2-out mixing (4) — every inlet to every outlet, same elbow/straight rule ----------
 const mix=[
-  {label:"Stem in, arms out", ports:["E","W","S","D"], roles:{E:"in",W:"in",S:"out",D:"out"}, streams:null},
-  {label:"Arms in, stem out", ports:["E","W","S","D"], roles:{S:"in",D:"in",E:"out",W:"out"}, streams:null},
-  {label:"E+S in, W+D out", ports:["E","W","S","D"], roles:{E:"in",S:"in",W:"out",D:"out"}, streams:null},
-  {label:"E+D in, W+S out", ports:["E","W","S","D"], roles:{E:"in",D:"in",W:"out",S:"out"}, streams:null}
+  {label:"Stem in, arms out — all elbow", ports:["E","W","S","D"], roles:{E:"in",W:"in",S:"out",D:"out"},
+   streams:[{type:"elbow",from:"E",to:"S"},{type:"elbow",from:"E",to:"D"},{type:"elbow",from:"W",to:"S"},{type:"elbow",from:"W",to:"D"}]},
+  {label:"Arms in, stem out — all elbow", ports:["E","W","S","D"], roles:{S:"in",D:"in",E:"out",W:"out"},
+   streams:[{type:"elbow",from:"S",to:"E"},{type:"elbow",from:"S",to:"W"},{type:"elbow",from:"D",to:"E"},{type:"elbow",from:"D",to:"W"}]},
+  {label:"E+S in, W+D out — 1 straight", ports:["E","W","S","D"], roles:{E:"in",S:"in",W:"out",D:"out"},
+   streams:[{type:"straight",from:"E",to:"W"},{type:"elbow",from:"E",to:"D"},{type:"elbow",from:"S",to:"W"},{type:"elbow",from:"S",to:"D"}]},
+  {label:"E+D in, W+S out — 1 straight", ports:["E","W","S","D"], roles:{E:"in",D:"in",W:"out",S:"out"},
+   streams:[{type:"straight",from:"E",to:"W"},{type:"elbow",from:"E",to:"S"},{type:"elbow",from:"D",to:"W"},{type:"elbow",from:"D",to:"S"}]}
 ];
 
 // ---------- corner-through 2-in-2-out non-mixing (8) ----------
@@ -288,13 +275,26 @@ const fiveSM=[
 ];
 
 // ---------- five-way: 2-in-3-out / 3-in-2-out mixing (6) ----------
+// every inlet to every outlet, same elbow/straight rule as everywhere else
 const fiveMix=[
-  {label:"Apex + one flat in (U,N)", ports:["N","E","S","W","U"], roles:{U:"in",N:"in",E:"out",S:"out",W:"out"}, streams:null},
-  {label:"Two opposite flat in (N,S)", ports:["N","E","S","W","U"], roles:{N:"in",S:"in",E:"out",W:"out",U:"out"}, streams:null},
-  {label:"Two adjacent flat in (N,E)", ports:["N","E","S","W","U"], roles:{N:"in",E:"in",S:"out",W:"out",U:"out"}, streams:null},
-  {label:"Apex + one flat out (U,N)", ports:["N","E","S","W","U"], roles:{U:"out",N:"out",E:"in",S:"in",W:"in"}, streams:null},
-  {label:"Two opposite flat out (N,S)", ports:["N","E","S","W","U"], roles:{N:"out",S:"out",E:"in",W:"in",U:"in"}, streams:null},
-  {label:"Two adjacent flat out (N,E)", ports:["N","E","S","W","U"], roles:{N:"out",E:"out",S:"in",W:"in",U:"in"}, streams:null}
+  {label:"Apex + one flat in (U,N) — 1 straight", ports:["N","E","S","W","U"], roles:{U:"in",N:"in",E:"out",S:"out",W:"out"},
+   streams:[{type:"elbow",from:"U",to:"E"},{type:"elbow",from:"U",to:"S"},{type:"elbow",from:"U",to:"W"},
+            {type:"elbow",from:"N",to:"E"},{type:"straight",from:"N",to:"S"},{type:"elbow",from:"N",to:"W"}]},
+  {label:"Two opposite flat in (N,S) — all elbow", ports:["N","E","S","W","U"], roles:{N:"in",S:"in",E:"out",W:"out",U:"out"},
+   streams:[{type:"elbow",from:"N",to:"E"},{type:"elbow",from:"N",to:"W"},{type:"elbow",from:"N",to:"U"},
+            {type:"elbow",from:"S",to:"E"},{type:"elbow",from:"S",to:"W"},{type:"elbow",from:"S",to:"U"}]},
+  {label:"Two adjacent flat in (N,E) — 2 straight", ports:["N","E","S","W","U"], roles:{N:"in",E:"in",S:"out",W:"out",U:"out"},
+   streams:[{type:"straight",from:"N",to:"S"},{type:"elbow",from:"N",to:"W"},{type:"elbow",from:"N",to:"U"},
+            {type:"elbow",from:"E",to:"S"},{type:"straight",from:"E",to:"W"},{type:"elbow",from:"E",to:"U"}]},
+  {label:"Apex + one flat out (U,N) — 1 straight", ports:["N","E","S","W","U"], roles:{U:"out",N:"out",E:"in",S:"in",W:"in"},
+   streams:[{type:"elbow",from:"E",to:"U"},{type:"elbow",from:"S",to:"U"},{type:"elbow",from:"W",to:"U"},
+            {type:"elbow",from:"E",to:"N"},{type:"straight",from:"S",to:"N"},{type:"elbow",from:"W",to:"N"}]},
+  {label:"Two opposite flat out (N,S) — all elbow", ports:["N","E","S","W","U"], roles:{N:"out",S:"out",E:"in",W:"in",U:"in"},
+   streams:[{type:"elbow",from:"E",to:"N"},{type:"elbow",from:"W",to:"N"},{type:"elbow",from:"U",to:"N"},
+            {type:"elbow",from:"E",to:"S"},{type:"elbow",from:"W",to:"S"},{type:"elbow",from:"U",to:"S"}]},
+  {label:"Two adjacent flat out (N,E) — 2 straight", ports:["N","E","S","W","U"], roles:{N:"out",E:"out",S:"in",W:"in",U:"in"},
+   streams:[{type:"straight",from:"S",to:"N"},{type:"elbow",from:"W",to:"N"},{type:"elbow",from:"U",to:"N"},
+            {type:"elbow",from:"S",to:"E"},{type:"straight",from:"W",to:"E"},{type:"elbow",from:"U",to:"E"}]}
 ];
 
 [["board-ref",ref],["board-sm",sm],["board-mix",mix],["board-nonmix",nonmix],["board-pinwheel",pinwheel],
