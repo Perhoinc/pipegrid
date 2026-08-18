@@ -143,13 +143,12 @@ from the existing catalogue.
     (confirmed by the same symmetry method) and now confirmed buildable and legible once
     actually rendered, but judged not wanted.
 
-  **Owner's stated reasoning (2026-08-18), on why both of the above are inactive:** they
-  read as *two* independent parts sharing a cell, not one physical fitting — each elbow is
-  its own self-contained thing, and the fact that they happen to occupy the same space
-  doesn't make them a single part. Worth treating as a working hypothesis for every
-  non-mixing, multi-stream variant going forward, not just this pair — it's the same shape
-  of judgment that already rejected `xover` and all twelve of corner-through's non-mixing
-  layer, even though no reason was logged for those at the time.
+  **Owner's stated reasoning (2026-08-18):** every non-mixing, multi-stream variant gets
+  rejected for the same reason — confirmed this is the actual reasoning behind `xover`,
+  `xbend`, the pinwheel, and all twelve of corner-through's non-mixing layer, not just a
+  hypothesis. They read as *two* independent parts sharing a cell, not one physical fitting —
+  each stream is its own self-contained thing, and occupying the same cell doesn't make them
+  a single part. Now a settled rule, not a per-case judgment call — see Rules of thumb below.
 - **Corner-through** — 16 flow topologies total, all new (the shape itself is new).
   1-in-3-out / 3-in-1-out layer (4, all **active**, owner-confirmed 2026-08-18 via mockup
   board):
@@ -163,24 +162,45 @@ from the existing catalogue.
     off the one inlet.
   - Merge — the mirror of each of the above, same shapes.
 
-  2-in-2-out layer (12, all **inactive** — owner-judged non-viable on inspection via mockup
-  board, 2026-08-18, no specific reason logged):
-  - 4 mixing variants: stem-in/arms-out, arms-in/stem-out, and the two ways to pair one stem
-    end with one arm as the inlets.
-  - 8 non-mixing variants, less symmetric than cross's equivalent layer so more of them stay
-    distinct rather than collapsing into each other: 2 from pairing the stem together and the
-    arms together (one has a genuine straight run through the stem plus a separate elbow
-    between the arms), and 3 each from the two ways of pairing a stem end with an arm
-    (all-elbow, no straight segment, differing only in which specific ports feed which).
+  2-in-2-out layer (12, all **inactive**, owner-judged via mockup board, reasoning logged
+  2026-08-18 — two different reasons for the two halves, not one blanket verdict):
+  - 4 mixing variants (stem-in/arms-out, arms-in/stem-out, and the two ways to pair one stem
+    end with one arm as the inlets) — rejected for **aesthetics, not physical validity**: the
+    arms meet the shared chamber at a hard right angle to the stem's own axis, which reads as
+    awkward branching rather than a clean mixing junction. This is specific to shapes like
+    corner-through that have a distinguished straight axis *plus* separate perpendicular
+    arms — cross's mixing junctions don't have this problem because all four of its ports are
+    equivalent to begin with, so nothing branches off anything at a jarring angle. See Rules
+    of thumb below.
+  - 8 non-mixing variants (2 from pairing the stem together and the arms together — one has a
+    genuine straight run through the stem plus a separate elbow between the arms — and 3 each
+    from the two ways of pairing a stem end with an arm, all-elbow, no straight segment) —
+    rejected under the same "two parts, not one" rule as `xover`/`xbend`/the pinwheel.
 
   Net result for this shape: the simpler single-anchor splits and merges hold up as real
-  parts; the busier balanced-flow layer, once actually visible, didn't.
+  parts; the busier balanced-flow layer, once actually visible, didn't — for two genuinely
+  different reasons depending on which half you're looking at.
+
+## Rules of thumb (owner-confirmed 2026-08-18, apply going forward without re-deriving)
+
+1. **Two parts, not one.** Any non-mixing, multi-stream variant — separate streams that never
+   touch, just happening to share a cell — reads as two independent parts occupying the same
+   space, not a single fitting. Reject on sight; don't wait for a mockup to confirm.
+2. **No right-angle branching into a mixing chamber.** A mixing junction is only aesthetically
+   sound when its ports are all equivalent to each other (like cross's four flat ports). If a
+   shape has a distinguished straight-through axis *plus* separate perpendicular arms (like
+   corner-through's stem-and-arms), its mixing variants will read as arms jutting into the
+   chamber at a jarring angle, not clean blending — likely reject, worth a mockup to confirm
+   on shapes not yet checked.
+
+Both rules matter for **five-way and six-way**, next up: five-way keeps that same
+stem-plus-odd-port asymmetry (two full axes plus one more), so expect rule 2 to bite some of
+its mixing variants. Six-way is fully symmetric (three complete axes, nothing distinguished),
+closer to cross's situation — worth checking whether rule 2 actually doesn't apply there, not
+assuming it automatically clears.
 
 ## Open / deferred
 
-- **"Two parts, not one" as a general filter.** Working hypothesis logged above — apply it
-  when judging any future non-mixing, multi-stream variant (five-way and six-way will likely
-  produce some), not just re-derive the same objection each time from scratch.
 - **Construction rule for balanced (no-single-anchor) flows** — the straight/elbow rule above
   only covers splits and merges with one minority-role port. `xjunc` and its kin already have
   their own hand-built rendering in the existing code; not yet checked whether that
