@@ -90,6 +90,24 @@ directly opposite. Two of the six pick up straight segments where an opposite re
 the other four end up all-elbow.</div>
 <div id="board-5way-mix"></div>
 
+<div class="grouphdr">SIX-WAY — SINGLE-ANCHOR LAYER (2)</div>
+<div class="groupnote">All six directions present, nothing distinguished — every port equivalent to every other.
+The anchor's opposite is always present this time, so this is one straight segment plus four elbow taps.</div>
+<div id="board-6way-sm"></div>
+
+<div class="grouphdr">SIX-WAY — 2-IN-4-OUT / 4-IN-2-OUT, MIXING (4)</div>
+<div class="groupnote">Same two families as every other shape: the two minority ports are either directly
+opposite each other (stays all-elbow, 8 connections) or merely adjacent (picks up two straight segments, one per
+port's own opposite landing on the far side).</div>
+<div id="board-6way-mix24"></div>
+
+<div class="grouphdr">SIX-WAY — 3-IN-3-OUT, MIXING (2)</div>
+<div class="groupnote">New territory — first genuinely balanced three-and-three split. Same two families as the
+very first three-port enumeration: the three inlets either contain one opposite pair (one straight segment) or are
+three mutually perpendicular ports with no opposite pair (all three inlets' opposites land on the outlet side —
+three straight, six elbow, nine connections in one cell). Worth judging density on its own, not just the angles.</div>
+<div id="board-6way-mix33"></div>
+
 <div class="foot">Not the real app. Placeholder geometry only — judging shape and plausibility, not finished
 rendering.</div>
 
@@ -297,8 +315,45 @@ const fiveMix=[
             {type:"elbow",from:"S",to:"E"},{type:"straight",from:"W",to:"E"},{type:"elbow",from:"U",to:"E"}]}
 ];
 
+// ---------- six-way: single-anchor layer (2) ----------
+const sixSM=[
+  {label:"Split, any port as anchor (U) — 1 straight, 4 elbow", ports:["N","E","S","W","U","D"], roles:{U:"in",N:"out",E:"out",S:"out",W:"out",D:"out"},
+   streams:[{type:"straight",from:"U",to:"D"},{type:"elbow",from:"U",to:"N"},{type:"elbow",from:"U",to:"E"},{type:"elbow",from:"U",to:"S"},{type:"elbow",from:"U",to:"W"}]},
+  {label:"Merge, any port as anchor (U)", ports:["N","E","S","W","U","D"], roles:{U:"out",N:"in",E:"in",S:"in",W:"in",D:"in"},
+   streams:[{type:"straight",from:"U",to:"D"},{type:"elbow",from:"N",to:"U"},{type:"elbow",from:"E",to:"U"},{type:"elbow",from:"S",to:"U"},{type:"elbow",from:"W",to:"U"}]}
+];
+
+// ---------- six-way: 2-in-4-out / 4-in-2-out mixing (4) ----------
+const sixMix24=[
+  {label:"Opposite pair in (N,S) — all elbow", ports:["N","E","S","W","U","D"], roles:{N:"in",S:"in",E:"out",W:"out",U:"out",D:"out"},
+   streams:[{type:"elbow",from:"N",to:"E"},{type:"elbow",from:"N",to:"W"},{type:"elbow",from:"N",to:"U"},{type:"elbow",from:"N",to:"D"},
+            {type:"elbow",from:"S",to:"E"},{type:"elbow",from:"S",to:"W"},{type:"elbow",from:"S",to:"U"},{type:"elbow",from:"S",to:"D"}]},
+  {label:"Adjacent pair in (N,E) — 2 straight", ports:["N","E","S","W","U","D"], roles:{N:"in",E:"in",S:"out",W:"out",U:"out",D:"out"},
+   streams:[{type:"straight",from:"N",to:"S"},{type:"elbow",from:"N",to:"W"},{type:"elbow",from:"N",to:"U"},{type:"elbow",from:"N",to:"D"},
+            {type:"elbow",from:"E",to:"S"},{type:"straight",from:"E",to:"W"},{type:"elbow",from:"E",to:"U"},{type:"elbow",from:"E",to:"D"}]},
+  {label:"Opposite pair out (N,S) — all elbow", ports:["N","E","S","W","U","D"], roles:{N:"out",S:"out",E:"in",W:"in",U:"in",D:"in"},
+   streams:[{type:"elbow",from:"E",to:"N"},{type:"elbow",from:"W",to:"N"},{type:"elbow",from:"U",to:"N"},{type:"elbow",from:"D",to:"N"},
+            {type:"elbow",from:"E",to:"S"},{type:"elbow",from:"W",to:"S"},{type:"elbow",from:"U",to:"S"},{type:"elbow",from:"D",to:"S"}]},
+  {label:"Adjacent pair out (N,E) — 2 straight", ports:["N","E","S","W","U","D"], roles:{N:"out",E:"out",S:"in",W:"in",U:"in",D:"in"},
+   streams:[{type:"straight",from:"S",to:"N"},{type:"elbow",from:"W",to:"N"},{type:"elbow",from:"U",to:"N"},{type:"elbow",from:"D",to:"N"},
+            {type:"elbow",from:"S",to:"E"},{type:"straight",from:"W",to:"E"},{type:"elbow",from:"U",to:"E"},{type:"elbow",from:"D",to:"E"}]}
+];
+
+// ---------- six-way: 3-in-3-out mixing (2) ----------
+const sixMix33=[
+  {label:"T-type in (N,S,E) — 1 straight, 8 elbow", ports:["N","E","S","W","U","D"], roles:{N:"in",S:"in",E:"in",W:"out",U:"out",D:"out"},
+   streams:[{type:"elbow",from:"N",to:"W"},{type:"elbow",from:"N",to:"U"},{type:"elbow",from:"N",to:"D"},
+            {type:"elbow",from:"S",to:"W"},{type:"elbow",from:"S",to:"U"},{type:"elbow",from:"S",to:"D"},
+            {type:"straight",from:"E",to:"W"},{type:"elbow",from:"E",to:"U"},{type:"elbow",from:"E",to:"D"}]},
+  {label:"Corner-type in (N,E,U) — 3 straight, 6 elbow", ports:["N","E","S","W","U","D"], roles:{N:"in",E:"in",U:"in",S:"out",W:"out",D:"out"},
+   streams:[{type:"straight",from:"N",to:"S"},{type:"elbow",from:"N",to:"W"},{type:"elbow",from:"N",to:"D"},
+            {type:"elbow",from:"E",to:"S"},{type:"straight",from:"E",to:"W"},{type:"elbow",from:"E",to:"D"},
+            {type:"elbow",from:"U",to:"S"},{type:"elbow",from:"U",to:"W"},{type:"straight",from:"U",to:"D"}]}
+];
+
 [["board-ref",ref],["board-sm",sm],["board-mix",mix],["board-nonmix",nonmix],["board-pinwheel",pinwheel],
- ["board-5way-sm",fiveSM],["board-5way-mix",fiveMix]].forEach(([id,list])=>{
+ ["board-5way-sm",fiveSM],["board-5way-mix",fiveMix],
+ ["board-6way-sm",sixSM],["board-6way-mix24",sixMix24],["board-6way-mix33",sixMix33]].forEach(([id,list])=>{
   const el=document.getElementById(id);
   list.forEach(cfg=>buildCell(el,cfg));
 });
