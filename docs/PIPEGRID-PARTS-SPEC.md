@@ -329,17 +329,46 @@ initially stated backwards and corrected — see below):
   to reason about by hand. The test board keeps them in the validation table and deliberately keeps
   them out of the visual explorer.
 
-**Validated against hand-derived numbers** (all pass, plus a coset-size check confirming every
-group of equivalent rotations is the same size, as orbit-stabilizer requires): cap 6 · straight
-3 bare / 6 directional · corner 8 bare / 24 split / 24 merge · T 12 bare / 24 `tsplit` · cross
-`xjunc` 6 · five-way apex split 6 · six-way opposite-pair-in 3 / adjacent-pair-in 12 /
-corner-type 3-in-3-out 8.
+**Validated against hand-derived numbers, across all nine connectivity patterns** (all pass, plus a
+coset-size check confirming every group of equivalent rotations is the same size, as
+orbit-stabilizer requires):
+
+| Pattern | Bare | With a flow role assigned |
+|---|---|---|
+| Cap | — | 6 (`src`) |
+| Straight | 3 | 6 directional |
+| Elbow | 12 | 24 directional |
+| T | 12 | 24 (`tsplit`) |
+| Corner | 8 | 24 split · 24 merge |
+| Cross | 3 | 12 (`xsplit`) · 6 (`xjunc`) |
+| Corner-through | 12 | 24 split, stem end in |
+| Five-way | 6 | 6 apex split · 24 flat-port split |
+| Six-way | 1 | 3 opposite-pair-in · 12 adjacent-pair-in · 8 corner-type 3-in-3-out |
+
+Three of the bare counts land exactly on the cube's own features — **straight 3** (its 3 axes),
+**elbow 12** (its 12 edges), **corner 8** (its 8 vertices) — which is not a coincidence: a
+two-adjacent-port shape *is* an edge of the cube, a three-mutually-perpendicular-port shape *is* a
+vertex. Independent corroboration that the generated rotation set is the real cube group.
+
+Note five-way's apex split as the case where a role adds nothing: 6 either way, because the apex is
+already singular by geometry before any role is assigned. That's the "or stays equal" half of the
+rule above, and it only shows up on shapes that already distinguish their own ports.
 
 That last figure independently confirms this document's earlier claim that six-way's corner-type
 3-in-3-out has no separate merge variant: there are exactly 8 ways to pick one direction from each
 opposite pair as the inlet set, and the pose count comes out to 8, not 16 — so every such
 configuration, including the complement of any given one, is the same topology posed differently.
 The claim was originally derived by hand; the pose system reproduces it without being told.
+
+**Coverage correction on record (2026-08-19).** The first version of this section validated only
+five of the nine connectivity patterns — elbow, cross, corner-through and five-way were all
+missing, and the owner caught the elbow. That was the worst of the four to omit: `vup`/`vdn` are
+hand-built vertical *elbow* exceptions, and they are the motivating example in this document's
+own opening paragraph. The pose system's headline claim is that those exceptions dissolve into
+"the elbow, posed differently," and the validation skipped exactly that shape. All nine patterns
+are now covered, with the numbers hand-derived first and confirmed after. General rule taken from
+it: a validation table that covers *most* cases hides the one most likely to be wrong — enumerate
+against the spec's own list, the same way the flow-topology passes did.
 
 **Correction on record (2026-08-19).** This section originally claimed the opposite — that roles
 could only *shrink* the pose count. The owner's question about whether a directional straight has

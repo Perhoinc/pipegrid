@@ -70,13 +70,16 @@
 </div>
 
 <div class="panel">
-  <div class="plabel">2. DISTINCT-POSE COUNTS — SHAPE + ROLE, CHECKED AGAINST HAND-DERIVED NUMBERS</div>
+  <div class="plabel">2. DISTINCT-POSE COUNTS — ALL NINE CONNECTIVITY PATTERNS, CHECKED AGAINST HAND-DERIVED NUMBERS</div>
   <div class="note">Same shape can have a different count depending on whether a flow role (in/out) is
   assigned. Assigning a role <b>raises</b> the count, never lowers it: a role removes symmetry, and
   fewer self-matching rotations means more orientations are genuinely tellable apart. A directional
   straight has 6 poses where a bare one has 3, because the 180° flip that's invisible on the bare
   shape swaps inlet for outlet once the ends have roles. The roled count is always a whole multiple
-  of the bare count, capped at 24.
+  of the bare count, capped at 24. Worth a glance: the three simplest bare counts land exactly on
+  the cube's own features — <b>straight 3</b> (its 3 axes), <b>elbow 12</b> (its 12 edges),
+  <b>corner 8</b> (its 8 vertices). A two-adjacent-port shape <i>is</i> an edge of the cube, so the
+  12 is not a coincidence.
   <b>Bare</b> rows have no flow role at all (silhouette only, never actually placed on the board) —
   they exist purely to sanity-check the rotation math against a plain shape. The rest are real,
   placeable flow topologies.</div>
@@ -196,19 +199,49 @@ function distinctPoses(ports){
 }
 
 // ---------- test cases (numbers hand-derived earlier, cross-checked here) ----------
+// Ordered to match the connectivity-pattern table in docs/PIPEGRID-PARTS-SPEC.md:
+// cap · straight · elbow · T · corner · cross · corner-through · five-way · six-way.
+// All nine patterns are represented; leaving one out hides exactly the case most
+// likely to be wrong (the elbow was originally missing, and it is the shape whose
+// hand-built vup/vdn exceptions motivate this whole pose system).
 var TESTS = [
+  // --- 1 port ---
   {name:'cap, src (1 port)', ports:[{dir:'N',role:'in'}], expect:6, bare:false},
+  // --- 2 ports: straight (opposite pair) ---
   {name:'straight, bare', ports:[{dir:'N',role:'x'},{dir:'S',role:'x'}], expect:3, bare:true},
   {name:'straight, directional', ports:[{dir:'N',role:'in'},{dir:'S',role:'out'}], expect:6, bare:false,
    streams:[{type:'straight',from:'N',to:'S'}]},
+  // --- 2 ports: elbow (adjacent pair) ---
+  {name:'elbow, bare', ports:[{dir:'N',role:'x'},{dir:'E',role:'x'}], expect:12, bare:true},
+  {name:'elbow, directional', ports:[{dir:'N',role:'in'},{dir:'E',role:'out'}], expect:24, bare:false,
+   streams:[{type:'elbow',from:'N',to:'E'}]},
+  // --- 3 ports: T (opposite pair + one) ---
+  {name:'T, bare', ports:[{dir:'N',role:'x'},{dir:'S',role:'x'},{dir:'E',role:'x'}], expect:12, bare:true},
+  {name:'T, tsplit (anchor on run)', ports:[{dir:'N',role:'in'},{dir:'S',role:'out'},{dir:'E',role:'out'}], expect:24, bare:false,
+   streams:[{type:'straight',from:'N',to:'S'},{type:'elbow',from:'N',to:'E'}]},
+  // --- 3 ports: corner (mutually perpendicular) ---
   {name:'corner, bare', ports:[{dir:'N',role:'x'},{dir:'E',role:'x'},{dir:'U',role:'x'}], expect:8, bare:true},
   {name:'corner, split (1 in / 2 out)', ports:[{dir:'N',role:'in'},{dir:'E',role:'out'},{dir:'U',role:'out'}], expect:24, bare:false,
    streams:[{type:'elbow',from:'N',to:'E'},{type:'elbow',from:'N',to:'U'}]},
   {name:'corner, merge (2 in / 1 out)', ports:[{dir:'N',role:'out'},{dir:'E',role:'in'},{dir:'U',role:'in'}], expect:24, bare:false,
    streams:[{type:'elbow',from:'E',to:'N'},{type:'elbow',from:'U',to:'N'}]},
-  {name:'T, bare', ports:[{dir:'N',role:'x'},{dir:'S',role:'x'},{dir:'E',role:'x'}], expect:12, bare:true},
-  {name:'T, tsplit (anchor on run)', ports:[{dir:'N',role:'in'},{dir:'S',role:'out'},{dir:'E',role:'out'}], expect:24, bare:false,
-   streams:[{type:'straight',from:'N',to:'S'},{type:'elbow',from:'N',to:'E'}]},
+  // --- 4 ports: cross (one full plane) ---
+  {name:'cross, bare', ports:[{dir:'N',role:'x'},{dir:'E',role:'x'},{dir:'S',role:'x'},{dir:'W',role:'x'}], expect:3, bare:true},
+  {name:'cross, xsplit (1 in / 3 out)', ports:[{dir:'N',role:'in'},{dir:'E',role:'out'},{dir:'S',role:'out'},{dir:'W',role:'out'}], expect:12, bare:false,
+   streams:[{type:'straight',from:'N',to:'S'},{type:'elbow',from:'N',to:'E'},{type:'elbow',from:'N',to:'W'}]},
+  {name:'cross, xjunc (2 in / 2 out, mixing)', ports:[{dir:'N',role:'in'},{dir:'S',role:'in'},{dir:'E',role:'out'},{dir:'W',role:'out'}], expect:6, bare:false,
+   streams:[{type:'elbow',from:'N',to:'E'},{type:'elbow',from:'N',to:'W'},{type:'elbow',from:'S',to:'E'},{type:'elbow',from:'S',to:'W'}]},
+  // --- 4 ports: corner-through (corner with one arm run through) ---
+  {name:'corner-through, bare', ports:[{dir:'N',role:'x'},{dir:'S',role:'x'},{dir:'E',role:'x'},{dir:'U',role:'x'}], expect:12, bare:true},
+  {name:'corner-through, split (stem end in)', ports:[{dir:'N',role:'in'},{dir:'S',role:'out'},{dir:'E',role:'out'},{dir:'U',role:'out'}], expect:24, bare:false,
+   streams:[{type:'straight',from:'N',to:'S'},{type:'elbow',from:'N',to:'E'},{type:'elbow',from:'N',to:'U'}]},
+  // --- 5 ports: five-way (every direction but one) ---
+  {name:'five-way, bare', ports:[{dir:'N',role:'x'},{dir:'E',role:'x'},{dir:'S',role:'x'},{dir:'W',role:'x'},{dir:'U',role:'x'}], expect:6, bare:true},
+  {name:'five-way, apex split (U in)', ports:[{dir:'U',role:'in'},{dir:'N',role:'out'},{dir:'E',role:'out'},{dir:'S',role:'out'},{dir:'W',role:'out'}], expect:6, bare:false,
+   streams:[{type:'elbow',from:'U',to:'N'},{type:'elbow',from:'U',to:'E'},{type:'elbow',from:'U',to:'S'},{type:'elbow',from:'U',to:'W'}]},
+  {name:'five-way, flat-port split (N in)', ports:[{dir:'N',role:'in'},{dir:'E',role:'out'},{dir:'S',role:'out'},{dir:'W',role:'out'},{dir:'U',role:'out'}], expect:24, bare:false,
+   streams:[{type:'straight',from:'N',to:'S'},{type:'elbow',from:'N',to:'E'},{type:'elbow',from:'N',to:'W'},{type:'elbow',from:'N',to:'U'}]},
+  // --- 6 ports: six-way (every direction) ---
   {name:'six-way, opposite pair in', expect:3, bare:false,
    ports:[{dir:'N',role:'in'},{dir:'S',role:'in'},{dir:'E',role:'out'},{dir:'W',role:'out'},{dir:'U',role:'out'},{dir:'D',role:'out'}],
    streams:[{type:'elbow',from:'N',to:'E'},{type:'elbow',from:'N',to:'W'},{type:'elbow',from:'N',to:'U'},{type:'elbow',from:'N',to:'D'},
