@@ -72,7 +72,11 @@
 <div class="panel">
   <div class="plabel">2. DISTINCT-POSE COUNTS — SHAPE + ROLE, CHECKED AGAINST HAND-DERIVED NUMBERS</div>
   <div class="note">Same shape can have a different count depending on whether a flow role (in/out) is
-  assigned — a role can only shrink the count from the bare shape's number, never grow it.
+  assigned. Assigning a role <b>raises</b> the count, never lowers it: a role removes symmetry, and
+  fewer self-matching rotations means more orientations are genuinely tellable apart. A directional
+  straight has 6 poses where a bare one has 3, because the 180° flip that's invisible on the bare
+  shape swaps inlet for outlet once the ends have roles. The roled count is always a whole multiple
+  of the bare count, capped at 24.
   <b>Bare</b> rows have no flow role at all (silhouette only, never actually placed on the board) —
   they exist purely to sanity-check the rotation math against a plain shape. The rest are real,
   placeable flow topologies.</div>

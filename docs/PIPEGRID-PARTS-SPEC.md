@@ -289,10 +289,68 @@ nothing.
   manufactures every part himself, so there's no external catalogue to match against — every
   flow topology marked active in this document is, by definition, available to manufacture.
   Nothing left to check here.
-- **Pose mechanics.** Not yet designed: how a shape's canonical local directions actually map
-  through the 24-rotation pose system in code (today's `rot` field only spans 4 flat
-  rotations plus a couple of hand-built vertical exceptions). Now the only deferred item left
-  — the shape/flow enumeration it was waiting on is complete.
+- ~~Pose mechanics~~ — **resolved 2026-08-19**, see the section below. Nothing deferred
+  remains in this document.
+
+## Pose mechanics (resolved 2026-08-19, validated on `boards/pipegrid-pose-mechanics-test.html`)
+
+How a shape's canonical local directions map onto actual world directions. This replaces the
+current build's hand-built approach entirely — today's `rot` field spans only 4 flat rotations
+plus a few hard-coded vertical exceptions (`vup`/`vdn`/`riser`), which is exactly the "one shape
+per physical topology" problem this document exists to fix.
+
+**The model.** A pose is one of the 24 orientation-preserving rotations of a cube, stored as a
+plain lookup table: for each of the six directions, which direction does it become. A shape
+defines its ports *once*, in a home orientation; applying a pose's table to those ports yields
+their world-facing directions. No per-shape orientation logic, no hand-built exceptions —
+`vup`/`vdn`/`riser` stop being separate kinds and become the elbow and straight in particular
+poses, which is the whole point.
+
+**Generated, not hand-typed.** The 24 rotations are produced mechanically by repeatedly combining
+two primitive moves (a quarter-spin about the vertical axis, a quarter-tip about the E–W axis)
+until no new ones appear. Getting exactly 24 is itself the first correctness check; the board also
+verifies the set is closed under composition, contains the identity, and contains an inverse for
+every member.
+
+**Distinct poses are shape-and-role dependent.** Given a shape *and* a flow topology, the number of
+genuinely different placements is 24 divided by however many rotations leave that exact
+port-and-role configuration unchanged. Two facts, both verified rather than asserted (the first was
+initially stated backwards and corrected — see below):
+
+- **Assigning flow roles raises the pose count, or leaves it equal — never lowers it.** A role
+  removes symmetry, and fewer self-matching rotations means more orientations are tellable apart.
+  A bare straight has 3 poses (it only cares which axis it lies on); a directional straight has 6,
+  because the 180° flip that's invisible on the bare shape swaps inlet for outlet once the ends
+  have roles. The roled count is always a whole multiple of the bare count, capped at 24. It stays
+  *equal* when the shape already distinguishes the ports on its own — five-way's apex split is 6
+  either way, since the apex is singular by geometry before any role is assigned.
+- **Bare counts are bookkeeping only.** Nothing is ever placed on the board without a flow
+  direction, so bare figures exist purely to check the rotation math against shapes simple enough
+  to reason about by hand. The test board keeps them in the validation table and deliberately keeps
+  them out of the visual explorer.
+
+**Validated against hand-derived numbers** (all pass, plus a coset-size check confirming every
+group of equivalent rotations is the same size, as orbit-stabilizer requires): cap 6 · straight
+3 bare / 6 directional · corner 8 bare / 24 split / 24 merge · T 12 bare / 24 `tsplit` · cross
+`xjunc` 6 · five-way apex split 6 · six-way opposite-pair-in 3 / adjacent-pair-in 12 /
+corner-type 3-in-3-out 8.
+
+That last figure independently confirms this document's earlier claim that six-way's corner-type
+3-in-3-out has no separate merge variant: there are exactly 8 ways to pick one direction from each
+opposite pair as the inlet set, and the pose count comes out to 8, not 16 — so every such
+configuration, including the complement of any given one, is the same topology posed differently.
+The claim was originally derived by hand; the pose system reproduces it without being told.
+
+**Correction on record (2026-08-19).** This section originally claimed the opposite — that roles
+could only *shrink* the pose count. The owner's question about whether a directional straight has
+2 orientations along its axis is what surfaced it: the reasoning had the symmetry argument
+inverted, and the board's own numbers (3→6, 8→24, 12→24) contradicted the claim printed above them.
+Corrected in both the board text and here, and the corrected version was then verified across
+eight shapes rather than re-asserted.
+
+**Not yet built:** how a pose gets *chosen* at placement time — the gesture/UI question — and how
+poses serialize into the save file without breaking the v:3 envelope. Both belong to the vertical
+slice, not to this document.
 
 ## Next
 
