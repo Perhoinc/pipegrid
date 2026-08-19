@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>PIPEGRID — pose mechanics test</title>
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12151b; --panel2:#0e1116; --edge:#2c313d;
+    --text:#c7d3e2; --dim:#5f6775; --acc:#e0a14e; --out:#3a4150;
+    --pass:#4caf6b; --fail:#ff5d55;
+  }
+  body[data-theme="light"]{
+    --bg:#eef1f5; --panel:#ffffff; --panel2:#f4f6f9; --edge:#d3d9e2;
+    --text:#232a35; --dim:#7a8494; --acc:#c97a1f; --out:#9aa4b3;
+    --pass:#1f8a4c; --fail:#c9302c;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  body{background:var(--bg);color:var(--text);
+       font-family:ui-monospace,SFMono-Regular,Menlo,monospace;-webkit-text-size-adjust:100%;
+       padding:14px;padding-bottom:60px;}
+  .hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:10px;flex-wrap:wrap;}
+  .title{font-size:15px;font-weight:700;letter-spacing:2px;}
+  .sub{font-size:9px;letter-spacing:1px;color:var(--dim);}
+  .themebtn{margin-left:auto;font-family:inherit;font-size:10px;letter-spacing:.5px;text-transform:uppercase;
+        padding:7px 9px;border:1px solid var(--edge);border-radius:4px;background:transparent;
+        color:var(--text);cursor:pointer;}
+  .panel{border:1px solid var(--edge);border-radius:8px;background:var(--panel);padding:12px;margin-bottom:12px;max-width:720px;}
+  .plabel{font-size:11px;font-weight:700;letter-spacing:1.5px;margin-bottom:6px;}
+  .note{font-size:10px;color:var(--dim);line-height:1.6;margin:4px 0 10px;}
+  .note b{color:var(--text);}
+  .badge{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.5px;padding:3px 8px;border-radius:4px;}
+  .badge.pass{background:var(--pass);color:#06170c;}
+  .badge.fail{background:var(--fail);color:#2a0705;}
+  table{border-collapse:collapse;width:100%;font-size:10.5px;}
+  th,td{text-align:left;padding:4px 6px;border-bottom:1px solid var(--edge);}
+  th{color:var(--dim);font-weight:700;font-size:9.5px;letter-spacing:.5px;text-transform:uppercase;}
+  .num{text-align:right;font-variant-numeric:tabular-nums;}
+  select{font-family:inherit;font-size:11px;background:var(--panel2);color:var(--text);
+         border:1px solid var(--edge);border-radius:4px;padding:6px;width:100%;margin-bottom:8px;}
+  .stage{width:100%;aspect-ratio:1/1;max-width:320px;touch-action:none;background:var(--panel2);
+         border:1px solid var(--edge);border-radius:8px;display:block;margin:0 auto;}
+  .steprow{display:flex;align-items:center;gap:8px;justify-content:center;margin:10px 0;}
+  .stepbtn{font-family:inherit;font-size:16px;padding:8px 16px;border:1px solid var(--edge);border-radius:6px;
+           background:var(--panel2);color:var(--text);cursor:pointer;}
+  .stepread{font-size:10.5px;color:var(--dim);min-width:120px;text-align:center;}
+  .readout{font-size:10.5px;line-height:1.9;margin-top:8px;}
+  .readout .in{color:var(--acc);font-weight:700;}
+  .readout .out{color:var(--dim);}
+  .legend{font-size:9.5px;color:var(--dim);margin-top:6px;}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;vertical-align:middle;}
+  .dot.in{background:var(--acc);}
+  .dot.out{background:var(--out);}
+</style>
+</head>
+<body data-theme="dark">
+<div class="hdr">
+  <div class="title">PIPEGRID — POSE MECHANICS TEST</div>
+  <div class="sub">validating the 24-rotation pose system, before it touches index.html</div>
+  <button class="themebtn" id="themebtn">LIGHT</button>
+</div>
+
+<div class="panel">
+  <div class="plabel">1. ROTATION MATH — GENERATED, NOT HAND-TYPED</div>
+  <div class="note">All 24 orientation-preserving rotations of a cube, built by repeatedly combining two
+  basic moves (spin around vertical, tip forward) until nothing new turns up. If this table isn't all green,
+  nothing downstream can be trusted.</div>
+  <table id="mathTests"></table>
+</div>
+
+<div class="panel">
+  <div class="plabel">2. DISTINCT-POSE COUNTS — SHAPE + ROLE, CHECKED AGAINST HAND-DERIVED NUMBERS</div>
+  <div class="note">Same shape can have a different count depending on whether a flow role (in/out) is
+  assigned — a role can only shrink the count from the bare shape's number, never grow it.
+  <b>Bare</b> rows have no flow role at all (silhouette only, never actually placed on the board) —
+  they exist purely to sanity-check the rotation math against a plain shape. The rest are real,
+  placeable flow topologies.</div>
+  <table id="poseTests"><thead><tr><th>Shape / role</th><th class="num">Expected</th><th class="num">Actual</th><th>Coset check</th><th></th></tr></thead><tbody></tbody></table>
+</div>
+
+<div class="panel">
+  <div class="plabel">3. EXPLORE A SHAPE</div>
+  <div class="note">Pick a real (role-assigned) part and step through every orientation it can actually
+  take — duplicates already filtered out. Drag the stage to orbit the camera; that's just changing your
+  viewing angle, not the part's pose.</div>
+  <select id="shapeSel"></select>
+  <svg class="stage" id="stage" viewBox="-160 -160 320 320"></svg>
+  <div class="steprow">
+    <button class="stepbtn" id="prevBtn">‹ prev</button>
+    <div class="stepread" id="stepRead">pose 1 of 6</div>
+    <button class="stepbtn" id="nextBtn">next ›</button>
+  </div>
+  <div class="readout" id="portRead"></div>
+  <div class="legend"><span class="dot in"></span>inlet &nbsp; <span class="dot out"></span>outlet</div>
+</div>
+
+<script>
+(function(){
+'use strict';
+var svgNS = 'http://www.w3.org/2000/svg';
+var DIRS = ['N','E','S','W','U','D'];
+var DIRVEC = {N:[0,1,0],S:[0,-1,0],E:[1,0,0],W:[-1,0,0],U:[0,0,1],D:[0,0,-1]};
+var PR = 0.9;
+
+// ---------- rotation group (generated, not hand-typed) ----------
+function matMulVec(M,v){
+  return [M[0][0]*v[0]+M[0][1]*v[1]+M[0][2]*v[2],
+          M[1][0]*v[0]+M[1][1]*v[1]+M[1][2]*v[2],
+          M[2][0]*v[0]+M[2][1]*v[1]+M[2][2]*v[2]];
+}
+function matMul(A,B){
+  var R=[[0,0,0],[0,0,0],[0,0,0]];
+  for(var i=0;i<3;i++)for(var j=0;j<3;j++){
+    var s=0; for(var k=0;k<3;k++) s+=A[i][k]*B[k][j];
+    R[i][j]=Math.round(s);
+  }
+  return R;
+}
+function matKey(M){ return M.map(function(r){return r.join(',');}).join('|'); }
+var IDENT=[[1,0,0],[0,1,0],[0,0,1]];
+var RZ90=[[0,-1,0],[1,0,0],[0,0,1]];   // spin around vertical (U-D) axis
+var RX90=[[1,0,0],[0,0,-1],[0,1,0]];   // tip forward around E-W axis
+
+function generateGroup(){
+  var seen={}; var list=[];
+  function add(M){ var k=matKey(M); if(!seen[k]){ seen[k]=true; list.push(M); } return k; }
+  add(IDENT);
+  var frontier=[IDENT];
+  while(frontier.length){
+    var next=[];
+    frontier.forEach(function(M){
+      [RZ90,RX90].forEach(function(G){
+        var M2=matMul(G,M); var k=matKey(M2);
+        if(!seen[k]){ seen[k]=true; list.push(M2); next.push(M2); }
+      });
+    });
+    frontier=next;
+  }
+  return list;
+}
+var ROTS = generateGroup();
+
+function dirMapFor(M){
+  var map={};
+  DIRS.forEach(function(d){
+    var v2=matMulVec(M,DIRVEC[d]); var found=null;
+    DIRS.forEach(function(d2){
+      var v=DIRVEC[d2];
+      if(v[0]===v2[0]&&v[1]===v2[1]&&v[2]===v2[2]) found=d2;
+    });
+    map[d]=found;
+  });
+  return map;
+}
+var DMAPS = ROTS.map(dirMapFor);
+
+function transpose(M){ return [[M[0][0],M[1][0],M[2][0]],[M[0][1],M[1][1],M[2][1]],[M[0][2],M[1][2],M[2][2]]]; }
+
+function testClosure(){
+  var keys={}; ROTS.forEach(function(M){keys[matKey(M)]=true;});
+  for(var i=0;i<ROTS.length;i++)for(var j=0;j<ROTS.length;j++){
+    if(!keys[matKey(matMul(ROTS[i],ROTS[j]))]) return false;
+  }
+  return true;
+}
+function testIdentity(){
+  var keys={}; ROTS.forEach(function(M){keys[matKey(M)]=true;});
+  return !!keys[matKey(IDENT)];
+}
+function testInverses(){
+  var keys={}; ROTS.forEach(function(M){keys[matKey(M)]=true;});
+  return ROTS.every(function(M){ return keys[matKey(transpose(M))]; });
+}
+
+// ---------- applying pose to a shape's canonical ports ----------
+function applyPose(ports,dmap){
+  return ports.map(function(p){ return {dir:dmap[p.dir], role:p.role}; });
+}
+function configKey(worldPorts){
+  var byDir={}; worldPorts.forEach(function(p){ byDir[p.dir]=p.role; });
+  return DIRS.map(function(d){ return byDir[d]?d+':'+byDir[d]:''; }).join(',');
+}
+function distinctPoses(ports){
+  var groups=[]; var seen={};
+  DMAPS.forEach(function(dmap,idx){
+    var world=applyPose(ports,dmap); var key=configKey(world);
+    if(!seen[key]){ seen[key]={key:key,reps:[],world:world}; groups.push(seen[key]); }
+    seen[key].reps.push(idx);
+  });
+  return groups;
+}
+
+// ---------- test cases (numbers hand-derived earlier, cross-checked here) ----------
+var TESTS = [
+  {name:'cap, src (1 port)', ports:[{dir:'N',role:'in'}], expect:6, bare:false},
+  {name:'straight, bare', ports:[{dir:'N',role:'x'},{dir:'S',role:'x'}], expect:3, bare:true},
+  {name:'straight, directional', ports:[{dir:'N',role:'in'},{dir:'S',role:'out'}], expect:6, bare:false,
+   streams:[{type:'straight',from:'N',to:'S'}]},
+  {name:'corner, bare', ports:[{dir:'N',role:'x'},{dir:'E',role:'x'},{dir:'U',role:'x'}], expect:8, bare:true},
+  {name:'corner, split (1 in / 2 out)', ports:[{dir:'N',role:'in'},{dir:'E',role:'out'},{dir:'U',role:'out'}], expect:24, bare:false,
+   streams:[{type:'elbow',from:'N',to:'E'},{type:'elbow',from:'N',to:'U'}]},
+  {name:'corner, merge (2 in / 1 out)', ports:[{dir:'N',role:'out'},{dir:'E',role:'in'},{dir:'U',role:'in'}], expect:24, bare:false,
+   streams:[{type:'elbow',from:'E',to:'N'},{type:'elbow',from:'U',to:'N'}]},
+  {name:'T, bare', ports:[{dir:'N',role:'x'},{dir:'S',role:'x'},{dir:'E',role:'x'}], expect:12, bare:true},
+  {name:'T, tsplit (anchor on run)', ports:[{dir:'N',role:'in'},{dir:'S',role:'out'},{dir:'E',role:'out'}], expect:24, bare:false,
+   streams:[{type:'straight',from:'N',to:'S'},{type:'elbow',from:'N',to:'E'}]},
+  {name:'six-way, opposite pair in', expect:3, bare:false,
+   ports:[{dir:'N',role:'in'},{dir:'S',role:'in'},{dir:'E',role:'out'},{dir:'W',role:'out'},{dir:'U',role:'out'},{dir:'D',role:'out'}],
+   streams:[{type:'elbow',from:'N',to:'E'},{type:'elbow',from:'N',to:'W'},{type:'elbow',from:'N',to:'U'},{type:'elbow',from:'N',to:'D'},
+            {type:'elbow',from:'S',to:'E'},{type:'elbow',from:'S',to:'W'},{type:'elbow',from:'S',to:'U'},{type:'elbow',from:'S',to:'D'}]},
+  {name:'six-way, adjacent pair in', expect:12, bare:false,
+   ports:[{dir:'N',role:'in'},{dir:'E',role:'in'},{dir:'S',role:'out'},{dir:'W',role:'out'},{dir:'U',role:'out'},{dir:'D',role:'out'}],
+   streams:[{type:'straight',from:'N',to:'S'},{type:'elbow',from:'N',to:'W'},{type:'elbow',from:'N',to:'U'},{type:'elbow',from:'N',to:'D'},
+            {type:'elbow',from:'E',to:'S'},{type:'straight',from:'E',to:'W'},{type:'elbow',from:'E',to:'U'},{type:'elbow',from:'E',to:'D'}]}
+];
+
+// ---------- render: math validation table ----------
+function badge(ok){ return '<span class="badge '+(ok?'pass':'fail')+'">'+(ok?'PASS':'FAIL')+'</span>'; }
+(function(){
+  var rows = [
+    ['Generated exactly 24 rotations', ROTS.length===24, ROTS.length+' generated'],
+    ['Closed under composition', testClosure(), ''],
+    ['Identity present', testIdentity(), ''],
+    ['Every rotation has an inverse in the set', testInverses(), '']
+  ];
+  var html = '<tbody>';
+  rows.forEach(function(r){
+    html += '<tr><td>'+r[0]+(r[2]?' <span style="color:var(--dim)">('+r[2]+')</span>':'')+'</td><td class="num">'+badge(r[1])+'</td></tr>';
+  });
+  html += '</tbody>';
+  document.getElementById('mathTests').innerHTML = html;
+})();
+
+// ---------- render: per-shape distinct-pose-count table ----------
+(function(){
+  var tbody = document.querySelector('#poseTests tbody');
+  var html = '';
+  TESTS.forEach(function(t){
+    var groups = distinctPoses(t.ports);
+    var actual = groups.length;
+    var pass = actual === t.expect;
+    var cosetOk = groups.every(function(g){ return g.reps.length === (24/t.expect); });
+    html += '<tr><td>'+t.name+(t.bare?' <span style="color:var(--dim)">(bare)</span>':'')+'</td>'+
+            '<td class="num">'+t.expect+'</td><td class="num">'+actual+'</td>'+
+            '<td>'+badge(cosetOk)+'</td><td>'+badge(pass)+'</td></tr>';
+  });
+  tbody.innerHTML = html;
+})();
+
+// ---------- 3D rendering for the explorer ----------
+function straightPts(fromDir,toDir){
+  var a=DIRVEC[fromDir], b=DIRVEC[toDir];
+  return [[a[0]*PR,a[1]*PR,a[2]*PR],[b[0]*PR,b[1]*PR,b[2]*PR]];
+}
+function elbowPts(fromDir,toDir,steps){
+  var a=DIRVEC[fromDir], b=DIRVEC[toDir]; var pts=[];
+  for(var i=0;i<=steps;i++){
+    var t=i/steps, ang=t*Math.PI/2, c=Math.cos(ang), s=Math.sin(ang);
+    pts.push([PR*(c*a[0]+s*b[0]), PR*(c*a[1]+s*b[1]), PR*(c*a[2]+s*b[2])]);
+  }
+  return pts;
+}
+function camRot(p,az,el){
+  var x=p[0],y=p[1],z=p[2];
+  var ca=Math.cos(az), sa=Math.sin(az);
+  var x1=x*ca-y*sa, y1=x*sa+y*ca, z1=z;
+  var ce=Math.cos(el), se=Math.sin(el);
+  var y2=y1*ce-z1*se, z2=y1*se+z1*ce;
+  return [x1,y2,z2];
+}
+function proj(p){
+  var s=95;
+  return {x:p[0]*s, y:-p[2]*s - p[1]*s*0.32, depth:p[1]*0.6+p[2]};
+}
+function matApply(M,p){ return [M[0][0]*p[0]+M[0][1]*p[1]+M[0][2]*p[2],
+                                 M[1][0]*p[0]+M[1][1]*p[1]+M[1][2]*p[2],
+                                 M[2][0]*p[0]+M[2][1]*p[1]+M[2][2]*p[2]]; }
+
+var stage = document.getElementById('stage');
+var az = 0.7, el = -0.5;
+var shapeIdx = 2; // default: straight, directional
+var poseIdx = 0;
+
+var explorable = TESTS.filter(function(t){ return !t.bare; });
+var sel = document.getElementById('shapeSel');
+explorable.forEach(function(t,i){
+  var o = document.createElement('option'); o.value=i; o.textContent=t.name; sel.appendChild(o);
+});
+shapeIdx = explorable.indexOf(TESTS[2]);
+sel.value = shapeIdx;
+
+function render(){
+  var t = explorable[shapeIdx];
+  var groups = distinctPoses(t.ports);
+  if(poseIdx>=groups.length) poseIdx=0;
+  if(poseIdx<0) poseIdx=groups.length-1;
+  var group = groups[poseIdx];
+  var repIdx = group.reps[0];
+  var M = ROTS[repIdx];
+
+  while(stage.firstChild) stage.removeChild(stage.firstChild);
+  var drawables = [];
+
+  if(t.streams){
+    t.streams.forEach(function(seg){
+      var pts3 = seg.type==='straight' ? straightPts(seg.from,seg.to) : elbowPts(seg.from,seg.to,12);
+      var world = pts3.map(function(p){ return matApply(M,p); });
+      var view = world.map(function(p){ return camRot(p,az,el); });
+      var pts2 = view.map(proj);
+      var avgDepth = view.reduce(function(s,p){return s+p[1];},0)/view.length;
+      drawables.push({depth:avgDepth, kind:'path', pts:pts2});
+    });
+  }
+  t.ports.forEach(function(p){
+    var pos3 = [DIRVEC[p.dir][0]*PR, DIRVEC[p.dir][1]*PR, DIRVEC[p.dir][2]*PR];
+    var world = matApply(M,pos3);
+    var view = camRot(world,az,el);
+    var pt2 = proj(view);
+    drawables.push({depth:view[1], kind:'ring', pt:pt2, role:p.role});
+  });
+
+  drawables.sort(function(a,b){ return a.depth-b.depth; });
+
+  drawables.forEach(function(d){
+    if(d.kind==='path'){
+      var path = document.createElementNS(svgNS,'path');
+      var dstr = 'M '+d.pts.map(function(p){return p.x.toFixed(1)+' '+p.y.toFixed(1);}).join(' L ');
+      path.setAttribute('d', dstr);
+      path.setAttribute('fill','none');
+      path.setAttribute('stroke','var(--text)');
+      path.setAttribute('stroke-width','7');
+      path.setAttribute('stroke-linecap','round');
+      path.setAttribute('opacity','0.55');
+      stage.appendChild(path);
+    } else {
+      var c = document.createElementNS(svgNS,'circle');
+      c.setAttribute('cx', d.pt.x.toFixed(1)); c.setAttribute('cy', d.pt.y.toFixed(1));
+      c.setAttribute('r', '11');
+      c.setAttribute('fill', d.role==='in' ? 'var(--acc)' : (d.role==='out' ? 'var(--out)' : 'var(--text)'));
+      c.setAttribute('stroke','var(--panel)'); c.setAttribute('stroke-width','2');
+      stage.appendChild(c);
+    }
+  });
+
+  document.getElementById('stepRead').textContent =
+    'pose '+(poseIdx+1)+' of '+groups.length+'  ·  raw '+(repIdx+1)+'/24 ('+group.reps.length+' equivalent)';
+
+  var readHtml = group.world.map(function(w,i){
+    var canonicalDir = t.ports[i].dir;
+    var cls = w.role==='in' ? 'in' : (w.role==='out' ? 'out' : '');
+    return '<div><span class="'+cls+'">'+canonicalDir+' (home) → '+w.dir+' (world)</span> · role: '+w.role+'</div>';
+  }).join('');
+  document.getElementById('portRead').innerHTML = readHtml;
+}
+
+sel.addEventListener('change', function(){ shapeIdx=+sel.value; poseIdx=0; render(); });
+document.getElementById('prevBtn').addEventListener('click', function(){ poseIdx--; render(); });
+document.getElementById('nextBtn').addEventListener('click', function(){ poseIdx++; render(); });
+
+var dragging=false, lastX=0, lastY=0;
+function dragStart(x,y){ dragging=true; lastX=x; lastY=y; }
+function dragMove(x,y){ if(!dragging) return; az += (x-lastX)*0.01; el += (y-lastY)*0.01; lastX=x; lastY=y; render(); }
+function dragEnd(){ dragging=false; }
+stage.addEventListener('pointerdown', function(e){ dragStart(e.clientX,e.clientY); stage.setPointerCapture(e.pointerId); });
+stage.addEventListener('pointermove', function(e){ dragMove(e.clientX,e.clientY); });
+stage.addEventListener('pointerup', dragEnd);
+stage.addEventListener('pointercancel', dragEnd);
+
+render();
+
+document.getElementById('themebtn').addEventListener('click', function(){
+  var body=document.body;
+  var isLight = body.getAttribute('data-theme')==='light';
+  body.setAttribute('data-theme', isLight?'dark':'light');
+  this.textContent = isLight?'LIGHT':'DARK';
+});
+})();
+</script>
+</body>
+</html>
