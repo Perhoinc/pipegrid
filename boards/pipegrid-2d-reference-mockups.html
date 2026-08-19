@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>PIPEGRID — 2D reference view mockups</title>
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12151b; --panel2:#0e1116; --edge:#2c313d;
+    --text:#c7d3e2; --dim:#5f6775; --acc:#e0a14e; --grid:#1e2430; --pipe:#8ea6bf;
+  }
+  body[data-theme="workshop"]{
+    --bg:#e6dfcf; --panel:#efe9dc; --panel2:#f3eee2; --edge:#c9c0aa;
+    --text:#2a2a28; --dim:#8a8272; --acc:#c2620f; --grid:#d5cdb8; --pipe:#3f4a52;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  body{background:var(--bg);color:var(--text);
+       font-family:ui-monospace,SFMono-Regular,Menlo,monospace;-webkit-text-size-adjust:100%;
+       padding:14px;padding-bottom:60px;}
+  .hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:10px;flex-wrap:wrap;}
+  .title{font-size:15px;font-weight:700;letter-spacing:2px;}
+  .sub{font-size:9px;letter-spacing:1px;color:var(--dim);}
+  .btn{font-family:inherit;font-size:10px;letter-spacing:.5px;text-transform:uppercase;
+       padding:7px 9px;border:1px solid var(--edge);border-radius:4px;background:transparent;
+       color:var(--text);cursor:pointer;margin-left:auto;}
+  .panel{border:1px solid var(--edge);border-radius:8px;background:var(--panel);padding:12px;margin-bottom:12px;max-width:760px;}
+  .plabel{font-size:11px;font-weight:700;letter-spacing:1.5px;margin-bottom:6px;}
+  .plabel .tag{color:var(--acc);}
+  .note{font-size:10px;color:var(--dim);line-height:1.65;margin:4px 0 10px;}
+  .note b{color:var(--text);}
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start;}
+  .col{flex:1;min-width:230px;}
+  .colhdr{font-size:9.5px;font-weight:700;letter-spacing:1px;color:var(--acc);margin-bottom:5px;text-transform:uppercase;}
+  .colnote{font-size:9px;color:var(--dim);line-height:1.6;margin-top:6px;}
+  svg.plan{width:100%;background:var(--panel2);border:1px solid var(--edge);border-radius:6px;display:block;}
+  table{border-collapse:collapse;width:100%;font-size:10.5px;margin-top:4px;}
+  th,td{text-align:left;padding:3px 6px;border-bottom:1px solid var(--edge);}
+  th{color:var(--dim);font-weight:700;font-size:9px;letter-spacing:.5px;text-transform:uppercase;}
+  .num{text-align:right;font-variant-numeric:tabular-nums;}
+  .sub2{color:var(--dim);font-size:9.5px;}
+  ul{margin:6px 0 0 15px;padding:0;font-size:10px;color:var(--dim);line-height:1.7;}
+  li{margin-bottom:4px;}
+  li b{color:var(--text);}
+  .keyrow{display:flex;gap:14px;flex-wrap:wrap;font-size:9px;color:var(--dim);margin-top:8px;}
+  .q{border-left:2px solid var(--acc);padding-left:9px;margin-top:10px;font-size:10px;line-height:1.65;color:var(--text);}
+</style>
+</head>
+<body data-theme="carbon">
+<div class="hdr">
+  <div class="title">PIPEGRID — 2D REFERENCE VIEW</div>
+  <div class="sub">one layer of the stack, for the bench · three ways of showing which way a part faces</div>
+  <button class="btn" id="themebtn">WORKSHOP</button>
+</div>
+
+<div class="panel">
+  <div class="plabel">THE PROBLEM, IN ONE LINE</div>
+  <div class="note">A flat plan draws N/E/S/W ports as channels without trouble. <b>U and D ports have
+  nowhere to go</b> — they collapse onto the cell's centre. v38 solved that for a handful of vertical
+  poses with the ⊙ / under-ring grammar; the question is whether that survives parts which can now
+  face any of 24 ways. The same layer is drawn three ways below. Every plan shows the identical
+  parts — only the treatment of vertical ports differs.</div>
+  <div class="keyrow">
+    <div>⊙ opening faces UP</div>
+    <div>◍ opening dives DOWN (under-ring)</div>
+    <div>▲▼ shared vertical bore, continues to next layer</div>
+    <div><span style="color:var(--acc)">amber</span> = inlet</div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="plabel">TREATMENTS — SAME LAYER, THREE WAYS</div>
+  <div class="row">
+    <div class="col">
+      <div class="colhdr">A · v38 grammar, extended</div>
+      <svg class="plan" id="planA" viewBox="0 0 260 260"></svg>
+      <div class="colnote">Channels in plane, vertical ports as centre glyphs. Nothing new to learn
+      if you already read v38 drawings. Watch the busy cells — where several marks land on one
+      centre, does it still read?</div>
+    </div>
+    <div class="col">
+      <div class="colhdr">B · plan + iso thumbnail</div>
+      <svg class="plan" id="planB" viewBox="0 0 260 260"></svg>
+      <div class="colnote">Same plan, but each cell also carries a small 3D thumbnail of the actual
+      posed part. Unambiguous — you see the real orientation — at the cost of a busier drawing and
+      small marks at bench distance.</div>
+    </div>
+    <div class="col">
+      <div class="colhdr">C · plan + edge ticks</div>
+      <svg class="plan" id="planC" viewBox="0 0 260 260"></svg>
+      <div class="colnote">Channels in plane, plus a tick on the cell edge for every port and a
+      corner badge reading U / D / UD for vertical ones. Reads like a dimensioned drawing rather
+      than a picture.</div>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="plabel">CUT LIST — <span class="tag">does orientation belong here?</span></div>
+  <div class="note">Your hard law says a rotated fitting is the same fitting, so poses never multiply
+  the bill. v38 still breaks the list down by orientation, which was useful when there were four
+  poses. With 24 it may just be noise — and a corner-split is one object to fabricate however it
+  ends up sitting.</div>
+  <div class="row">
+    <div class="col">
+      <div class="colhdr">Parts only — what you fabricate</div>
+      <table id="cutPlain"></table>
+      <div class="colnote">Short. Every line is a thing you actually make. Orientation lives on the
+      plan, where assembly happens.</div>
+    </div>
+    <div class="col">
+      <div class="colhdr">Broken down by orientation — v38 style</div>
+      <table id="cutPosed"></table>
+      <div class="colnote">Every distinct orientation gets its own line. Truthful, but it's assembly
+      information wearing a cut list's clothes, and it grows fast.</div>
+    </div>
+  </div>
+  <div class="q">My read: the plain list is the cut list, and orientation belongs on the plan beside
+  the part it describes — the sheet you carry to the bench already shows you which way it goes.
+  But you're the one who'll be holding both.</div>
+</div>
+
+<div class="panel">
+  <div class="plabel">WHAT I STILL DON'T KNOW</div>
+  <ul>
+    <li><b>Does one layer at a time actually work</b> for a part that spans layers — a riser, or
+        anything whose bore continues upward? It appears on two sheets. The ▲▼ chevrons say "this
+        continues", but you may want the neighbouring layer ghosted in as well.</li>
+    <li><b>How much does the plan need to say about flow?</b> Right now inlets are amber. For
+        fabrication you may not care about flow at all — it's a welding drawing, not a schematic —
+        or it may be exactly what stops you assembling something backwards.</li>
+    <li><b>Sheet identity.</b> Nothing here names the layer, the job, or the date. A reference you
+        carry to a bench probably wants a title block.</li>
+  </ul>
+</div>
+
+<script>
+(function(){
+'use strict';
+var NS='http://www.w3.org/2000/svg';
+var V={N:[0,1,0],S:[0,-1,0],E:[1,0,0],W:[-1,0,0],U:[0,0,1],D:[0,0,-1]};
+var OPP={N:'S',S:'N',E:'W',W:'E',U:'D',D:'U'};
+var PR=0.82;
+
+function streamsFor(ports){
+  var ins=ports.filter(function(p){return p.role==='in';});
+  var outs=ports.filter(function(p){return p.role==='out';});
+  var o=[];
+  ins.forEach(function(i){outs.forEach(function(u){
+    o.push({type:OPP[i.dir]===u.dir?'straight':'elbow',from:i.dir,to:u.dir});});});
+  return o;
+}
+function P(spec){return spec.split(' ').map(function(t){
+  return {dir:t.slice(0,-1),role:t.slice(-1)==='+'?'in':'out'};});}
+
+// A believable little layer: easy cases, then the ones that stress the grammar.
+// Ports are given already posed, in world directions.
+var LAYOUT=[
+  {r:0,c:0, part:'straight',       spec:'N+ S-'},
+  {r:0,c:1, part:'elbow',          spec:'S+ E-'},
+  {r:0,c:2, part:'corner split',   spec:'W+ S- U-'},   // one port leaves upward
+  {r:1,c:0, part:'T tsplit',       spec:'N+ S- E-'},
+  {r:1,c:1, part:'corner-through', spec:'N+ S- E- U-'},// stem through, one arm up
+  {r:1,c:2, part:'elbow',          spec:'W+ D-'},      // dives to the layer below
+  {r:2,c:0, part:'straight',       spec:'N+ S-'},
+  {r:2,c:1, part:'six-way 3-in-3-out', spec:'N+ E+ U+ S- W- D-'}, // worst case: U and D both
+  {r:2,c:2, part:'five-way apex split',spec:'U+ N- E- S- W-'}
+];
+LAYOUT.forEach(function(p){ p.ports=P(p.spec); p.streams=streamsFor(p.ports); });
+
+function el(tag,a){var e=document.createElementNS(NS,tag);for(var k in a)e.setAttribute(k,a[k]);return e;}
+
+var N=3, CS=78, PAD=13;
+function cellOrigin(r,c){ return {x:PAD+c*CS, y:PAD+r*CS}; }
+function cellCentre(r,c){ var o=cellOrigin(r,c); return {x:o.x+CS/2, y:o.y+CS/2}; }
+
+// plan projection: N is up the page, E is right, U/D collapse to the centre
+function planPt(p,ctr){ return {x:ctr.x+p[0]*(CS/2), y:ctr.y-p[1]*(CS/2)}; }
+
+function straight3(a,b){var u=V[a],v=V[b];
+  return [[u[0]*PR,u[1]*PR,u[2]*PR],[v[0]*PR,v[1]*PR,v[2]*PR]];}
+function elbow3(a,b,n){var u=V[a],v=V[b],o=[];
+  for(var i=0;i<=n;i++){var t=(i/n)*(Math.PI/2),s=Math.sin(t),c=Math.cos(t);
+    o.push([PR*(u[0]+v[0])-PR*(s*u[0]+c*v[0]),
+            PR*(u[1]+v[1])-PR*(s*u[1]+c*v[1]),
+            PR*(u[2]+v[2])-PR*(s*u[2]+c*v[2])]);}
+  return o;}
+
+function drawGrid(svg){
+  for(var r=0;r<N;r++)for(var c=0;c<N;c++){
+    var o=cellOrigin(r,c);
+    svg.appendChild(el('rect',{x:o.x,y:o.y,width:CS,height:CS,fill:'none',
+      stroke:'var(--grid)','stroke-width':1}));
+  }
+}
+function drawChannels(svg,item,ctr){
+  item.streams.forEach(function(s){
+    var p3=s.type==='straight'?straight3(s.from,s.to):elbow3(s.from,s.to,16);
+    var pts=p3.map(function(p){return planPt(p,ctr);});
+    // a channel between two vertical ports collapses to a dot in plan — skip the line
+    var span=Math.max.apply(null,pts.map(function(p){return Math.hypot(p.x-ctr.x,p.y-ctr.y);}));
+    if(span<3) return;
+    svg.appendChild(el('path',{d:'M '+pts.map(function(p){return p.x.toFixed(1)+' '+p.y.toFixed(1);}).join(' L '),
+      fill:'none',stroke:'var(--pipe)','stroke-width':5,'stroke-linecap':'round','stroke-linejoin':'round'}));
+  });
+}
+function vertPorts(item){
+  return {up:item.ports.filter(function(p){return p.dir==='U';})[0],
+          dn:item.ports.filter(function(p){return p.dir==='D';})[0]};
+}
+// v38 grammar: under-ring painted BEFORE the channel, so it reads as diving beneath
+function drawUnderRing(svg,ctr){
+  svg.appendChild(el('circle',{cx:ctr.x,cy:ctr.y,r:12,fill:'none',
+    stroke:'var(--pipe)','stroke-width':2.5,opacity:0.55}));
+}
+function drawUpMark(svg,ctr,role){
+  var col=role==='in'?'var(--acc)':'var(--pipe)';
+  svg.appendChild(el('circle',{cx:ctr.x,cy:ctr.y,r:8,fill:'var(--panel2)',stroke:col,'stroke-width':2}));
+  svg.appendChild(el('circle',{cx:ctr.x,cy:ctr.y,r:2.6,fill:col}));
+}
+function drawPortDots(svg,item,ctr){
+  item.ports.forEach(function(p){
+    if(p.dir==='U'||p.dir==='D') return;
+    var v=V[p.dir], q=planPt([v[0]*PR,v[1]*PR,v[2]*PR],ctr);
+    svg.appendChild(el('circle',{cx:q.x.toFixed(1),cy:q.y.toFixed(1),r:4,
+      fill:p.role==='in'?'var(--acc)':'var(--panel2)',stroke:'var(--pipe)','stroke-width':2}));
+  });
+}
+
+/* ---------- A: v38 grammar extended ---------- */
+function buildA(svg){
+  drawGrid(svg);
+  LAYOUT.forEach(function(item){
+    var ctr=cellCentre(item.r,item.c);
+    var vp=vertPorts(item);
+    if(vp.dn) drawUnderRing(svg,ctr);          // under-ring first: it sits beneath
+    drawChannels(svg,item,ctr);
+    drawPortDots(svg,item,ctr);
+    if(vp.up) drawUpMark(svg,ctr,vp.up.role);
+  });
+}
+
+/* ---------- B: plan + iso thumbnail ---------- */
+function isoPt(p,ctr,s){
+  var az=0.72, el2=-0.5;
+  var ca=Math.cos(az),sa=Math.sin(az);
+  var x=p[0]*ca-p[1]*sa, y=p[0]*sa+p[1]*ca, z=p[2];
+  var ce=Math.cos(el2),se=Math.sin(el2);
+  var y2=y*ce-z*se, z2=y*se+z*ce;
+  return {x:ctr.x+x*s, y:ctr.y-z2*s-y2*s*0.3};
+}
+function buildB(svg){
+  drawGrid(svg);
+  LAYOUT.forEach(function(item){
+    var ctr=cellCentre(item.r,item.c);
+    var vp=vertPorts(item);
+    if(vp.dn) drawUnderRing(svg,ctr);
+    drawChannels(svg,item,ctr);
+    drawPortDots(svg,item,ctr);
+    if(vp.up) drawUpMark(svg,ctr,vp.up.role);
+    // thumbnail, tucked into the cell's lower-right
+    var o=cellOrigin(item.r,item.c);
+    var tc={x:o.x+CS-19, y:o.y+CS-19}, s=11;
+    svg.appendChild(el('rect',{x:tc.x-16,y:tc.y-16,width:32,height:32,rx:3,
+      fill:'var(--panel)',stroke:'var(--edge)','stroke-width':1}));
+    item.streams.forEach(function(st){
+      var p3=st.type==='straight'?straight3(st.from,st.to):elbow3(st.from,st.to,10);
+      var pts=p3.map(function(p){return isoPt(p,tc,s);});
+      svg.appendChild(el('path',{d:'M '+pts.map(function(p){return p.x.toFixed(1)+' '+p.y.toFixed(1);}).join(' L '),
+        fill:'none',stroke:'var(--pipe)','stroke-width':1.6,'stroke-linecap':'round',opacity:0.95}));
+    });
+    item.ports.forEach(function(p){
+      var v=V[p.dir], q=isoPt([v[0]*PR,v[1]*PR,v[2]*PR],tc,s);
+      svg.appendChild(el('circle',{cx:q.x.toFixed(1),cy:q.y.toFixed(1),r:2,
+        fill:p.role==='in'?'var(--acc)':'var(--dim)'}));
+    });
+  });
+}
+
+/* ---------- C: plan + edge ticks and a U/D badge ---------- */
+function buildC(svg){
+  drawGrid(svg);
+  LAYOUT.forEach(function(item){
+    var ctr=cellCentre(item.r,item.c), o=cellOrigin(item.r,item.c);
+    var vp=vertPorts(item);
+    if(vp.dn) drawUnderRing(svg,ctr);
+    drawChannels(svg,item,ctr);
+    // a tick on the cell edge for every in-plane port
+    item.ports.forEach(function(p){
+      if(p.dir==='U'||p.dir==='D') return;
+      var v=V[p.dir];
+      var a={x:ctr.x+v[0]*(CS/2), y:ctr.y-v[1]*(CS/2)};
+      var t={x:-v[1],y:-v[0]};
+      svg.appendChild(el('line',{x1:(a.x-t.x*7).toFixed(1),y1:(a.y-t.y*7).toFixed(1),
+        x2:(a.x+t.x*7).toFixed(1),y2:(a.y+t.y*7).toFixed(1),
+        stroke:p.role==='in'?'var(--acc)':'var(--pipe)','stroke-width':3}));
+    });
+    // corner badge naming the vertical ports
+    var tag=(vp.up?'U':'')+(vp.dn?'D':'');
+    if(tag){
+      svg.appendChild(el('rect',{x:o.x+4,y:o.y+4,width:tag.length>1?21:14,height:13,rx:2,
+        fill:'var(--panel)',stroke:'var(--pipe)','stroke-width':1}));
+      var tx=el('text',{x:o.x+(tag.length>1?14.5:11),y:o.y+13.5,'text-anchor':'middle',
+        'font-size':9,'font-family':'ui-monospace,monospace',
+        fill:(vp.up&&vp.up.role==='in')||(vp.dn&&vp.dn.role==='in')?'var(--acc)':'var(--pipe)'});
+      tx.textContent=tag; svg.appendChild(tx);
+    }
+  });
+}
+
+buildA(document.getElementById('planA'));
+buildB(document.getElementById('planB'));
+buildC(document.getElementById('planC'));
+
+/* ---------- cut lists ---------- */
+function orientKey(item){
+  return item.ports.map(function(p){return p.dir+(p.role==='in'?'+':'-');}).join(' ');
+}
+(function(){
+  var byPart={}, byPosed={};
+  LAYOUT.forEach(function(i){
+    byPart[i.part]=(byPart[i.part]||0)+1;
+    var k=i.part+'|'+orientKey(i);
+    byPosed[k]=(byPosed[k]||0)+1;
+  });
+  var a='<thead><tr><th>Part</th><th class="num">Qty</th></tr></thead><tbody>';
+  Object.keys(byPart).sort().forEach(function(k){
+    a+='<tr><td>'+k+'</td><td class="num">'+byPart[k]+'</td></tr>';
+  });
+  a+='<tr><td class="sub2">'+Object.keys(byPart).length+' distinct parts</td><td class="num sub2">'+LAYOUT.length+'</td></tr></tbody>';
+  document.getElementById('cutPlain').innerHTML=a;
+
+  var b='<thead><tr><th>Part · orientation</th><th class="num">Qty</th></tr></thead><tbody>';
+  Object.keys(byPosed).sort().forEach(function(k){
+    var s=k.split('|');
+    b+='<tr><td>'+s[0]+'<br><span class="sub2">'+s[1]+'</span></td><td class="num">'+byPosed[k]+'</td></tr>';
+  });
+  b+='<tr><td class="sub2">'+Object.keys(byPosed).length+' distinct lines</td><td class="num sub2">'+LAYOUT.length+'</td></tr></tbody>';
+  document.getElementById('cutPosed').innerHTML=b;
+})();
+
+document.getElementById('themebtn').addEventListener('click',function(){
+  var w=document.body.getAttribute('data-theme')==='workshop';
+  document.body.setAttribute('data-theme',w?'carbon':'workshop');
+  this.textContent=w?'WORKSHOP':'CARBON';
+});
+})();
+</script>
+</body>
+</html>
