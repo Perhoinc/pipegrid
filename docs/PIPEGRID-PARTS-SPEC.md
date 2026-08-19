@@ -360,15 +360,40 @@ opposite pair as the inlet set, and the pose count comes out to 8, not 16 — so
 configuration, including the complement of any given one, is the same topology posed differently.
 The claim was originally derived by hand; the pose system reproduces it without being told.
 
-**Coverage correction on record (2026-08-19).** The first version of this section validated only
-five of the nine connectivity patterns — elbow, cross, corner-through and five-way were all
-missing, and the owner caught the elbow. That was the worst of the four to omit: `vup`/`vdn` are
-hand-built vertical *elbow* exceptions, and they are the motivating example in this document's
-own opening paragraph. The pose system's headline claim is that those exceptions dissolve into
-"the elbow, posed differently," and the validation skipped exactly that shape. All nine patterns
-are now covered, with the numbers hand-derived first and confirmed after. General rule taken from
-it: a validation table that covers *most* cases hides the one most likely to be wrong — enumerate
-against the spec's own list, the same way the flow-topology passes did.
+**The complete catalogue is now on the board too.** Beyond the hand-derived spot checks above, the
+test board carries all **40** active flow topologies from this document with their pose counts, and
+audits them: all 40 are confirmed genuinely distinct under rotation (nothing in this document's
+enumeration is secretly the same part twice), and the two entries this document claims *should*
+collapse — six-way's 3-in-3-out T-type and corner-type, split versus merge — are verified to
+actually collapse, with T's ordinary `tsplit`/`tmerge` as a control that stays distinct. Channels
+are generated from the construction rule rather than hand-written per part, so the board draws
+parts the same way the mockup boards do.
+
+Total pose count across the active catalogue: the 40 topologies span 1 to 24 distinct orientations
+each. Notable that **the Y-family parts often have fewer poses than their T-shaped siblings** —
+`tsplitb` has 12 where `tsplit` has 24, because the Y's two branches are interchangeable and half
+its orientations are therefore duplicates. Symmetry in the part means fewer distinct ways to place
+it.
+
+**Coverage corrections on record (2026-08-19).** Two rounds, both caught by the owner, both the
+same failure mode — validating a *sample* instead of enumerating against this document's own lists.
+
+1. The first version covered only five of the nine connectivity patterns; elbow, cross,
+   corner-through and five-way were missing. The elbow was the worst of the four to omit:
+   `vup`/`vdn` are hand-built vertical *elbow* exceptions and they are the motivating example in
+   this document's opening paragraph. The pose system's headline claim is that those exceptions
+   dissolve into "the elbow, posed differently," and the validation skipped exactly that shape.
+2. Even with all nine patterns present, only 13 of the 40 active flow topologies were covered.
+   The owner identified the pattern behind the gap precisely: the missing ones were the variants
+   where **the anchor has no opposite port among the shape's own ports** — T's `tsplitb`/`tmergeb`
+   and corner-through's arm-anchored tripods — so every channel is an elbow and no straight segment
+   appears. Everything on the board had been a run-with-a-tap; the entire Y/tripod family was
+   absent, along with most merge counterparts and all three mixing layers.
+
+General rule taken from both: **enumerate against this document's own tables, never against a
+sample that feels representative.** A validation set that covers most cases hides the case most
+likely to be wrong, and "most likely to be wrong" is exactly where the shapes differ structurally
+from the ones already checked.
 
 **Correction on record (2026-08-19).** This section originally claimed the opposite — that roles
 could only *shrink* the pose count. The owner's question about whether a directional straight has

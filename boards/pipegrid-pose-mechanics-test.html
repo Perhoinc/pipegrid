@@ -33,10 +33,14 @@
   .badge{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.5px;padding:3px 8px;border-radius:4px;}
   .badge.pass{background:var(--pass);color:#06170c;}
   .badge.fail{background:var(--fail);color:#2a0705;}
+  .tablewrap{overflow-x:auto;}
   table{border-collapse:collapse;width:100%;font-size:10.5px;}
   th,td{text-align:left;padding:4px 6px;border-bottom:1px solid var(--edge);}
   th{color:var(--dim);font-weight:700;font-size:9.5px;letter-spacing:.5px;text-transform:uppercase;}
   .num{text-align:right;font-variant-numeric:tabular-nums;}
+  tr.shapehdr td{background:var(--panel2);color:var(--acc);font-weight:700;letter-spacing:1px;
+                 font-size:9.5px;text-transform:uppercase;padding-top:7px;padding-bottom:5px;}
+  .ytag{color:var(--acc);font-weight:700;}
   select{font-family:inherit;font-size:11px;background:var(--panel2);color:var(--text);
          border:1px solid var(--edge);border-radius:4px;padding:6px;width:100%;margin-bottom:8px;}
   .stage{width:100%;aspect-ratio:1/1;max-width:320px;touch-action:none;background:var(--panel2);
@@ -44,7 +48,7 @@
   .steprow{display:flex;align-items:center;gap:8px;justify-content:center;margin:10px 0;}
   .stepbtn{font-family:inherit;font-size:16px;padding:8px 16px;border:1px solid var(--edge);border-radius:6px;
            background:var(--panel2);color:var(--text);cursor:pointer;}
-  .stepread{font-size:10.5px;color:var(--dim);min-width:120px;text-align:center;}
+  .stepread{font-size:10.5px;color:var(--dim);min-width:150px;text-align:center;}
   .readout{font-size:10.5px;line-height:1.9;margin-top:8px;}
   .readout .in{color:var(--acc);font-weight:700;}
   .readout .out{color:var(--dim);}
@@ -70,32 +74,49 @@
 </div>
 
 <div class="panel">
-  <div class="plabel">2. DISTINCT-POSE COUNTS — ALL NINE CONNECTIVITY PATTERNS, CHECKED AGAINST HAND-DERIVED NUMBERS</div>
-  <div class="note">Same shape can have a different count depending on whether a flow role (in/out) is
-  assigned. Assigning a role <b>raises</b> the count, never lowers it: a role removes symmetry, and
-  fewer self-matching rotations means more orientations are genuinely tellable apart. A directional
-  straight has 6 poses where a bare one has 3, because the 180° flip that's invisible on the bare
-  shape swaps inlet for outlet once the ends have roles. The roled count is always a whole multiple
-  of the bare count, capped at 24. Worth a glance: the three simplest bare counts land exactly on
-  the cube's own features — <b>straight 3</b> (its 3 axes), <b>elbow 12</b> (its 12 edges),
-  <b>corner 8</b> (its 8 vertices). A two-adjacent-port shape <i>is</i> an edge of the cube, so the
-  12 is not a coincidence.
-  <b>Bare</b> rows have no flow role at all (silhouette only, never actually placed on the board) —
-  they exist purely to sanity-check the rotation math against a plain shape. The rest are real,
-  placeable flow topologies.</div>
-  <table id="poseTests"><thead><tr><th>Shape / role</th><th class="num">Expected</th><th class="num">Actual</th><th>Coset check</th><th></th></tr></thead><tbody></tbody></table>
+  <div class="plabel">2. HAND-DERIVED SPOT CHECKS — ALL NINE CONNECTIVITY PATTERNS</div>
+  <div class="note">Every number in this table was worked out by hand <b>first</b> and only then compared
+  against what the code produces — that's what makes it a test rather than a readout. Assigning a flow
+  role <b>raises</b> a shape's pose count or leaves it equal, never lowers it: a role removes symmetry, and
+  fewer self-matching rotations means more orientations are genuinely tellable apart.
+  <b>Bare</b> rows have no flow role at all (silhouette only, never actually placed on a board) — they
+  exist purely to check the rotation math against shapes simple enough to reason about unaided. Their three
+  simplest counts land exactly on the cube's own features: <b>straight 3</b> (its 3 axes), <b>elbow 12</b>
+  (its 12 edges), <b>corner 8</b> (its 8 vertices) — not a coincidence, since a two-adjacent-port shape
+  <i>is</i> an edge and a three-perpendicular-port shape <i>is</i> a vertex.</div>
+  <div class="tablewrap">
+  <table id="poseTests"><thead><tr><th>Shape / role</th><th class="num">Hand</th><th class="num">Code</th><th>Coset</th><th></th></tr></thead><tbody></tbody></table>
+  </div>
 </div>
 
 <div class="panel">
-  <div class="plabel">3. EXPLORE A SHAPE</div>
-  <div class="note">Pick a real (role-assigned) part and step through every orientation it can actually
-  take — duplicates already filtered out. Drag the stage to orbit the camera; that's just changing your
-  viewing angle, not the part's pose.</div>
+  <div class="plabel">3. THE COMPLETE ACTIVE CATALOGUE — EVERY FLOW TOPOLOGY, EVERY PORT COUNT</div>
+  <div class="note">All <b>40</b> flow topologies currently marked active in
+  <b>docs/PIPEGRID-PARTS-SPEC.md</b>, each with the number of genuinely distinct orientations it can be
+  placed in. Counts here are computed, not hand-derived — but the audit below them is a real check on the
+  spec doc's enumeration: if any two entries were secretly the same part seen from different angles, they
+  would collapse together here. <b class="ytag">Y</b> marks the shapes where the anchor has no opposite
+  port among the shape's own ports, so every channel is an elbow and no straight segment appears anywhere —
+  the Y and tripod family.</div>
+  <table id="auditTable"></table>
+  <div class="tablewrap" style="margin-top:10px;">
+  <table id="catTable"><thead><tr><th>Flow topology</th><th class="num">Poses</th><th>Channels</th></tr></thead><tbody></tbody></table>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="plabel">4. EXPLORE ANY PART</div>
+  <div class="note">Every one of the 40. Step through the orientations a part can actually take —
+  duplicates already filtered out, so what you see is the real placement count. Drag the stage to orbit the
+  camera; that's your viewing angle changing, not the part's pose. Channels are drawn by the construction
+  rule straight from the spec doc — every inlet to every outlet, straight if that pair is directly
+  opposite, elbow if merely adjacent — so this board draws parts the same way the mockup boards do rather
+  than from its own hand-written shapes.</div>
   <select id="shapeSel"></select>
   <svg class="stage" id="stage" viewBox="-160 -160 320 320"></svg>
   <div class="steprow">
     <button class="stepbtn" id="prevBtn">‹ prev</button>
-    <div class="stepread" id="stepRead">pose 1 of 6</div>
+    <div class="stepread" id="stepRead"></div>
     <button class="stepbtn" id="nextBtn">next ›</button>
   </div>
   <div class="readout" id="portRead"></div>
@@ -108,14 +129,10 @@
 var svgNS = 'http://www.w3.org/2000/svg';
 var DIRS = ['N','E','S','W','U','D'];
 var DIRVEC = {N:[0,1,0],S:[0,-1,0],E:[1,0,0],W:[-1,0,0],U:[0,0,1],D:[0,0,-1]};
+var OPP = {N:'S',S:'N',E:'W',W:'E',U:'D',D:'U'};
 var PR = 0.9;
 
 // ---------- rotation group (generated, not hand-typed) ----------
-function matMulVec(M,v){
-  return [M[0][0]*v[0]+M[0][1]*v[1]+M[0][2]*v[2],
-          M[1][0]*v[0]+M[1][1]*v[1]+M[1][2]*v[2],
-          M[2][0]*v[0]+M[2][1]*v[1]+M[2][2]*v[2]];
-}
 function matMul(A,B){
   var R=[[0,0,0],[0,0,0],[0,0,0]];
   for(var i=0;i<3;i++)for(var j=0;j<3;j++){
@@ -124,168 +141,225 @@ function matMul(A,B){
   }
   return R;
 }
+function matApply(M,p){
+  return [M[0][0]*p[0]+M[0][1]*p[1]+M[0][2]*p[2],
+          M[1][0]*p[0]+M[1][1]*p[1]+M[1][2]*p[2],
+          M[2][0]*p[0]+M[2][1]*p[1]+M[2][2]*p[2]];
+}
 function matKey(M){ return M.map(function(r){return r.join(',');}).join('|'); }
+function transpose(M){ return [[M[0][0],M[1][0],M[2][0]],[M[0][1],M[1][1],M[2][1]],[M[0][2],M[1][2],M[2][2]]]; }
 var IDENT=[[1,0,0],[0,1,0],[0,0,1]];
-var RZ90=[[0,-1,0],[1,0,0],[0,0,1]];   // spin around vertical (U-D) axis
-var RX90=[[1,0,0],[0,0,-1],[0,1,0]];   // tip forward around E-W axis
+var RZ90=[[0,-1,0],[1,0,0],[0,0,1]];   // spin around the vertical (U-D) axis
+var RX90=[[1,0,0],[0,0,-1],[0,1,0]];   // tip forward around the E-W axis
 
-function generateGroup(){
-  var seen={}; var list=[];
-  function add(M){ var k=matKey(M); if(!seen[k]){ seen[k]=true; list.push(M); } return k; }
-  add(IDENT);
+var ROTS = (function(){
+  var seen={}, list=[];
+  seen[matKey(IDENT)]=true; list.push(IDENT);
   var frontier=[IDENT];
   while(frontier.length){
     var next=[];
     frontier.forEach(function(M){
       [RZ90,RX90].forEach(function(G){
-        var M2=matMul(G,M); var k=matKey(M2);
+        var M2=matMul(G,M), k=matKey(M2);
         if(!seen[k]){ seen[k]=true; list.push(M2); next.push(M2); }
       });
     });
     frontier=next;
   }
   return list;
-}
-var ROTS = generateGroup();
+})();
 
-function dirMapFor(M){
+var DMAPS = ROTS.map(function(M){
   var map={};
   DIRS.forEach(function(d){
-    var v2=matMulVec(M,DIRVEC[d]); var found=null;
-    DIRS.forEach(function(d2){
+    var v2=matApply(M,DIRVEC[d]);
+    map[d]=DIRS.filter(function(d2){
       var v=DIRVEC[d2];
-      if(v[0]===v2[0]&&v[1]===v2[1]&&v[2]===v2[2]) found=d2;
-    });
-    map[d]=found;
+      return v[0]===v2[0]&&v[1]===v2[1]&&v[2]===v2[2];
+    })[0];
   });
   return map;
-}
-var DMAPS = ROTS.map(dirMapFor);
+});
 
-function transpose(M){ return [[M[0][0],M[1][0],M[2][0]],[M[0][1],M[1][1],M[2][1]],[M[0][2],M[1][2],M[2][2]]]; }
-
-function testClosure(){
-  var keys={}; ROTS.forEach(function(M){keys[matKey(M)]=true;});
-  for(var i=0;i<ROTS.length;i++)for(var j=0;j<ROTS.length;j++){
-    if(!keys[matKey(matMul(ROTS[i],ROTS[j]))]) return false;
-  }
-  return true;
-}
-function testIdentity(){
-  var keys={}; ROTS.forEach(function(M){keys[matKey(M)]=true;});
-  return !!keys[matKey(IDENT)];
-}
-function testInverses(){
-  var keys={}; ROTS.forEach(function(M){keys[matKey(M)]=true;});
-  return ROTS.every(function(M){ return keys[matKey(transpose(M))]; });
-}
-
-// ---------- applying pose to a shape's canonical ports ----------
-function applyPose(ports,dmap){
-  return ports.map(function(p){ return {dir:dmap[p.dir], role:p.role}; });
-}
-function configKey(worldPorts){
-  var byDir={}; worldPorts.forEach(function(p){ byDir[p.dir]=p.role; });
+// ---------- poses of a shape+role configuration ----------
+function configKey(ports,dmap){
+  var byDir={};
+  ports.forEach(function(p){ byDir[dmap[p.dir]]=p.role; });
   return DIRS.map(function(d){ return byDir[d]?d+':'+byDir[d]:''; }).join(',');
 }
 function distinctPoses(ports){
-  var groups=[]; var seen={};
+  var groups=[], seen={};
   DMAPS.forEach(function(dmap,idx){
-    var world=applyPose(ports,dmap); var key=configKey(world);
-    if(!seen[key]){ seen[key]={key:key,reps:[],world:world}; groups.push(seen[key]); }
+    var key=configKey(ports,dmap);
+    if(!seen[key]){ seen[key]={key:key,reps:[],world:ports.map(function(p){return {dir:dmap[p.dir],role:p.role};})}; groups.push(seen[key]); }
     seen[key].reps.push(idx);
   });
   return groups;
 }
+function canonical(ports){
+  return DMAPS.map(function(dm){ return configKey(ports,dm); }).sort()[0];
+}
 
-// ---------- test cases (numbers hand-derived earlier, cross-checked here) ----------
-// Ordered to match the connectivity-pattern table in docs/PIPEGRID-PARTS-SPEC.md:
-// cap · straight · elbow · T · corner · cross · corner-through · five-way · six-way.
-// All nine patterns are represented; leaving one out hides exactly the case most
-// likely to be wrong (the elbow was originally missing, and it is the shape whose
-// hand-built vup/vdn exceptions motivate this whole pose system).
-var TESTS = [
-  // --- 1 port ---
-  {name:'cap, src (1 port)', ports:[{dir:'N',role:'in'}], expect:6, bare:false},
-  // --- 2 ports: straight (opposite pair) ---
-  {name:'straight, bare', ports:[{dir:'N',role:'x'},{dir:'S',role:'x'}], expect:3, bare:true},
-  {name:'straight, directional', ports:[{dir:'N',role:'in'},{dir:'S',role:'out'}], expect:6, bare:false,
-   streams:[{type:'straight',from:'N',to:'S'}]},
-  // --- 2 ports: elbow (adjacent pair) ---
-  {name:'elbow, bare', ports:[{dir:'N',role:'x'},{dir:'E',role:'x'}], expect:12, bare:true},
-  {name:'elbow, directional', ports:[{dir:'N',role:'in'},{dir:'E',role:'out'}], expect:24, bare:false,
-   streams:[{type:'elbow',from:'N',to:'E'}]},
-  // --- 3 ports: T (opposite pair + one) ---
-  {name:'T, bare', ports:[{dir:'N',role:'x'},{dir:'S',role:'x'},{dir:'E',role:'x'}], expect:12, bare:true},
-  {name:'T, tsplit (anchor on run)', ports:[{dir:'N',role:'in'},{dir:'S',role:'out'},{dir:'E',role:'out'}], expect:24, bare:false,
-   streams:[{type:'straight',from:'N',to:'S'},{type:'elbow',from:'N',to:'E'}]},
-  // --- 3 ports: corner (mutually perpendicular) ---
-  {name:'corner, bare', ports:[{dir:'N',role:'x'},{dir:'E',role:'x'},{dir:'U',role:'x'}], expect:8, bare:true},
-  {name:'corner, split (1 in / 2 out)', ports:[{dir:'N',role:'in'},{dir:'E',role:'out'},{dir:'U',role:'out'}], expect:24, bare:false,
-   streams:[{type:'elbow',from:'N',to:'E'},{type:'elbow',from:'N',to:'U'}]},
-  {name:'corner, merge (2 in / 1 out)', ports:[{dir:'N',role:'out'},{dir:'E',role:'in'},{dir:'U',role:'in'}], expect:24, bare:false,
-   streams:[{type:'elbow',from:'E',to:'N'},{type:'elbow',from:'U',to:'N'}]},
-  // --- 4 ports: cross (one full plane) ---
-  {name:'cross, bare', ports:[{dir:'N',role:'x'},{dir:'E',role:'x'},{dir:'S',role:'x'},{dir:'W',role:'x'}], expect:3, bare:true},
-  {name:'cross, xsplit (1 in / 3 out)', ports:[{dir:'N',role:'in'},{dir:'E',role:'out'},{dir:'S',role:'out'},{dir:'W',role:'out'}], expect:12, bare:false,
-   streams:[{type:'straight',from:'N',to:'S'},{type:'elbow',from:'N',to:'E'},{type:'elbow',from:'N',to:'W'}]},
-  {name:'cross, xjunc (2 in / 2 out, mixing)', ports:[{dir:'N',role:'in'},{dir:'S',role:'in'},{dir:'E',role:'out'},{dir:'W',role:'out'}], expect:6, bare:false,
-   streams:[{type:'elbow',from:'N',to:'E'},{type:'elbow',from:'N',to:'W'},{type:'elbow',from:'S',to:'E'},{type:'elbow',from:'S',to:'W'}]},
-  // --- 4 ports: corner-through (corner with one arm run through) ---
-  {name:'corner-through, bare', ports:[{dir:'N',role:'x'},{dir:'S',role:'x'},{dir:'E',role:'x'},{dir:'U',role:'x'}], expect:12, bare:true},
-  {name:'corner-through, split (stem end in)', ports:[{dir:'N',role:'in'},{dir:'S',role:'out'},{dir:'E',role:'out'},{dir:'U',role:'out'}], expect:24, bare:false,
-   streams:[{type:'straight',from:'N',to:'S'},{type:'elbow',from:'N',to:'E'},{type:'elbow',from:'N',to:'U'}]},
-  // --- 5 ports: five-way (every direction but one) ---
-  {name:'five-way, bare', ports:[{dir:'N',role:'x'},{dir:'E',role:'x'},{dir:'S',role:'x'},{dir:'W',role:'x'},{dir:'U',role:'x'}], expect:6, bare:true},
-  {name:'five-way, apex split (U in)', ports:[{dir:'U',role:'in'},{dir:'N',role:'out'},{dir:'E',role:'out'},{dir:'S',role:'out'},{dir:'W',role:'out'}], expect:6, bare:false,
-   streams:[{type:'elbow',from:'U',to:'N'},{type:'elbow',from:'U',to:'E'},{type:'elbow',from:'U',to:'S'},{type:'elbow',from:'U',to:'W'}]},
-  {name:'five-way, flat-port split (N in)', ports:[{dir:'N',role:'in'},{dir:'E',role:'out'},{dir:'S',role:'out'},{dir:'W',role:'out'},{dir:'U',role:'out'}], expect:24, bare:false,
-   streams:[{type:'straight',from:'N',to:'S'},{type:'elbow',from:'N',to:'E'},{type:'elbow',from:'N',to:'W'},{type:'elbow',from:'N',to:'U'}]},
-  // --- 6 ports: six-way (every direction) ---
-  {name:'six-way, opposite pair in', expect:3, bare:false,
-   ports:[{dir:'N',role:'in'},{dir:'S',role:'in'},{dir:'E',role:'out'},{dir:'W',role:'out'},{dir:'U',role:'out'},{dir:'D',role:'out'}],
-   streams:[{type:'elbow',from:'N',to:'E'},{type:'elbow',from:'N',to:'W'},{type:'elbow',from:'N',to:'U'},{type:'elbow',from:'N',to:'D'},
-            {type:'elbow',from:'S',to:'E'},{type:'elbow',from:'S',to:'W'},{type:'elbow',from:'S',to:'U'},{type:'elbow',from:'S',to:'D'}]},
-  {name:'six-way, adjacent pair in', expect:12, bare:false,
-   ports:[{dir:'N',role:'in'},{dir:'E',role:'in'},{dir:'S',role:'out'},{dir:'W',role:'out'},{dir:'U',role:'out'},{dir:'D',role:'out'}],
-   streams:[{type:'straight',from:'N',to:'S'},{type:'elbow',from:'N',to:'W'},{type:'elbow',from:'N',to:'U'},{type:'elbow',from:'N',to:'D'},
-            {type:'elbow',from:'E',to:'S'},{type:'straight',from:'E',to:'W'},{type:'elbow',from:'E',to:'U'},{type:'elbow',from:'E',to:'D'}]}
+// ---------- the construction rule, straight from the spec doc ----------
+// Every inlet to every outlet: straight if that pair is directly opposite,
+// elbow if merely adjacent. Same rule the parts-flow mockup board draws with.
+function streamsFor(ports){
+  var ins=ports.filter(function(p){return p.role==='in';});
+  var outs=ports.filter(function(p){return p.role==='out';});
+  var out=[];
+  ins.forEach(function(i){ outs.forEach(function(o){
+    out.push({type: OPP[i.dir]===o.dir ? 'straight' : 'elbow', from:i.dir, to:o.dir});
+  });});
+  return out;
+}
+
+// "N+ S- E-"  =>  N inlet, S outlet, E outlet
+function P(spec){
+  return spec.split(' ').map(function(t){
+    return {dir:t.slice(0,-1), role:t.slice(-1)==='+' ? 'in' : 'out'};
+  });
+}
+function bareOf(ports){ return ports.map(function(p){ return {dir:p.dir, role:'x'}; }); }
+
+// ---------- the complete active catalogue (docs/PIPEGRID-PARTS-SPEC.md) ----------
+// hand: pose count derived by hand before being compared to the code (section 2).
+// y:    anchor has no opposite port here, so every channel is an elbow (Y / tripod).
+var CAT = [
+  {shape:'cap',            name:'src',                            spec:'N+',                   hand:6},
+  {shape:'cap',            name:'snk',                            spec:'N-'},
+
+  {shape:'straight',       name:'directional',                    spec:'N+ S-',                hand:6, bare:3},
+
+  {shape:'elbow',          name:'directional',                    spec:'N+ E-',                hand:24, bare:12},
+
+  {shape:'T',              name:'tsplit — anchor on run',         spec:'N+ S- E-',             hand:24, bare:12},
+  {shape:'T',              name:'tsplitb — anchor on branch',     spec:'E+ N- S-',             hand:12, y:true},
+  {shape:'T',              name:'tmerge — anchor on run',         spec:'N- S+ E+'},
+  {shape:'T',              name:'tmergeb — anchor on branch',     spec:'E- N+ S+',             y:true},
+
+  {shape:'corner',         name:'split (1 in / 2 out)',           spec:'N+ E- U-',             hand:24, bare:8, y:true},
+  {shape:'corner',         name:'merge (2 in / 1 out)',           spec:'N- E+ U+',             hand:24, y:true},
+
+  {shape:'cross',          name:'xsplit (1 in / 3 out)',          spec:'N+ E- S- W-',          hand:12, bare:3},
+  {shape:'cross',          name:'xmerge (3 in / 1 out)',          spec:'N- E+ S+ W+'},
+  {shape:'cross',          name:'xjunc — opposite inlets',        spec:'N+ S+ E- W-',          hand:6},
+  {shape:'cross',          name:'xjunc — adjacent inlets',        spec:'N+ E+ S- W-',          hand:12},
+
+  {shape:'corner-through', name:'split — stem end in',            spec:'N+ S- E- U-',          hand:24, bare:12},
+  {shape:'corner-through', name:'split — ARM in (tripod)',        spec:'E+ N- S- U-',          hand:24, y:true},
+  {shape:'corner-through', name:'merge — stem end out',           spec:'N- S+ E+ U+'},
+  {shape:'corner-through', name:'merge — ARM out (tripod)',       spec:'E- N+ S+ U+',          y:true},
+  {shape:'corner-through', name:'mix — stem in / arms out',       spec:'N+ S+ E- U-'},
+  {shape:'corner-through', name:'mix — arms in / stem out',       spec:'E+ U+ N- S-'},
+  {shape:'corner-through', name:'mix — stem end + arm E in',      spec:'N+ E+ S- U-'},
+  {shape:'corner-through', name:'mix — stem end + arm U in',      spec:'N+ U+ S- E-'},
+
+  {shape:'five-way',       name:'apex split',                     spec:'U+ N- E- S- W-',       hand:6, bare:6, y:true},
+  {shape:'five-way',       name:'flat-port split',                spec:'N+ E- S- W- U-',       hand:24},
+  {shape:'five-way',       name:'apex merge',                     spec:'U- N+ E+ S+ W+',       y:true},
+  {shape:'five-way',       name:'flat-port merge',                spec:'N- E+ S+ W+ U+'},
+  {shape:'five-way',       name:'mix — apex + flat in',           spec:'U+ N+ E- S- W-'},
+  {shape:'five-way',       name:'mix — two opposite flat in',     spec:'N+ S+ E- W- U-'},
+  {shape:'five-way',       name:'mix — two adjacent flat in',     spec:'N+ E+ S- W- U-'},
+  {shape:'five-way',       name:'mix — apex + flat out',          spec:'U- N- E+ S+ W+'},
+  {shape:'five-way',       name:'mix — two opposite flat out',    spec:'N- S- E+ W+ U+'},
+  {shape:'five-way',       name:'mix — two adjacent flat out',    spec:'N- E- S+ W+ U+'},
+
+  {shape:'six-way',        name:'split — any port as anchor',     spec:'U+ N- E- S- W- D-',    bare:1},
+  {shape:'six-way',        name:'merge — any port as anchor',     spec:'U- N+ E+ S+ W+ D+'},
+  {shape:'six-way',        name:'2-in-4-out — opposite pair in',  spec:'N+ S+ E- W- U- D-',    hand:3},
+  {shape:'six-way',        name:'2-in-4-out — adjacent pair in',  spec:'N+ E+ S- W- U- D-',    hand:12},
+  {shape:'six-way',        name:'4-in-2-out — opposite pair out', spec:'N- S- E+ W+ U+ D+'},
+  {shape:'six-way',        name:'4-in-2-out — adjacent pair out', spec:'N- E- S+ W+ U+ D+'},
+  {shape:'six-way',        name:'3-in-3-out — T-type inlets',     spec:'N+ S+ E+ W- U- D-',    hand:12},
+  {shape:'six-way',        name:'3-in-3-out — corner-type inlets',spec:'N+ E+ U+ S- W- D-',    hand:8}
+];
+CAT.forEach(function(e){ e.ports = P(e.spec); e.streams = streamsFor(e.ports); });
+
+// Pairs the spec doc says SHOULD be the same part despite looking like split vs merge.
+var INTENDED_COLLAPSE = [
+  ['six-way 3-in-3-out T-type: split vs merge',      'N+ S+ E+ W- U- D-', 'N- S- E- W+ U+ D+'],
+  ['six-way 3-in-3-out corner-type: split vs merge', 'N+ E+ U+ S- W- D-', 'N- E- U- S+ W+ D+']
 ];
 
-// ---------- render: math validation table ----------
+// ---------- section 1: rotation math ----------
 function badge(ok){ return '<span class="badge '+(ok?'pass':'fail')+'">'+(ok?'PASS':'FAIL')+'</span>'; }
 (function(){
-  var rows = [
+  var keys={}; ROTS.forEach(function(M){ keys[matKey(M)]=true; });
+  var closed=true;
+  for(var i=0;i<ROTS.length&&closed;i++)for(var j=0;j<ROTS.length;j++){
+    if(!keys[matKey(matMul(ROTS[i],ROTS[j]))]){ closed=false; break; }
+  }
+  var rows=[
     ['Generated exactly 24 rotations', ROTS.length===24, ROTS.length+' generated'],
-    ['Closed under composition', testClosure(), ''],
-    ['Identity present', testIdentity(), ''],
-    ['Every rotation has an inverse in the set', testInverses(), '']
+    ['Closed under composition', closed, ''],
+    ['Identity present', !!keys[matKey(IDENT)], ''],
+    ['Every rotation has an inverse in the set', ROTS.every(function(M){return !!keys[matKey(transpose(M))];}), '']
   ];
-  var html = '<tbody>';
-  rows.forEach(function(r){
-    html += '<tr><td>'+r[0]+(r[2]?' <span style="color:var(--dim)">('+r[2]+')</span>':'')+'</td><td class="num">'+badge(r[1])+'</td></tr>';
-  });
-  html += '</tbody>';
-  document.getElementById('mathTests').innerHTML = html;
+  document.getElementById('mathTests').innerHTML='<tbody>'+rows.map(function(r){
+    return '<tr><td>'+r[0]+(r[2]?' <span style="color:var(--dim)">('+r[2]+')</span>':'')+'</td><td class="num">'+badge(r[1])+'</td></tr>';
+  }).join('')+'</tbody>';
 })();
 
-// ---------- render: per-shape distinct-pose-count table ----------
+// ---------- section 2: hand-derived spot checks ----------
 (function(){
-  var tbody = document.querySelector('#poseTests tbody');
-  var html = '';
-  TESTS.forEach(function(t){
-    var groups = distinctPoses(t.ports);
-    var actual = groups.length;
-    var pass = actual === t.expect;
-    var cosetOk = groups.every(function(g){ return g.reps.length === (24/t.expect); });
-    html += '<tr><td>'+t.name+(t.bare?' <span style="color:var(--dim)">(bare)</span>':'')+'</td>'+
-            '<td class="num">'+t.expect+'</td><td class="num">'+actual+'</td>'+
-            '<td>'+badge(cosetOk)+'</td><td>'+badge(pass)+'</td></tr>';
+  var rows=[];
+  CAT.forEach(function(e){
+    if(e.bare!==undefined){
+      var bp=distinctPoses(bareOf(e.ports));
+      rows.push({label:e.shape+', bare', hand:e.bare, actual:bp.length, groups:bp});
+    }
+    if(e.hand!==undefined){
+      var gp=distinctPoses(e.ports);
+      rows.push({label:e.shape+' — '+e.name, hand:e.hand, actual:gp.length, groups:gp});
+    }
   });
-  tbody.innerHTML = html;
+  document.querySelector('#poseTests tbody').innerHTML=rows.map(function(r){
+    var coset=r.groups.every(function(g){ return g.reps.length===(24/r.hand); });
+    return '<tr><td>'+r.label+'</td><td class="num">'+r.hand+'</td><td class="num">'+r.actual+'</td>'+
+           '<td>'+badge(coset)+'</td><td>'+badge(r.actual===r.hand)+'</td></tr>';
+  }).join('');
 })();
 
-// ---------- 3D rendering for the explorer ----------
+// ---------- section 3: complete catalogue + distinctness audit ----------
+(function(){
+  var byCanon={};
+  CAT.forEach(function(e){
+    var c=canonical(e.ports);
+    (byCanon[c]=byCanon[c]||[]).push(e.shape+' / '+e.name);
+  });
+  var distinct=Object.keys(byCanon).length;
+  var collisions=Object.keys(byCanon).filter(function(k){ return byCanon[k].length>1; });
+  var intended=INTENDED_COLLAPSE.map(function(t){
+    return {label:t[0], ok:canonical(P(t[1]))===canonical(P(t[2]))};
+  });
+  var rows=[
+    ['Catalogue entries listed', CAT.length===40, CAT.length+' active'],
+    ['All of them genuinely distinct under rotation', collisions.length===0,
+      distinct+' distinct'+(collisions.length? ' — COLLIDING: '+collisions.map(function(k){return byCanon[k].join(' = ');}).join('; '):'')]
+  ];
+  intended.forEach(function(t){ rows.push(['Spec doc says these two collapse into one part — '+t.label, t.ok, 'verified']); });
+  document.getElementById('auditTable').innerHTML='<tbody>'+rows.map(function(r){
+    return '<tr><td>'+r[0]+(r[2]?' <span style="color:var(--dim)">('+r[2]+')</span>':'')+'</td><td class="num">'+badge(r[1])+'</td></tr>';
+  }).join('')+'</tbody>';
+
+  var html='', lastShape=null;
+  CAT.forEach(function(e){
+    if(e.shape!==lastShape){
+      html+='<tr class="shapehdr"><td colspan="3">'+e.shape+'</td></tr>';
+      lastShape=e.shape;
+    }
+    var st=e.streams.filter(function(s){return s.type==='straight';}).length;
+    var el=e.streams.filter(function(s){return s.type==='elbow';}).length;
+    var desc = e.streams.length===0 ? '—' :
+      (st? st+' straight':'')+(st&&el?' + ':'')+(el? el+' elbow':'');
+    html+='<tr><td>'+e.name+(e.y?' <span class="ytag">Y</span>':'')+'</td>'+
+          '<td class="num">'+distinctPoses(e.ports).length+'</td><td>'+desc+'</td></tr>';
+  });
+  document.querySelector('#catTable tbody').innerHTML=html;
+})();
+
+// ---------- 3D rendering ----------
 function straightPts(fromDir,toDir){
   var a=DIRVEC[fromDir], b=DIRVEC[toDir];
   return [[a[0]*PR,a[1]*PR,a[2]*PR],[b[0]*PR,b[1]*PR,b[2]*PR]];
@@ -308,117 +382,89 @@ function elbowPts(fromDir,toDir,steps){
   return pts;
 }
 function camRot(p,az,el){
-  var x=p[0],y=p[1],z=p[2];
   var ca=Math.cos(az), sa=Math.sin(az);
-  var x1=x*ca-y*sa, y1=x*sa+y*ca, z1=z;
+  var x1=p[0]*ca-p[1]*sa, y1=p[0]*sa+p[1]*ca, z1=p[2];
   var ce=Math.cos(el), se=Math.sin(el);
-  var y2=y1*ce-z1*se, z2=y1*se+z1*ce;
-  return [x1,y2,z2];
+  return [x1, y1*ce-z1*se, y1*se+z1*ce];
 }
-function proj(p){
-  var s=95;
-  return {x:p[0]*s, y:-p[2]*s - p[1]*s*0.32, depth:p[1]*0.6+p[2]};
-}
-function matApply(M,p){ return [M[0][0]*p[0]+M[0][1]*p[1]+M[0][2]*p[2],
-                                 M[1][0]*p[0]+M[1][1]*p[1]+M[1][2]*p[2],
-                                 M[2][0]*p[0]+M[2][1]*p[1]+M[2][2]*p[2]]; }
+function proj(p){ var s=95; return {x:p[0]*s, y:-p[2]*s - p[1]*s*0.32}; }
 
-var stage = document.getElementById('stage');
-var az = 0.7, el = -0.5;
-var shapeIdx = 2; // default: straight, directional
-var poseIdx = 0;
+var stage=document.getElementById('stage');
+var az=0.7, el=-0.5, shapeIdx=0, poseIdx=0;
 
-var explorable = TESTS.filter(function(t){ return !t.bare; });
-var sel = document.getElementById('shapeSel');
-explorable.forEach(function(t,i){
-  var o = document.createElement('option'); o.value=i; o.textContent=t.name; sel.appendChild(o);
-});
-shapeIdx = explorable.indexOf(TESTS[2]);
-sel.value = shapeIdx;
+var sel=document.getElementById('shapeSel');
+(function(){
+  var lastShape=null, grp=null;
+  CAT.forEach(function(e,i){
+    if(e.shape!==lastShape){
+      grp=document.createElement('optgroup'); grp.label=e.shape; sel.appendChild(grp); lastShape=e.shape;
+    }
+    var o=document.createElement('option'); o.value=i; o.textContent=e.name+(e.y?'  (Y)':''); grp.appendChild(o);
+  });
+})();
+shapeIdx=CAT.findIndex(function(e){ return e.shape==='elbow'; });
+sel.value=shapeIdx;
 
 function render(){
-  var t = explorable[shapeIdx];
-  var groups = distinctPoses(t.ports);
+  var e=CAT[shapeIdx];
+  var groups=distinctPoses(e.ports);
   if(poseIdx>=groups.length) poseIdx=0;
   if(poseIdx<0) poseIdx=groups.length-1;
-  var group = groups[poseIdx];
-  var repIdx = group.reps[0];
-  var M = ROTS[repIdx];
+  var group=groups[poseIdx];
+  var M=ROTS[group.reps[0]];
 
   while(stage.firstChild) stage.removeChild(stage.firstChild);
-  var drawables = [];
-
-  if(t.streams){
-    t.streams.forEach(function(seg){
-      var pts3 = seg.type==='straight' ? straightPts(seg.from,seg.to) : elbowPts(seg.from,seg.to,12);
-      var world = pts3.map(function(p){ return matApply(M,p); });
-      var view = world.map(function(p){ return camRot(p,az,el); });
-      var pts2 = view.map(proj);
-      var avgDepth = view.reduce(function(s,p){return s+p[1];},0)/view.length;
-      drawables.push({depth:avgDepth, kind:'path', pts:pts2});
-    });
-  }
-  t.ports.forEach(function(p){
-    var pos3 = [DIRVEC[p.dir][0]*PR, DIRVEC[p.dir][1]*PR, DIRVEC[p.dir][2]*PR];
-    var world = matApply(M,pos3);
-    var view = camRot(world,az,el);
-    var pt2 = proj(view);
-    drawables.push({depth:view[1], kind:'ring', pt:pt2, role:p.role});
+  var draw=[];
+  e.streams.forEach(function(seg){
+    var pts3=seg.type==='straight'?straightPts(seg.from,seg.to):elbowPts(seg.from,seg.to,12);
+    var view=pts3.map(function(p){ return camRot(matApply(M,p),az,el); });
+    draw.push({depth:view.reduce(function(s,p){return s+p[1];},0)/view.length, kind:'path', pts:view.map(proj)});
   });
-
-  drawables.sort(function(a,b){ return a.depth-b.depth; });
-
-  drawables.forEach(function(d){
+  e.ports.forEach(function(p){
+    var v=DIRVEC[p.dir];
+    var view=camRot(matApply(M,[v[0]*PR,v[1]*PR,v[2]*PR]),az,el);
+    draw.push({depth:view[1], kind:'ring', pt:proj(view), role:p.role});
+  });
+  draw.sort(function(a,b){ return a.depth-b.depth; });
+  draw.forEach(function(d){
     if(d.kind==='path'){
-      var path = document.createElementNS(svgNS,'path');
-      var dstr = 'M '+d.pts.map(function(p){return p.x.toFixed(1)+' '+p.y.toFixed(1);}).join(' L ');
-      path.setAttribute('d', dstr);
-      path.setAttribute('fill','none');
-      path.setAttribute('stroke','var(--text)');
-      path.setAttribute('stroke-width','7');
-      path.setAttribute('stroke-linecap','round');
-      path.setAttribute('opacity','0.55');
+      var path=document.createElementNS(svgNS,'path');
+      path.setAttribute('d','M '+d.pts.map(function(p){return p.x.toFixed(1)+' '+p.y.toFixed(1);}).join(' L '));
+      path.setAttribute('fill','none'); path.setAttribute('stroke','var(--text)');
+      path.setAttribute('stroke-width','7'); path.setAttribute('stroke-linecap','round');
+      path.setAttribute('opacity','0.5');
       stage.appendChild(path);
     } else {
-      var c = document.createElementNS(svgNS,'circle');
-      c.setAttribute('cx', d.pt.x.toFixed(1)); c.setAttribute('cy', d.pt.y.toFixed(1));
-      c.setAttribute('r', '11');
-      c.setAttribute('fill', d.role==='in' ? 'var(--acc)' : (d.role==='out' ? 'var(--out)' : 'var(--text)'));
+      var c=document.createElementNS(svgNS,'circle');
+      c.setAttribute('cx',d.pt.x.toFixed(1)); c.setAttribute('cy',d.pt.y.toFixed(1)); c.setAttribute('r','11');
+      c.setAttribute('fill', d.role==='in'?'var(--acc)':'var(--out)');
       c.setAttribute('stroke','var(--panel)'); c.setAttribute('stroke-width','2');
       stage.appendChild(c);
     }
   });
 
   document.getElementById('stepRead').textContent =
-    'pose '+(poseIdx+1)+' of '+groups.length+'  ·  raw '+(repIdx+1)+'/24 ('+group.reps.length+' equivalent)';
-
-  var readHtml = group.world.map(function(w,i){
-    var canonicalDir = t.ports[i].dir;
-    var cls = w.role==='in' ? 'in' : (w.role==='out' ? 'out' : '');
-    return '<div><span class="'+cls+'">'+canonicalDir+' (home) → '+w.dir+' (world)</span> · role: '+w.role+'</div>';
+    'pose '+(poseIdx+1)+' of '+groups.length+'  ·  raw '+(group.reps[0]+1)+'/24 ('+group.reps.length+' equivalent)';
+  document.getElementById('portRead').innerHTML = group.world.map(function(w,i){
+    return '<div><span class="'+(w.role==='in'?'in':'out')+'">'+e.ports[i].dir+' (home) → '+w.dir+' (world)</span> · '+w.role+'</div>';
   }).join('');
-  document.getElementById('portRead').innerHTML = readHtml;
 }
 
 sel.addEventListener('change', function(){ shapeIdx=+sel.value; poseIdx=0; render(); });
 document.getElementById('prevBtn').addEventListener('click', function(){ poseIdx--; render(); });
 document.getElementById('nextBtn').addEventListener('click', function(){ poseIdx++; render(); });
 
-var dragging=false, lastX=0, lastY=0;
-function dragStart(x,y){ dragging=true; lastX=x; lastY=y; }
-function dragMove(x,y){ if(!dragging) return; az += (x-lastX)*0.01; el += (y-lastY)*0.01; lastX=x; lastY=y; render(); }
-function dragEnd(){ dragging=false; }
-stage.addEventListener('pointerdown', function(e){ dragStart(e.clientX,e.clientY); stage.setPointerCapture(e.pointerId); });
-stage.addEventListener('pointermove', function(e){ dragMove(e.clientX,e.clientY); });
-stage.addEventListener('pointerup', dragEnd);
-stage.addEventListener('pointercancel', dragEnd);
+var dragging=false,lastX=0,lastY=0;
+stage.addEventListener('pointerdown', function(e){ dragging=true; lastX=e.clientX; lastY=e.clientY; stage.setPointerCapture(e.pointerId); });
+stage.addEventListener('pointermove', function(e){ if(!dragging) return; az+=(e.clientX-lastX)*0.01; el+=(e.clientY-lastY)*0.01; lastX=e.clientX; lastY=e.clientY; render(); });
+stage.addEventListener('pointerup', function(){ dragging=false; });
+stage.addEventListener('pointercancel', function(){ dragging=false; });
 
 render();
 
 document.getElementById('themebtn').addEventListener('click', function(){
-  var body=document.body;
-  var isLight = body.getAttribute('data-theme')==='light';
-  body.setAttribute('data-theme', isLight?'dark':'light');
+  var isLight=document.body.getAttribute('data-theme')==='light';
+  document.body.setAttribute('data-theme', isLight?'dark':'light');
   this.textContent = isLight?'LIGHT':'DARK';
 });
 })();
