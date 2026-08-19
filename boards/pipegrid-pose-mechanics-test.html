@@ -253,11 +253,20 @@ function straightPts(fromDir,toDir){
   var a=DIRVEC[fromDir], b=DIRVEC[toDir];
   return [[a[0]*PR,a[1]*PR,a[2]*PR],[b[0]*PR,b[1]*PR,b[2]*PR]];
 }
+// Quarter-arc centred on the CORNER between the two ports (PR*(a+b)), not on the
+// cell centre — so the curve leaves each port along that port's own axis, dips in
+// toward the middle of the cell, and swings back out the other side. Same formula
+// the parts-flow mockup board uses; do not "simplify" this into a great-circle arc
+// at fixed radius, which bulges outward through the cell wall instead.
 function elbowPts(fromDir,toDir,steps){
   var a=DIRVEC[fromDir], b=DIRVEC[toDir]; var pts=[];
   for(var i=0;i<=steps;i++){
-    var t=i/steps, ang=t*Math.PI/2, c=Math.cos(ang), s=Math.sin(ang);
-    pts.push([PR*(c*a[0]+s*b[0]), PR*(c*a[1]+s*b[1]), PR*(c*a[2]+s*b[2])]);
+    var t=(i/steps)*(Math.PI/2), s=Math.sin(t), c=Math.cos(t);
+    pts.push([
+      PR*(a[0]+b[0]) - PR*(s*a[0]+c*b[0]),
+      PR*(a[1]+b[1]) - PR*(s*a[1]+c*b[1]),
+      PR*(a[2]+b[2]) - PR*(s*a[2]+c*b[2])
+    ]);
   }
   return pts;
 }
