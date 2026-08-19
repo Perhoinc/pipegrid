@@ -402,9 +402,40 @@ inverted, and the board's own numbers (3→6, 8→24, 12→24) contradicted the 
 Corrected in both the board text and here, and the corrected version was then verified across
 eight shapes rather than re-asserted.
 
-**Not yet built:** how a pose gets *chosen* at placement time — the gesture/UI question — and how
-poses serialize into the save file without breaking the v:3 envelope. Both belong to the vertical
-slice, not to this document.
+### Choosing a pose: the gizmo (settled 2026-08-19, `boards/pipegrid-pose-gizmo-mockups.html`)
+
+Owner-decided, after a mockup pass. **Placement is connection-driven** — you drag from an existing
+part's port and the app picks a pose that makes the connection work, the way snapping already
+behaves — and **the override appears as soon as that gesture completes**, not only when the app is
+stuck. The override is a CAD-style transform gizmo: three coloured rings, one per grid axis, drag to
+rotate, plus handles to shift the part a whole cell.
+
+One connection doesn't fully determine a pose, so the override is doing real work rather than
+sitting there decoratively: fixing a corner's inlet direction still leaves four orientations.
+
+**The rings are the pose system's own generators.** Each quarter turn about an axis is one step in
+the group, so a gizmo that snaps in quarter turns is structurally incapable of producing an invalid
+orientation — there is nothing invalid within reach. Continuous free rotation would be meaningless
+given only 24 orientations exist, so the ring snaps rather than spins.
+
+Settled details:
+
+- **The part follows the finger's angle, then lands on a quarter turn.** The first attempt measured
+  linear drag distance along the ring's tangent, which the owner immediately identified as feeling
+  like cycling through a list rather than turning something. It now tracks true angular position.
+  Because a ring is a circle in 3D projecting to an ellipse on screen, naive screen-space angle
+  would skew — worst near edge-on, exactly where precision matters — so the true in-plane angle is
+  solved back from the projection. Free angle is preview only; what commits is always one of the 24,
+  shown live by a dashed ghost of the landing pose.
+- **Rings are world-aligned**, staying on the grid's axes rather than tumbling with the part, so a
+  given ring always means the same real axis.
+- **Ring colour sits outside the mark grammar, deliberately.** Pipe-colour means structure, amber
+  means flow; these mean neither. Owner chose the strong CAD palette over a muted one *because* it
+  makes the gizmo read as distinctly not part of the drawing — a gizmo is transient UI, not a mark.
+- **Translation is whole cells along one axis**, matching the grid. No free positioning.
+
+**Still not built:** how poses serialize into the save file without breaking the v:3 envelope. That
+belongs to the vertical slice, not to this document.
 
 ## Next
 
