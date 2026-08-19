@@ -96,17 +96,21 @@
 <div class="panel">
   <div class="plabel">DECISIONS BAKED IN HERE — OVERRULE ANY OF THEM</div>
   <ul>
-    <li><b>Quarter-turn snapping, not free spin.</b> Only 24 orientations exist, so continuous
-        rotation would mean nothing. The part jumps as you drag rather than following your finger
-        smoothly.</li>
+    <li><b>The part follows your finger around the ring, then lands on a quarter turn.</b> Grab a
+        ring anywhere and the part turns with your hand at whatever angle you're at — an amber dashed
+        ghost shows the orientation it will settle into, and it snaps there when you let go. Only 24
+        orientations exist, so the landing is always one of them; the free-angle part is just the
+        preview under your finger. <i>(First version measured how far you dragged in a straight line
+        instead of where your finger was around the ring, which made it feel like clicking through a
+        list rather than turning something. That's fixed — this is angular now.)</i></li>
     <li><b>Rings are world-aligned.</b> They stay on the grid's axes instead of tumbling with the
         part, so the same ring always means the same real axis. The alternative (rings follow the
         part) is the other common CAD convention — worth trying if this feels wrong.</li>
-    <li><b>Ring colour sits outside the mark grammar.</b> Pipe-coloured means structure and amber
-        means flow; these rings mean neither, which is why they get their own colours. The argument
-        is that a gizmo is transient UI, not part of the drawing. The PALETTE button up top swaps
-        between classic CAD red/green/blue and a quieter set tuned to the app — judge which one
-        belongs in a drawing-office instrument.</li>
+    <li><b>Ring colour sits outside the mark grammar — settled.</b> Pipe-coloured means structure and
+        amber means flow; these rings mean neither, which is why they get their own colours, on the
+        argument that a gizmo is transient UI rather than part of the drawing. Owner's call: the
+        strong CAD palette, because it makes the gizmo read as distinctly <i>not</i> part of the
+        drawing. The PALETTE button still swaps to the quieter set for comparison.</li>
     <li><b>The far half of each ring is dimmed</b> so you can read which way it faces in depth. Rings
         seen edge-on stay grabbable — the hit area doesn't collapse with the drawing.</li>
     <li><b>Translation is whole cells only</b>, along one axis at a time, matching how the grid
@@ -135,9 +139,29 @@ var ID=[[1,0,0],[0,1,0],[0,0,1]];
 var RX=[[1,0,0],[0,0,-1],[0,1,0]];        // about E–W
 var RY=[[0,0,1],[0,1,0],[-1,0,0]];        // about N–S
 var RZ=[[0,-1,0],[1,0,0],[0,0,1]];        // about U–D
-var AXES=[{id:'x',M:RX,ring:function(t){return [0,Math.cos(t),Math.sin(t)];},col:'var(--ax)',name:'E–W'},
-          {id:'y',M:RY,ring:function(t){return [Math.cos(t),0,Math.sin(t)];},col:'var(--ay)',name:'N–S'},
-          {id:'z',M:RZ,ring:function(t){return [Math.cos(t),Math.sin(t),0];},col:'var(--az)',name:'U–D'}];
+
+// Float ops, for following the finger continuously mid-drag. The committed pose is
+// always one of the 24 integer matrices; only the live preview is free-angle.
+function mulF(A,B){var R=[[0,0,0],[0,0,0],[0,0,0]];
+  for(var i=0;i<3;i++)for(var j=0;j<3;j++){var s=0;for(var k=0;k<3;k++)s+=A[i][k]*B[k][j];R[i][j]=s;}
+  return R;}
+
+// Each axis carries the two in-plane basis vectors e1,e2 chosen so that
+// rotating e1 by t gives cos(t)*e1 + sin(t)*e2. The ring is drawn from them and
+// the drag angle is solved against them, so the drawing and the maths can't drift
+// out of sync (they did: the y ring used to run backwards against RY).
+var AXES=[
+  {id:'x',M:RX,e1:[0,1,0],e2:[0,0,1],col:'var(--ax)',name:'E–W',
+   cont:function(t){var c=Math.cos(t),s=Math.sin(t);return [[1,0,0],[0,c,-s],[0,s,c]];}},
+  {id:'y',M:RY,e1:[0,0,1],e2:[1,0,0],col:'var(--ay)',name:'N–S',
+   cont:function(t){var c=Math.cos(t),s=Math.sin(t);return [[c,0,s],[0,1,0],[-s,0,c]];}},
+  {id:'z',M:RZ,e1:[1,0,0],e2:[0,1,0],col:'var(--az)',name:'U–D',
+   cont:function(t){var c=Math.cos(t),s=Math.sin(t);return [[c,-s,0],[s,c,0],[0,0,1]];}}
+];
+AXES.forEach(function(a){
+  a.ring=function(t){var c=Math.cos(t),s=Math.sin(t);
+    return [a.e1[0]*c+a.e2[0]*s, a.e1[1]*c+a.e2[1]*s, a.e1[2]*c+a.e2[2]*s];};
+});
 
 var ROTS=(function(){var seen={},L=[];seen[mkey(ID)]=1;L.push(ID);var f=[ID];
   while(f.length){var n=[];f.forEach(function(M){[RZ,RX].forEach(function(G){
@@ -232,10 +256,26 @@ function arrowEnds(axis){
 function el2(tag,attrs){var e=document.createElementNS(NS,tag);
   for(var k in attrs) e.setAttribute(k,attrs[k]); return e;}
 
+// While turning, the part follows the finger at a free angle; the committed pose is
+// still always one of the 24. Only the preview is continuous.
+function liveMatrix(){
+  if(drag && drag.type==='rot') return mulF(drag.axis.cont(drag.live), drag.basePose);
+  return pose;
+}
+// The pose it would commit to if you let go right now.
+function snapMatrix(){
+  if(!(drag && drag.type==='rot')) return pose;
+  var n=((snapQuarter(drag.live)%4)+4)%4, M=drag.basePose;
+  for(var i=0;i<n;i++) M=mul(drag.axis.M,M);
+  return M;
+}
+
 function render(){
   while(stage.firstChild) stage.removeChild(stage.firstChild);
   var part=PARTS[partIdx];
   var off=[cellPos[0]*CELL,cellPos[1]*CELL,cellPos[2]*CELL];
+  var Mlive=liveMatrix();   // free angle while turning — what you SEE
+  var Msnap=snapMatrix();   // nearest valid pose  — what you'd GET on release
 
   // neighbouring cell floor grid
   for(var gx=-1;gx<=1;gx++)for(var gy=-1;gy<=1;gy++){
@@ -246,17 +286,28 @@ function render(){
       fill:'none',stroke:'var(--grid)','stroke-width':1}));
   }
 
+  // ghost of the pose it will land on, shown only while turning
+  if(drag && drag.type==='rot'){
+    part.streams.forEach(function(s){
+      var p3=(s.type==='straight'?straightPts(s.from,s.to):elbowPts(s.from,s.to,14))
+               .map(function(p){var w=ap(Msnap,p);return pc([w[0]+off[0],w[1]+off[1],w[2]+off[2]]);});
+      stage.appendChild(el2('path',{d:'M '+p3.map(function(p){return p.x.toFixed(1)+' '+p.y.toFixed(1);}).join(' L '),
+        fill:'none',stroke:'var(--acc)','stroke-width':2,'stroke-linecap':'round',
+        'stroke-dasharray':'4 5',opacity:0.7}));
+    });
+  }
+
   var items=[];
 
   // the part
   part.streams.forEach(function(s){
     var p3=(s.type==='straight'?straightPts(s.from,s.to):elbowPts(s.from,s.to,14))
-             .map(function(p){var w=ap(pose,p);return [w[0]+off[0],w[1]+off[1],w[2]+off[2]];});
+             .map(function(p){var w=ap(Mlive,p);return [w[0]+off[0],w[1]+off[1],w[2]+off[2]];});
     var vw=p3.map(cam);
     items.push({d:vw.reduce(function(a,p){return a+p[1];},0)/vw.length, kind:'chan', pts:vw.map(proj)});
   });
   part.ports.forEach(function(p){
-    var v=V[p.dir], w=ap(pose,[v[0]*PR,v[1]*PR,v[2]*PR]);
+    var v=V[p.dir], w=ap(Mlive,[v[0]*PR,v[1]*PR,v[2]*PR]);
     var vw=cam([w[0]+off[0],w[1]+off[1],w[2]+off[2]]);
     items.push({d:vw[1],kind:'port',pt:proj(vw),role:p.role});
   });
@@ -304,11 +355,15 @@ function render(){
   });
 
   var np=distinctPoses(part.ports);
+  var turning = drag&&drag.type==='rot';
   document.getElementById('stat').innerHTML =
-    'pose <b>'+(poseIndex(pose)+1)+'</b> of 24 raw · this part has <b>'+np+'</b> distinct orientations · '+
-    'cell <b>'+cellPos.join(', ')+'</b>' + (drag? ' · <b>'+(drag.type==='rot'?('turning '+drag.axis.name):'moving '+drag.axis.name)+'</b>':'');
+    'pose <b>'+(poseIndex(Msnap)+1)+'</b> of 24 raw · this part has <b>'+np+'</b> distinct orientations · '+
+    'cell <b>'+cellPos.join(', ')+'</b>' +
+    (turning ? ' · <b>turning '+drag.axis.name+'</b> '+(drag.live*180/Math.PI).toFixed(0)+'° → snaps to '+
+               (((snapQuarter(drag.live)%4)+4)%4)*90+'°'
+             : (drag&&drag.type==='move' ? ' · <b>moving '+drag.axis.name+'</b>' : ''));
   document.getElementById('portRead').innerHTML = part.ports.map(function(p){
-    var w=ap(pose,V[p.dir]);
+    var w=ap(Msnap,V[p.dir]);
     var d=DIRS.filter(function(x){var v=V[x];return v[0]===w[0]&&v[1]===w[1]&&v[2]===w[2];})[0];
     return '<div><span class="'+(p.role==='in'?'in':'out')+'">'+p.dir+' (home) → '+d+' (world)</span> · '+p.role+'</div>';
   }).join('');
@@ -344,12 +399,34 @@ function hitArrow(pt){
   });
   return best;
 }
-// screen-space tangent of the ring at index i
-function ringTangent(pts,i){
-  var a=pc(pts[(i-1+pts.length)%pts.length]), b=pc(pts[(i+1)%pts.length]);
-  var dx=b.x-a.x, dy=b.y-a.y, m=Math.hypot(dx,dy)||1;
-  return {x:dx/m,y:dy/m};
+// Where is the finger, as an angle around the ring?
+//
+// The ring is a circle in 3D; orthographic projection turns it into an ellipse on
+// screen, so screen-space atan2 around the centre would be skewed — worst near
+// edge-on, exactly where precision matters most. But the projection is linear, so
+// a ring point at angle t lands at centre + cos(t)*A + sin(t)*B, where A and B are
+// the projected images of the two basis vectors. Given a screen point we invert
+// that 2x2 system for (cos t, sin t) and read the true angle off it. Exact for any
+// viewing angle, no skew.
+function ringAngleAt(axis,pt){
+  var b=[cellPos[0]*CELL,cellPos[1]*CELL,cellPos[2]*CELL];
+  var o=pc(b);
+  var A=pc([b[0]+axis.e1[0]*RING_R, b[1]+axis.e1[1]*RING_R, b[2]+axis.e1[2]*RING_R]);
+  var B=pc([b[0]+axis.e2[0]*RING_R, b[1]+axis.e2[1]*RING_R, b[2]+axis.e2[2]*RING_R]);
+  var ax=A.x-o.x, ay=A.y-o.y, bx=B.x-o.x, by=B.y-o.y;
+  var det=ax*by-ay*bx;
+  var px=pt.x-o.x, py=pt.y-o.y;
+  if(Math.abs(det)<1e-3){
+    // ring is edge-on: the ellipse has collapsed to a line and can't be inverted.
+    // Fall back to travel along that line so the ring stays usable rather than dead.
+    var m=Math.hypot(ax,ay)||1;
+    return {angle:(px*ax+py*ay)/m/RING_R, degenerate:true};
+  }
+  var c=( by*px - bx*py)/det;
+  var s=(-ay*px + ax*py)/det;
+  return {angle:Math.atan2(s,c), degenerate:false};
 }
+function snapQuarter(t){ return Math.round(t/(Math.PI/2)); }
 
 stage.addEventListener('pointerdown',function(ev){
   var pt=svgPt(ev);
@@ -358,7 +435,8 @@ stage.addEventListener('pointerdown',function(ev){
   if(a && (!r || a.dist<r.dist)){
     drag={type:'move',axis:a.axis,sign:a.sign,start:pt,base:cellPos.slice(),acc:0};
   } else if(r){
-    drag={type:'rot',axis:r.axis,start:pt,basePose:pose,tan:ringTangent(r.pts,r.idx),acc:0,steps:0};
+    var a0=ringAngleAt(r.axis,pt);
+    drag={type:'rot',axis:r.axis,start:pt,basePose:pose,prev:a0.angle,live:0,degenerate:a0.degenerate};
   } else {
     drag={type:'cam',start:pt,az0:az,el0:el,lx:ev.clientX,ly:ev.clientY};
   }
@@ -373,14 +451,16 @@ stage.addEventListener('pointermove',function(ev){
   var pt=svgPt(ev);
   var dx=pt.x-drag.start.x, dy=pt.y-drag.start.y;
   if(drag.type==='rot'){
-    var along=dx*drag.tan.x+dy*drag.tan.y;         // travel along the ring
-    var steps=Math.round(along/46);                 // one quarter turn per ~46 units
-    if(steps!==drag.steps){
-      drag.steps=steps;
-      var M=drag.basePose, n=((steps%4)+4)%4;
-      for(var i=0;i<n;i++) M=mul(drag.axis.M,M);
-      pose=M; render();
-    }
+    // Accumulate per-move deltas rather than measuring against the grab angle. Taking
+    // the difference from the start would cap a drag at half a turn and then reverse
+    // it as the angle wrapped; accumulating lets you wind round as many times as you like.
+    var cur=ringAngleAt(drag.axis,pt).angle;
+    var d=cur-drag.prev;
+    while(d>Math.PI) d-=Math.PI*2;      // shortest way round the seam
+    while(d<-Math.PI) d+=Math.PI*2;
+    drag.live+=d;
+    drag.prev=cur;
+    render();
   } else {
     var ax=drag.axis.id==='x'?0:drag.axis.id==='y'?1:2;
     var ref=pc([ax===0?1:0,ax===1?1:0,ax===2?1:0]), org=pc([0,0,0]);
@@ -391,7 +471,16 @@ stage.addEventListener('pointermove',function(ev){
     if(next[ax]!==cellPos[ax]){ cellPos=next; render(); }
   }
 });
-function endDrag(){ if(drag){ drag=null; render(); } }
+function endDrag(){
+  if(!drag) return;
+  if(drag.type==='rot'){
+    // let go and it lands on the nearest quarter turn — the only orientations that exist
+    var n=((snapQuarter(drag.live)%4)+4)%4, M=drag.basePose;
+    for(var i=0;i<n;i++) M=mul(drag.axis.M,M);
+    pose=M;
+  }
+  drag=null; render();
+}
 stage.addEventListener('pointerup',endDrag);
 stage.addEventListener('pointercancel',endDrag);
 
