@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>PIPEGRID — pose gizmo mockups</title>
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12151b; --panel2:#0e1116; --edge:#2c313d;
+    --text:#c7d3e2; --dim:#5f6775; --acc:#e0a14e; --out:#3a4150; --grid:#1c212b;
+    --ax:#d8534f; --ay:#5aa469; --az:#4a7fb5;          /* classic CAD */
+  }
+  body[data-pal="quiet"]{
+    --ax:#b8763e; --ay:#7d8a6a; --az:#5f7387;           /* restrained, tuned to the app */
+  }
+  body[data-theme="light"]{
+    --bg:#eef1f5; --panel:#ffffff; --panel2:#f4f6f9; --edge:#d3d9e2;
+    --text:#232a35; --dim:#7a8494; --acc:#c97a1f; --out:#9aa4b3; --grid:#dfe4ec;
+    --ax:#c0392b; --ay:#3f8f52; --az:#2f6ea8;
+  }
+  body[data-theme="light"][data-pal="quiet"]{
+    --ax:#9c6027; --ay:#5f6f4d; --az:#4a5c6e;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  body{background:var(--bg);color:var(--text);
+       font-family:ui-monospace,SFMono-Regular,Menlo,monospace;-webkit-text-size-adjust:100%;
+       padding:14px;padding-bottom:60px;}
+  .hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:10px;flex-wrap:wrap;}
+  .title{font-size:15px;font-weight:700;letter-spacing:2px;}
+  .sub{font-size:9px;letter-spacing:1px;color:var(--dim);}
+  .btn{font-family:inherit;font-size:10px;letter-spacing:.5px;text-transform:uppercase;
+       padding:7px 9px;border:1px solid var(--edge);border-radius:4px;background:transparent;
+       color:var(--text);cursor:pointer;}
+  .btn.on{border-color:var(--acc);color:var(--acc);}
+  .spacer{margin-left:auto;}
+  .panel{border:1px solid var(--edge);border-radius:8px;background:var(--panel);padding:12px;margin-bottom:12px;max-width:720px;}
+  .plabel{font-size:11px;font-weight:700;letter-spacing:1.5px;margin-bottom:6px;}
+  .note{font-size:10px;color:var(--dim);line-height:1.6;margin:4px 0 10px;}
+  .note b{color:var(--text);}
+  .stage{width:100%;aspect-ratio:1/1;max-width:420px;touch-action:none;background:var(--panel2);
+         border:1px solid var(--edge);border-radius:8px;display:block;margin:0 auto;cursor:grab;}
+  .ctrls{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:10px 0 6px;}
+  select{font-family:inherit;font-size:11px;background:var(--panel2);color:var(--text);
+         border:1px solid var(--edge);border-radius:4px;padding:6px;flex:1;min-width:180px;}
+  .readout{font-size:10.5px;line-height:1.85;margin-top:8px;}
+  .readout .in{color:var(--acc);font-weight:700;}
+  .readout .out{color:var(--dim);}
+  .stat{font-size:10px;color:var(--dim);margin-top:6px;}
+  .stat b{color:var(--text);}
+  .keyrow{display:flex;gap:12px;flex-wrap:wrap;font-size:9.5px;color:var(--dim);margin-top:8px;}
+  .key{display:flex;align-items:center;gap:5px;}
+  .sw{width:14px;height:3px;border-radius:2px;display:inline-block;}
+  ul{margin:6px 0 0 16px;padding:0;font-size:10px;color:var(--dim);line-height:1.7;}
+  li{margin-bottom:3px;}
+  li b{color:var(--text);}
+</style>
+</head>
+<body data-theme="dark" data-pal="cad">
+<div class="hdr">
+  <div class="title">PIPEGRID — POSE GIZMO</div>
+  <div class="sub">choosing an orientation by thumb · mockup, not wired to the app</div>
+  <button class="btn spacer" id="palbtn">PALETTE: CAD</button>
+  <button class="btn" id="themebtn">LIGHT</button>
+</div>
+
+<div class="panel">
+  <div class="plabel">THE GIZMO</div>
+  <div class="note">Three rings, one per grid axis. <b>Drag a ring</b> to turn the part about that axis —
+  it snaps in quarter turns, because those are the only orientations that exist. The rings are the
+  pose system's own generators, so this control physically cannot produce an invalid pose: every
+  quarter turn lands on one of the 24. <b>Drag the arrows</b> to shift the part a whole cell.
+  <b>Drag anywhere else</b> to orbit the camera — that's your viewpoint moving, not the part.
+  Rings stay locked to the grid's axes rather than tumbling with the part, so a given ring always
+  means the same real-world axis.</div>
+
+  <div class="ctrls">
+    <select id="partSel"></select>
+    <button class="btn" id="resetBtn">RESET</button>
+  </div>
+
+  <svg class="stage" id="stage" viewBox="-200 -200 400 400"></svg>
+
+  <div class="keyrow">
+    <div class="key"><span class="sw" style="background:var(--ax)"></span>E–W axis</div>
+    <div class="key"><span class="sw" style="background:var(--ay)"></span>N–S axis</div>
+    <div class="key"><span class="sw" style="background:var(--az)"></span>U–D axis</div>
+    <div class="key"><span class="sw" style="background:var(--acc)"></span>inlet</div>
+    <div class="key"><span class="sw" style="background:var(--out)"></span>outlet</div>
+  </div>
+
+  <div class="stat" id="stat"></div>
+  <div class="readout" id="portRead"></div>
+</div>
+
+<div class="panel">
+  <div class="plabel">DECISIONS BAKED IN HERE — OVERRULE ANY OF THEM</div>
+  <ul>
+    <li><b>Quarter-turn snapping, not free spin.</b> Only 24 orientations exist, so continuous
+        rotation would mean nothing. The part jumps as you drag rather than following your finger
+        smoothly.</li>
+    <li><b>Rings are world-aligned.</b> They stay on the grid's axes instead of tumbling with the
+        part, so the same ring always means the same real axis. The alternative (rings follow the
+        part) is the other common CAD convention — worth trying if this feels wrong.</li>
+    <li><b>Ring colour sits outside the mark grammar.</b> Pipe-coloured means structure and amber
+        means flow; these rings mean neither, which is why they get their own colours. The argument
+        is that a gizmo is transient UI, not part of the drawing. The PALETTE button up top swaps
+        between classic CAD red/green/blue and a quieter set tuned to the app — judge which one
+        belongs in a drawing-office instrument.</li>
+    <li><b>The far half of each ring is dimmed</b> so you can read which way it faces in depth. Rings
+        seen edge-on stay grabbable — the hit area doesn't collapse with the drawing.</li>
+    <li><b>Translation is whole cells only</b>, along one axis at a time, matching how the grid
+        works. No free positioning.</li>
+  </ul>
+</div>
+
+<script>
+(function(){
+'use strict';
+var NS='http://www.w3.org/2000/svg';
+var DIRS=['N','E','S','W','U','D'];
+var V={N:[0,1,0],S:[0,-1,0],E:[1,0,0],W:[-1,0,0],U:[0,0,1],D:[0,0,-1]};
+var OPP={N:'S',S:'N',E:'W',W:'E',U:'D',D:'U'};
+var PR=0.78, CELL=2.0;
+
+/* ---------- matrices ---------- */
+function mul(A,B){var R=[[0,0,0],[0,0,0],[0,0,0]];
+  for(var i=0;i<3;i++)for(var j=0;j<3;j++){var s=0;for(var k=0;k<3;k++)s+=A[i][k]*B[k][j];R[i][j]=Math.round(s);}
+  return R;}
+function ap(M,p){return [M[0][0]*p[0]+M[0][1]*p[1]+M[0][2]*p[2],
+                         M[1][0]*p[0]+M[1][1]*p[1]+M[1][2]*p[2],
+                         M[2][0]*p[0]+M[2][1]*p[1]+M[2][2]*p[2]];}
+function mkey(M){return M.map(function(r){return r.join(',');}).join('|');}
+var ID=[[1,0,0],[0,1,0],[0,0,1]];
+var RX=[[1,0,0],[0,0,-1],[0,1,0]];        // about E–W
+var RY=[[0,0,1],[0,1,0],[-1,0,0]];        // about N–S
+var RZ=[[0,-1,0],[1,0,0],[0,0,1]];        // about U–D
+var AXES=[{id:'x',M:RX,ring:function(t){return [0,Math.cos(t),Math.sin(t)];},col:'var(--ax)',name:'E–W'},
+          {id:'y',M:RY,ring:function(t){return [Math.cos(t),0,Math.sin(t)];},col:'var(--ay)',name:'N–S'},
+          {id:'z',M:RZ,ring:function(t){return [Math.cos(t),Math.sin(t),0];},col:'var(--az)',name:'U–D'}];
+
+var ROTS=(function(){var seen={},L=[];seen[mkey(ID)]=1;L.push(ID);var f=[ID];
+  while(f.length){var n=[];f.forEach(function(M){[RZ,RX].forEach(function(G){
+    var M2=mul(G,M),k=mkey(M2);if(!seen[k]){seen[k]=1;L.push(M2);n.push(M2);}});});f=n;}
+  return L;})();
+function poseIndex(M){var k=mkey(M);for(var i=0;i<ROTS.length;i++) if(mkey(ROTS[i])===k) return i;return -1;}
+
+/* ---------- parts (construction rule generates the channels) ---------- */
+function P(spec){return spec.split(' ').map(function(t){
+  return {dir:t.slice(0,-1), role:t.slice(-1)==='+'?'in':'out'};});}
+function streamsFor(ports){
+  var ins=ports.filter(function(p){return p.role==='in';});
+  var outs=ports.filter(function(p){return p.role==='out';});
+  var o=[];
+  ins.forEach(function(i){outs.forEach(function(u){
+    o.push({type:OPP[i.dir]===u.dir?'straight':'elbow',from:i.dir,to:u.dir});});});
+  return o;
+}
+var PARTS=[
+  {name:'corner — split (the slice part)', spec:'N+ E- U-'},
+  {name:'elbow — directional',             spec:'N+ E-'},
+  {name:'straight — directional',          spec:'N+ S-'},
+  {name:'T — tsplit (anchor on run)',      spec:'N+ S- E-'},
+  {name:'T — tsplitb (Y, anchor branch)',  spec:'E+ N- S-'},
+  {name:'corner-through — ARM in (tripod)',spec:'E+ N- S- U-'},
+  {name:'five-way — apex split',           spec:'U+ N- E- S- W-'},
+  {name:'six-way — 3-in-3-out corner-type',spec:'N+ E+ U+ S- W- D-'}
+];
+PARTS.forEach(function(p){p.ports=P(p.spec);p.streams=streamsFor(p.ports);});
+
+function distinctPoses(ports){
+  var seen={},n=0;
+  ROTS.forEach(function(M){
+    var b={};ports.forEach(function(p){
+      var w=ap(M,V[p.dir]);
+      var d=DIRS.filter(function(x){var v=V[x];return v[0]===w[0]&&v[1]===w[1]&&v[2]===w[2];})[0];
+      b[d]=p.role;});
+    var k=DIRS.map(function(d){return b[d]?d+':'+b[d]:'';}).join(',');
+    if(!seen[k]){seen[k]=1;n++;}
+  });
+  return n;
+}
+
+/* ---------- geometry ---------- */
+function straightPts(a,b){var u=V[a],v=V[b];
+  return [[u[0]*PR,u[1]*PR,u[2]*PR],[v[0]*PR,v[1]*PR,v[2]*PR]];}
+function elbowPts(a,b,n){var u=V[a],v=V[b],o=[];
+  for(var i=0;i<=n;i++){var t=(i/n)*(Math.PI/2),s=Math.sin(t),c=Math.cos(t);
+    o.push([PR*(u[0]+v[0])-PR*(s*u[0]+c*v[0]),
+            PR*(u[1]+v[1])-PR*(s*u[1]+c*v[1]),
+            PR*(u[2]+v[2])-PR*(s*u[2]+c*v[2])]);}
+  return o;}
+
+/* ---------- camera ---------- */
+var az=0.72, el=-0.46;
+function cam(p){
+  var ca=Math.cos(az),sa=Math.sin(az);
+  var x=p[0]*ca-p[1]*sa, y=p[0]*sa+p[1]*ca, z=p[2];
+  var ce=Math.cos(el),se=Math.sin(el);
+  return [x, y*ce-z*se, y*se+z*ce];
+}
+function proj(p){var s=74;return {x:p[0]*s, y:-p[2]*s-p[1]*s*0.3, d:p[1]};}
+function pc(p){return proj(cam(p));}
+
+/* ---------- state ---------- */
+var stage=document.getElementById('stage');
+var partIdx=0, pose=ID, cellPos=[0,0,0];
+var drag=null;
+
+var sel=document.getElementById('partSel');
+PARTS.forEach(function(p,i){var o=document.createElement('option');o.value=i;o.textContent=p.name;sel.appendChild(o);});
+
+/* ---------- ring sampling ---------- */
+var RING_R=1.5, RING_N=72;
+function ringPoints(axis){
+  var pts=[];
+  for(var i=0;i<=RING_N;i++){
+    var t=(i/RING_N)*Math.PI*2, u=axis.ring(t);
+    pts.push([u[0]*RING_R+cellPos[0]*CELL, u[1]*RING_R+cellPos[1]*CELL, u[2]*RING_R+cellPos[2]*CELL]);
+  }
+  return pts;
+}
+var ARROW_L=2.35;
+function arrowEnds(axis){
+  var u=axis.id==='x'?[1,0,0]:axis.id==='y'?[0,1,0]:[0,0,1];
+  var b=[cellPos[0]*CELL,cellPos[1]*CELL,cellPos[2]*CELL];
+  return [[b[0]+u[0]*ARROW_L,b[1]+u[1]*ARROW_L,b[2]+u[2]*ARROW_L],
+          [b[0]-u[0]*ARROW_L,b[1]-u[1]*ARROW_L,b[2]-u[2]*ARROW_L]];
+}
+
+/* ---------- render ---------- */
+function el2(tag,attrs){var e=document.createElementNS(NS,tag);
+  for(var k in attrs) e.setAttribute(k,attrs[k]); return e;}
+
+function render(){
+  while(stage.firstChild) stage.removeChild(stage.firstChild);
+  var part=PARTS[partIdx];
+  var off=[cellPos[0]*CELL,cellPos[1]*CELL,cellPos[2]*CELL];
+
+  // neighbouring cell floor grid
+  for(var gx=-1;gx<=1;gx++)for(var gy=-1;gy<=1;gy++){
+    var c=[gx*CELL,gy*CELL,-CELL/2];
+    var q=[[c[0]-CELL/2,c[1]-CELL/2,c[2]],[c[0]+CELL/2,c[1]-CELL/2,c[2]],
+           [c[0]+CELL/2,c[1]+CELL/2,c[2]],[c[0]-CELL/2,c[1]+CELL/2,c[2]]].map(pc);
+    stage.appendChild(el2('path',{d:'M '+q.map(function(p){return p.x.toFixed(1)+' '+p.y.toFixed(1);}).join(' L ')+' Z',
+      fill:'none',stroke:'var(--grid)','stroke-width':1}));
+  }
+
+  var items=[];
+
+  // the part
+  part.streams.forEach(function(s){
+    var p3=(s.type==='straight'?straightPts(s.from,s.to):elbowPts(s.from,s.to,14))
+             .map(function(p){var w=ap(pose,p);return [w[0]+off[0],w[1]+off[1],w[2]+off[2]];});
+    var vw=p3.map(cam);
+    items.push({d:vw.reduce(function(a,p){return a+p[1];},0)/vw.length, kind:'chan', pts:vw.map(proj)});
+  });
+  part.ports.forEach(function(p){
+    var v=V[p.dir], w=ap(pose,[v[0]*PR,v[1]*PR,v[2]*PR]);
+    var vw=cam([w[0]+off[0],w[1]+off[1],w[2]+off[2]]);
+    items.push({d:vw[1],kind:'port',pt:proj(vw),role:p.role});
+  });
+  items.sort(function(a,b){return a.d-b.d;});
+  items.forEach(function(it){
+    if(it.kind==='chan'){
+      stage.appendChild(el2('path',{d:'M '+it.pts.map(function(p){return p.x.toFixed(1)+' '+p.y.toFixed(1);}).join(' L '),
+        fill:'none',stroke:'var(--text)','stroke-width':6,'stroke-linecap':'round',opacity:0.55}));
+    } else {
+      stage.appendChild(el2('circle',{cx:it.pt.x.toFixed(1),cy:it.pt.y.toFixed(1),r:9,
+        fill:it.role==='in'?'var(--acc)':'var(--out)',stroke:'var(--panel2)','stroke-width':2}));
+    }
+  });
+
+  // translate arrows (drawn under rings)
+  AXES.forEach(function(axis){
+    var e=arrowEnds(axis).map(pc);
+    stage.appendChild(el2('line',{x1:e[0].x.toFixed(1),y1:e[0].y.toFixed(1),
+      x2:e[1].x.toFixed(1),y2:e[1].y.toFixed(1),stroke:axis.col,'stroke-width':1.5,
+      opacity:(drag&&drag.type==='move'&&drag.axis.id===axis.id)?0.95:0.35,'stroke-dasharray':'3 4'}));
+    e.forEach(function(p){
+      stage.appendChild(el2('rect',{x:(p.x-4).toFixed(1),y:(p.y-4).toFixed(1),width:8,height:8,
+        fill:axis.col,opacity:(drag&&drag.type==='move'&&drag.axis.id===axis.id)?1:0.6,
+        transform:'rotate(45 '+p.x.toFixed(1)+' '+p.y.toFixed(1)+')'}));
+    });
+  });
+
+  // rotation rings — far half dimmed so depth reads
+  AXES.forEach(function(axis){
+    var pts=ringPoints(axis).map(function(p){return {v:cam(p)};});
+    pts.forEach(function(o){o.p=proj(o.v);});
+    var active=drag&&drag.type==='rot'&&drag.axis.id===axis.id;
+    var segs=[[]];
+    for(var i=0;i<pts.length;i++){
+      var far=pts[i].v[1]>0.02;
+      if(i>0 && far!==(pts[i-1].v[1]>0.02)) segs.push([]);
+      segs[segs.length-1].push({p:pts[i].p,far:far});
+    }
+    segs.forEach(function(sg){
+      if(sg.length<2) return;
+      stage.appendChild(el2('path',{d:'M '+sg.map(function(o){return o.p.x.toFixed(1)+' '+o.p.y.toFixed(1);}).join(' L '),
+        fill:'none',stroke:axis.col,'stroke-width':active?5:3,
+        opacity:sg[0].far?(active?0.4:0.18):(active?1:0.7),'stroke-linecap':'round'}));
+    });
+  });
+
+  var np=distinctPoses(part.ports);
+  document.getElementById('stat').innerHTML =
+    'pose <b>'+(poseIndex(pose)+1)+'</b> of 24 raw · this part has <b>'+np+'</b> distinct orientations · '+
+    'cell <b>'+cellPos.join(', ')+'</b>' + (drag? ' · <b>'+(drag.type==='rot'?('turning '+drag.axis.name):'moving '+drag.axis.name)+'</b>':'');
+  document.getElementById('portRead').innerHTML = part.ports.map(function(p){
+    var w=ap(pose,V[p.dir]);
+    var d=DIRS.filter(function(x){var v=V[x];return v[0]===w[0]&&v[1]===w[1]&&v[2]===w[2];})[0];
+    return '<div><span class="'+(p.role==='in'?'in':'out')+'">'+p.dir+' (home) → '+d+' (world)</span> · '+p.role+'</div>';
+  }).join('');
+}
+
+/* ---------- hit testing ---------- */
+function svgPt(ev){
+  var r=stage.getBoundingClientRect();
+  var vb=stage.viewBox.baseVal;
+  return {x:(ev.clientX-r.left)/r.width*vb.width+vb.x,
+          y:(ev.clientY-r.top)/r.height*vb.height+vb.y};
+}
+function hitRing(pt){
+  var best=null;
+  AXES.forEach(function(axis){
+    var pts=ringPoints(axis);
+    for(var i=0;i<pts.length;i++){
+      var p=pc(pts[i]);
+      var dd=Math.hypot(p.x-pt.x,p.y-pt.y);
+      if(dd<14 && (!best||dd<best.dist)) best={axis:axis,dist:dd,idx:i,pts:pts};
+    }
+  });
+  return best;
+}
+function hitArrow(pt){
+  var best=null;
+  AXES.forEach(function(axis){
+    arrowEnds(axis).forEach(function(e,k){
+      var p=pc(e);
+      var dd=Math.hypot(p.x-pt.x,p.y-pt.y);
+      if(dd<15 && (!best||dd<best.dist)) best={axis:axis,dist:dd,sign:k===0?1:-1};
+    });
+  });
+  return best;
+}
+// screen-space tangent of the ring at index i
+function ringTangent(pts,i){
+  var a=pc(pts[(i-1+pts.length)%pts.length]), b=pc(pts[(i+1)%pts.length]);
+  var dx=b.x-a.x, dy=b.y-a.y, m=Math.hypot(dx,dy)||1;
+  return {x:dx/m,y:dy/m};
+}
+
+stage.addEventListener('pointerdown',function(ev){
+  var pt=svgPt(ev);
+  stage.setPointerCapture(ev.pointerId);
+  var r=hitRing(pt), a=hitArrow(pt);
+  if(a && (!r || a.dist<r.dist)){
+    drag={type:'move',axis:a.axis,sign:a.sign,start:pt,base:cellPos.slice(),acc:0};
+  } else if(r){
+    drag={type:'rot',axis:r.axis,start:pt,basePose:pose,tan:ringTangent(r.pts,r.idx),acc:0,steps:0};
+  } else {
+    drag={type:'cam',start:pt,az0:az,el0:el,lx:ev.clientX,ly:ev.clientY};
+  }
+  render();
+});
+stage.addEventListener('pointermove',function(ev){
+  if(!drag) return;
+  if(drag.type==='cam'){
+    az+=(ev.clientX-drag.lx)*0.01; el+=(ev.clientY-drag.ly)*0.01;
+    drag.lx=ev.clientX; drag.ly=ev.clientY; render(); return;
+  }
+  var pt=svgPt(ev);
+  var dx=pt.x-drag.start.x, dy=pt.y-drag.start.y;
+  if(drag.type==='rot'){
+    var along=dx*drag.tan.x+dy*drag.tan.y;         // travel along the ring
+    var steps=Math.round(along/46);                 // one quarter turn per ~46 units
+    if(steps!==drag.steps){
+      drag.steps=steps;
+      var M=drag.basePose, n=((steps%4)+4)%4;
+      for(var i=0;i<n;i++) M=mul(drag.axis.M,M);
+      pose=M; render();
+    }
+  } else {
+    var ax=drag.axis.id==='x'?0:drag.axis.id==='y'?1:2;
+    var ref=pc([ax===0?1:0,ax===1?1:0,ax===2?1:0]), org=pc([0,0,0]);
+    var ux=ref.x-org.x, uy=ref.y-org.y, m=Math.hypot(ux,uy)||1;
+    var along=(dx*ux+dy*uy)/m;
+    var steps=Math.round(along/40);
+    var next=drag.base.slice(); next[ax]=Math.max(-1,Math.min(1,drag.base[ax]+steps));
+    if(next[ax]!==cellPos[ax]){ cellPos=next; render(); }
+  }
+});
+function endDrag(){ if(drag){ drag=null; render(); } }
+stage.addEventListener('pointerup',endDrag);
+stage.addEventListener('pointercancel',endDrag);
+
+sel.addEventListener('change',function(){partIdx=+sel.value;pose=ID;cellPos=[0,0,0];render();});
+document.getElementById('resetBtn').addEventListener('click',function(){pose=ID;cellPos=[0,0,0];render();});
+document.getElementById('palbtn').addEventListener('click',function(){
+  var quiet=document.body.getAttribute('data-pal')==='quiet';
+  document.body.setAttribute('data-pal',quiet?'cad':'quiet');
+  this.textContent='PALETTE: '+(quiet?'CAD':'QUIET');
+});
+document.getElementById('themebtn').addEventListener('click',function(){
+  var light=document.body.getAttribute('data-theme')==='light';
+  document.body.setAttribute('data-theme',light?'dark':'light');
+  this.textContent=light?'LIGHT':'DARK';
+});
+
+render();
+})();
+</script>
+</body>
+</html>
