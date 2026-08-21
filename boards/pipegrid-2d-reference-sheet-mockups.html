@@ -305,23 +305,34 @@ function drawIsoPanel(svg,x,y,w,h,label){
       stroke:LINE,'stroke-width':0.75,opacity:0.5}));
   }
 
+  // Depth-sort at the CELL level first, fine per-point depth only breaks ties
+  // within the same cell. Sorting on fine depth alone falls apart at steep
+  // elevation: near top-down, every cell sits at nearly the same distance from
+  // the camera, so individual channel segments from DIFFERENT parts can outrank
+  // each other on tiny local variation and interleave — a channel from the back
+  // row drawing in front of one from the front row. That reads as the whole
+  // layer flipping, even though nothing in the rotation itself is discontinuous.
+  // Grouping by cell first guarantees each part always draws as one coherent
+  // unit relative to its neighbours, at any angle.
   var items=[];
   LAYOUT.forEach(function(item){
     var off=cellOff(item.r,item.c);
+    var cellDepth=place(off).depth;
     item.streams.forEach(function(st){
       var p3=(st.type==='straight'?straight3(st.from,st.to):elbow3(st.from,st.to,14))
         .map(function(p){return [p[0]+off[0],p[1]+off[1],p[2]+off[2]];});
       var pts=p3.map(place);
-      items.push({depth:pts.reduce(function(a,p){return a+p.depth;},0)/pts.length, kind:'chan', pts:pts});
+      items.push({cellDepth:cellDepth, depth:pts.reduce(function(a,p){return a+p.depth;},0)/pts.length,
+        kind:'chan', pts:pts});
     });
     item.ports.forEach(function(p){
       var v=V[p.dir];
       var w3=[v[0]*PR+off[0],v[1]*PR+off[1],v[2]*PR+off[2]];
       var pt=place(w3);
-      items.push({depth:pt.depth, kind:'port', pt:pt, role:p.role});
+      items.push({cellDepth:cellDepth, depth:pt.depth, kind:'port', pt:pt, role:p.role});
     });
   });
-  items.sort(function(a,b){return a.depth-b.depth;});
+  items.sort(function(a,b){return (a.cellDepth-b.cellDepth)||(a.depth-b.depth);});
   items.forEach(function(it){
     if(it.kind==='chan'){
       svg.appendChild(el('path',{d:'M '+it.pts.map(function(p){return p.x.toFixed(1)+' '+p.y.toFixed(1);}).join(' L '),
