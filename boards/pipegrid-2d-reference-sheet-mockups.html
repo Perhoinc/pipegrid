@@ -23,6 +23,9 @@
   .field{display:flex;flex-direction:column;}
   input[type=text]{font-family:inherit;font-size:11px;background:var(--bg);color:var(--text);
        border:1px solid var(--edge);border-radius:4px;padding:6px 8px;min-width:160px;}
+  .slidefield{display:flex;flex-direction:column;min-width:190px;}
+  .slidefield .readout{font-size:9.5px;color:var(--acc);font-variant-numeric:tabular-nums;}
+  input[type=range]{width:100%;accent-color:var(--acc);}
   .btn{font-family:inherit;font-size:10px;letter-spacing:.5px;text-transform:uppercase;
        padding:8px 11px;border:1px solid var(--edge);border-radius:4px;background:transparent;
        color:var(--text);cursor:pointer;align-self:flex-end;}
@@ -64,12 +67,24 @@
     <button class="btn primary" id="pngBtn">EXPORT PNG</button>
     <button class="btn" id="printBtn">PRINT / SAVE AS PDF</button>
   </div>
+  <div class="ctrls">
+    <div class="slidefield">
+      <label>Iso elevation (roll toward viewer) <span class="readout" id="elRead"></span></label>
+      <input type="range" id="elSlider" min="-85" max="5" step="1" />
+    </div>
+    <div class="slidefield">
+      <label>Iso azimuth (turn) <span class="readout" id="azRead"></span></label>
+      <input type="range" id="azSlider" min="-180" max="180" step="1" />
+    </div>
+    <button class="btn" id="angleReset">RESET TO DEFAULT</button>
+  </div>
   <div id="sheetWrap">
     <svg id="sheet" viewBox="0 0 1000 760" xmlns="http://www.w3.org/2000/svg"></svg>
   </div>
-  <div class="note" style="margin-top:10px;">Isometric angle is fixed, not draggable — this is meant
-  to be a standard, repeatable view like a real isometric drawing, not an exploration tool (that's
-  what the 3D working view is for). If you want it adjustable, say so and I'll add it.</div>
+  <div class="note" style="margin-top:10px;">Mockup-only sliders — for the real app the isometric
+  angle is meant to be one fixed, repeatable view like a real engineering drawing, not something you
+  adjust per layer. Find the angle that reads clearest here and tell me the numbers in the readout;
+  that becomes the new permanent default, and the sliders go away.</div>
 </div>
 
 <div class="panel">
@@ -146,7 +161,9 @@ var SHEET_W=1000, SHEET_H=760, MARGIN=22;
 var TB_H=76;                       // title block height
 var GAP=14;
 
-var state={jobName:'', layerName:'Layer 2 of 5', showIso:true};
+var DEFAULT_AZ_DEG=+(0.72*180/Math.PI).toFixed(1), DEFAULT_EL_DEG=+(-0.5*180/Math.PI).toFixed(1);
+var state={jobName:'', layerName:'Layer 2 of 5', showIso:true,
+           isoAzDeg:DEFAULT_AZ_DEG, isoElDeg:DEFAULT_EL_DEG};
 
 function render(){
   var svg=document.getElementById('sheet');
@@ -251,12 +268,15 @@ function drawPlanPanel(svg,x,y,w,h,label){
   });
 }
 
-/* ---------- isometric panel: the whole layer, one fixed standard view ---------- */
-var ISO_AZ=0.72, ISO_EL=-0.5, CELL=2.0;
+/* ---------- isometric panel: the whole layer ---------- */
+// Mockup-only: angle is adjustable via the sliders so the owner can find the clearest
+// view by eye. In the real app this becomes one fixed constant, no slider.
+var CELL=2.0;
 function isoProject(p){
-  var ca=Math.cos(ISO_AZ),sa=Math.sin(ISO_AZ);
+  var az=state.isoAzDeg*Math.PI/180, el=state.isoElDeg*Math.PI/180;
+  var ca=Math.cos(az),sa=Math.sin(az);
   var x=p[0]*ca-p[1]*sa, y=p[0]*sa+p[1]*ca, z=p[2];
-  var ce=Math.cos(ISO_EL),se=Math.sin(ISO_EL);
+  var ce=Math.cos(el),se=Math.sin(el);
   var y2=y*ce-z*se, z2=y*se+z*ce;
   return {vx:x, vy:y2, vz:z2};
 }
@@ -370,6 +390,21 @@ document.getElementById('isoToggle').addEventListener('click',function(){
 });
 document.getElementById('pngBtn').addEventListener('click',exportPNG);
 document.getElementById('printBtn').addEventListener('click',function(){ window.print(); });
+
+var elSlider=document.getElementById('elSlider'), azSlider=document.getElementById('azSlider');
+var elRead=document.getElementById('elRead'), azRead=document.getElementById('azRead');
+function syncAngleReadouts(){
+  elRead.textContent=state.isoElDeg+'°'; azRead.textContent=state.isoAzDeg+'°';
+}
+elSlider.value=state.isoElDeg; azSlider.value=state.isoAzDeg;
+syncAngleReadouts();
+elSlider.addEventListener('input',function(){ state.isoElDeg=+this.value; syncAngleReadouts(); render(); });
+azSlider.addEventListener('input',function(){ state.isoAzDeg=+this.value; syncAngleReadouts(); render(); });
+document.getElementById('angleReset').addEventListener('click',function(){
+  state.isoAzDeg=DEFAULT_AZ_DEG; state.isoElDeg=DEFAULT_EL_DEG;
+  elSlider.value=state.isoElDeg; azSlider.value=state.isoAzDeg;
+  syncAngleReadouts(); render();
+});
 
 render();
 window.__pgSheet={render:render,state:state,exportPNG:exportPNG,LAYOUT:LAYOUT,SHEET_W:SHEET_W,SHEET_H:SHEET_H};
