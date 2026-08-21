@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>PIPEGRID — engineering drawing sheet mockup</title>
+<style>
+  :root{ --bg:#0b0d10; --panel:#12151b; --edge:#2c313d; --text:#c7d3e2; --dim:#5f6775; --acc:#e0a14e; }
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  body{background:var(--bg);color:var(--text);
+       font-family:ui-monospace,SFMono-Regular,Menlo,monospace;-webkit-text-size-adjust:100%;
+       padding:14px;padding-bottom:60px;}
+  .hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:10px;flex-wrap:wrap;}
+  .title{font-size:15px;font-weight:700;letter-spacing:2px;}
+  .sub{font-size:9px;letter-spacing:1px;color:var(--dim);}
+  .panel{border:1px solid var(--edge);border-radius:8px;background:var(--panel);padding:12px;margin-bottom:12px;max-width:1060px;}
+  .plabel{font-size:11px;font-weight:700;letter-spacing:1.5px;margin-bottom:6px;}
+  .note{font-size:10px;color:var(--dim);line-height:1.65;margin:4px 0 10px;}
+  .note b{color:var(--text);}
+  .ctrls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;}
+  .ctrls label{font-size:9px;color:var(--dim);letter-spacing:.5px;text-transform:uppercase;display:block;margin-bottom:2px;}
+  .field{display:flex;flex-direction:column;}
+  input[type=text]{font-family:inherit;font-size:11px;background:var(--bg);color:var(--text);
+       border:1px solid var(--edge);border-radius:4px;padding:6px 8px;min-width:160px;}
+  .btn{font-family:inherit;font-size:10px;letter-spacing:.5px;text-transform:uppercase;
+       padding:8px 11px;border:1px solid var(--edge);border-radius:4px;background:transparent;
+       color:var(--text);cursor:pointer;align-self:flex-end;}
+  .btn.on{border-color:var(--acc);color:var(--acc);}
+  .btn.primary{border-color:var(--acc);background:var(--acc);color:#1a1206;font-weight:700;}
+  #sheetWrap{background:#3a3a38;padding:16px;border-radius:6px;overflow-x:auto;}
+  #sheet{display:block;margin:0 auto;background:#f7f4ec;max-width:100%;height:auto;}
+  ul{margin:6px 0 0 15px;padding:0;font-size:10px;color:var(--dim);line-height:1.7;}
+  li{margin-bottom:4px;}
+  li b{color:var(--text);}
+  @media print{
+    body *{visibility:hidden;}
+    #sheetWrap, #sheetWrap *{visibility:visible;}
+    #sheetWrap{position:absolute;left:0;top:0;padding:0;background:#fff;width:100%;}
+    #sheet{width:100%;}
+  }
+</style>
+</head>
+<body>
+<div class="hdr">
+  <div class="title">PIPEGRID — ENGINEERING DRAWING SHEET</div>
+  <div class="sub">one exportable layer reference: plan + isometric + cut list</div>
+</div>
+
+<div class="panel">
+  <div class="plabel">WHAT CHANGED FROM THE THREE-TREATMENT BOARD</div>
+  <div class="note">Owner's verdict: treatment B (plan + thumbnail), but scaled up — one full isometric
+  view of the whole layer next to the plan, not forty-seven small per-cell ones. Title block added
+  (job, layer, date, stack position). Cut list is <b>parts only</b> now — orientation lives entirely
+  in the isometric view, not in the list. Whole sheet exports as one PNG or prints to PDF via the
+  browser's own print dialog.</div>
+</div>
+
+<div class="panel">
+  <div class="ctrls">
+    <div class="field"><label>Job name</label><input type="text" id="jobName" placeholder="e.g. Harbour piece, north wing" /></div>
+    <div class="field"><label>Layer</label><input type="text" id="layerName" value="Layer 2 of 5" /></div>
+    <button class="btn on" id="isoToggle">ISO VIEW: ON</button>
+    <button class="btn primary" id="pngBtn">EXPORT PNG</button>
+    <button class="btn" id="printBtn">PRINT / SAVE AS PDF</button>
+  </div>
+  <div id="sheetWrap">
+    <svg id="sheet" viewBox="0 0 1000 760" xmlns="http://www.w3.org/2000/svg"></svg>
+  </div>
+  <div class="note" style="margin-top:10px;">Isometric angle is fixed, not draggable — this is meant
+  to be a standard, repeatable view like a real isometric drawing, not an exploration tool (that's
+  what the 3D working view is for). If you want it adjustable, say so and I'll add it.</div>
+</div>
+
+<div class="panel">
+  <div class="plabel">STILL OPEN</div>
+  <ul>
+    <li><b>Stack diagram is demo data</b> — 5 layers, current = 2, hardcoded. The real app would
+        drive this from <code>state.layer</code> and however many layers the board actually uses.</li>
+    <li><b>A part spanning two layers</b> still needs to appear on both sheets somehow — unresolved,
+        carried over from the last board.</li>
+    <li><b>PDF, specifically:</b> there's no PDF library in a single dependency-free HTML file, so
+        "Print / Save as PDF" uses the browser's own print dialog — on iPad Safari that's Share →
+        Print → pinch to preview → Save to Files, which does produce a real PDF. PNG export is
+        instant and needs no dialog. Worth confirming this two-path approach is acceptable, or
+        whether a direct one-tap PDF matters enough to be worth a real dependency.</li>
+  </ul>
+</div>
+
+<script>
+(function(){
+'use strict';
+var NS='http://www.w3.org/2000/svg';
+var V={N:[0,1,0],S:[0,-1,0],E:[1,0,0],W:[-1,0,0],U:[0,0,1],D:[0,0,-1]};
+var OPP={N:'S',S:'N',E:'W',W:'E',U:'D',D:'U'};
+var PR=0.82;
+
+var INK='#232a35', DIMC='#7a8494', LINE='#8a95a6', ACC='#c2620f', PAPER='#f7f4ec', PANELBG='#fbfaf5';
+
+function streamsFor(ports){
+  var ins=ports.filter(function(p){return p.role==='in';});
+  var outs=ports.filter(function(p){return p.role==='out';});
+  var o=[];
+  ins.forEach(function(i){outs.forEach(function(u){
+    o.push({type:OPP[i.dir]===u.dir?'straight':'elbow',from:i.dir,to:u.dir});});});
+  return o;
+}
+function P(spec){return spec.split(' ').map(function(t){
+  return {dir:t.slice(0,-1),role:t.slice(-1)==='+'?'in':'out'};});}
+function straight3(a,b){var u=V[a],v=V[b];
+  return [[u[0]*PR,u[1]*PR,u[2]*PR],[v[0]*PR,v[1]*PR,v[2]*PR]];}
+function elbow3(a,b,n){var u=V[a],v=V[b],o=[];
+  for(var i=0;i<=n;i++){var t=(i/n)*(Math.PI/2),s=Math.sin(t),c=Math.cos(t);
+    o.push([PR*(u[0]+v[0])-PR*(s*u[0]+c*v[0]),
+            PR*(u[1]+v[1])-PR*(s*u[1]+c*v[1]),
+            PR*(u[2]+v[2])-PR*(s*u[2]+c*v[2])]);}
+  return o;}
+
+// Same nine-part layer as the treatment board, kept identical so the two boards
+// stay cross-checkable against each other.
+var LAYOUT=[
+  {r:0,c:0, part:'straight',       spec:'N+ S-'},
+  {r:0,c:1, part:'elbow',          spec:'S+ E-'},
+  {r:0,c:2, part:'corner split',   spec:'W+ S- U-'},
+  {r:1,c:0, part:'T tsplit',       spec:'N+ S- E-'},
+  {r:1,c:1, part:'corner-through', spec:'N+ S- E- U-'},
+  {r:1,c:2, part:'elbow',          spec:'W+ D-'},
+  {r:2,c:0, part:'straight',       spec:'N+ S-'},
+  {r:2,c:1, part:'six-way 3-in-3-out', spec:'N+ E+ U+ S- W- D-'},
+  {r:2,c:2, part:'five-way apex split',spec:'U+ N- E- S- W-'}
+];
+LAYOUT.forEach(function(p){ p.ports=P(p.spec); p.streams=streamsFor(p.ports); });
+var GRIDN=3;
+
+function el(tag,a){var e=document.createElementNS(NS,tag);for(var k in a)e.setAttribute(k,a[k]);return e;}
+function txt(x,y,s,opt){
+  opt=opt||{};
+  var t=el('text',{x:x,y:y,'font-family':'ui-monospace,SFMono-Regular,Menlo,monospace',
+    'font-size':opt.size||11,fill:opt.fill||INK,'font-weight':opt.weight||400,
+    'text-anchor':opt.anchor||'start','letter-spacing':opt.ls||'0'});
+  t.textContent=s; return t;
+}
+
+/* ---------- sheet layout ---------- */
+var SHEET_W=1000, SHEET_H=760, MARGIN=22;
+var TB_H=76;                       // title block height
+var GAP=14;
+
+var state={jobName:'', layerName:'Layer 2 of 5', showIso:true};
+
+function render(){
+  var svg=document.getElementById('sheet');
+  while(svg.firstChild) svg.removeChild(svg.firstChild);
+  svg.setAttribute('viewBox','0 0 '+SHEET_W+' '+SHEET_H);
+
+  // paper
+  svg.appendChild(el('rect',{x:0,y:0,width:SHEET_W,height:SHEET_H,fill:PAPER}));
+  svg.appendChild(el('rect',{x:MARGIN,y:MARGIN,width:SHEET_W-2*MARGIN,height:SHEET_H-2*MARGIN,
+    fill:'none',stroke:INK,'stroke-width':1.5}));
+
+  drawTitleBlock(svg, MARGIN, MARGIN, SHEET_W-2*MARGIN, TB_H);
+
+  var mainY=MARGIN+TB_H+GAP;
+  var mainH=430;
+  if(state.showIso){
+    var half=(SHEET_W-2*MARGIN-GAP)/2;
+    drawPlanPanel(svg, MARGIN, mainY, half, mainH, 'PLAN — VIEW FROM ABOVE');
+    drawIsoPanel(svg, MARGIN+half+GAP, mainY, half, mainH, 'ISOMETRIC');
+  } else {
+    drawPlanPanel(svg, MARGIN, mainY, SHEET_W-2*MARGIN, mainH, 'PLAN — VIEW FROM ABOVE');
+  }
+
+  var cutY=mainY+mainH+GAP;
+  drawCutList(svg, MARGIN, cutY, SHEET_W-2*MARGIN, SHEET_H-MARGIN-cutY);
+}
+
+/* ---------- title block ---------- */
+function drawStackDiagram(svg, x, y, w, h){
+  var total=5, current=2;   // demo data — see "still open" note
+  var barH=(h-6)/total, barW=w*0.4;
+  for(var i=0;i<total;i++){
+    var layerNo=total-i;    // top of the stack drawn at the top
+    var by=y+i*barH;
+    var isCur=layerNo===current;
+    svg.appendChild(el('rect',{x:x,y:by,width:barW,height:barH-3,
+      fill:isCur?ACC:'none',stroke:isCur?ACC:LINE,'stroke-width':isCur?0:1,
+      opacity:isCur?0.25:1}));
+    svg.appendChild(el('rect',{x:x,y:by,width:barW,height:barH-3,
+      fill:'none',stroke:isCur?ACC:LINE,'stroke-width':isCur?1.6:1}));
+    svg.appendChild(txt(x+barW+6,by+barH-6,'L'+layerNo,{size:8.5,fill:isCur?ACC:DIMC,weight:isCur?700:400}));
+  }
+}
+function drawTitleBlock(svg,x,y,w,h){
+  svg.appendChild(el('rect',{x:x,y:y,width:w,height:h,fill:PANELBG,stroke:INK,'stroke-width':1}));
+  svg.appendChild(el('line',{x1:x+w*0.62,y1:y,x2:x+w*0.62,y2:y+h,stroke:LINE,'stroke-width':1}));
+
+  var lx=x+14;
+  svg.appendChild(txt(lx,y+22,'PIPEGRID',{size:13,weight:700,ls:'2px'}));
+  svg.appendChild(txt(lx,y+40,'JOB  '+(state.jobName||'— unnamed —'),{size:10.5,fill:state.jobName?INK:DIMC}));
+  svg.appendChild(txt(lx,y+56,(state.layerName||'—'),{size:10.5,fill:INK,weight:700}));
+  var d=new Date();
+  var iso=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  svg.appendChild(txt(lx,y+70,'DATE  '+iso,{size:9,fill:DIMC}));
+
+  svg.appendChild(txt(x+w*0.62+14,y+16,'STACK POSITION',{size:8,fill:DIMC,ls:'1px'}));
+  drawStackDiagram(svg, x+w*0.62+14, y+22, w*0.36-28, h-30);
+}
+
+/* ---------- plan panel (same grammar as treatment A) ---------- */
+function panelFrame(svg,x,y,w,h,label){
+  svg.appendChild(el('rect',{x:x,y:y,width:w,height:h,fill:PANELBG,stroke:INK,'stroke-width':1}));
+  svg.appendChild(txt(x+8,y+15,label,{size:9,fill:DIMC,ls:'1px',weight:700}));
+}
+function drawPlanPanel(svg,x,y,w,h,label){
+  panelFrame(svg,x,y,w,h,label);
+  var innerY=y+22, innerH=h-30;
+  var cs=Math.min(w-24,innerH)/GRIDN;
+  var ox=x+(w-cs*GRIDN)/2, oy=innerY+(innerH-cs*GRIDN)/2;
+  function ctrOf(r,c){ return {x:ox+c*cs+cs/2, y:oy+r*cs+cs/2}; }
+  for(var r=0;r<GRIDN;r++)for(var c=0;c<GRIDN;c++){
+    svg.appendChild(el('rect',{x:ox+c*cs,y:oy+r*cs,width:cs,height:cs,fill:'none',
+      stroke:LINE,'stroke-width':0.75,opacity:0.55}));
+  }
+  function planPt(p,ctr){ return {x:ctr.x+p[0]*(cs/2), y:ctr.y-p[1]*(cs/2)}; }
+
+  LAYOUT.forEach(function(item){
+    var ctr=ctrOf(item.r,item.c);
+    var up=item.ports.filter(function(p){return p.dir==='U';})[0];
+    var dn=item.ports.filter(function(p){return p.dir==='D';})[0];
+    if(dn){
+      svg.appendChild(el('circle',{cx:ctr.x,cy:ctr.y,r:cs*0.16,fill:'none',stroke:LINE,'stroke-width':2,opacity:0.6}));
+    }
+    item.streams.forEach(function(s){
+      var p3=s.type==='straight'?straight3(s.from,s.to):elbow3(s.from,s.to,16);
+      var pts=p3.map(function(p){return planPt(p,ctr);});
+      var span=Math.max.apply(null,pts.map(function(p){return Math.hypot(p.x-ctr.x,p.y-ctr.y);}));
+      if(span<3) return;
+      svg.appendChild(el('path',{d:'M '+pts.map(function(p){return p.x.toFixed(1)+' '+p.y.toFixed(1);}).join(' L '),
+        fill:'none',stroke:INK,'stroke-width':4,'stroke-linecap':'round','stroke-linejoin':'round'}));
+    });
+    item.ports.forEach(function(p){
+      if(p.dir==='U'||p.dir==='D') return;
+      var v=V[p.dir], q=planPt([v[0]*PR,v[1]*PR,v[2]*PR],ctr);
+      svg.appendChild(el('circle',{cx:q.x.toFixed(1),cy:q.y.toFixed(1),r:3.4,
+        fill:p.role==='in'?ACC:PANELBG,stroke:INK,'stroke-width':1.6}));
+    });
+    if(up){
+      svg.appendChild(el('circle',{cx:ctr.x,cy:ctr.y,r:cs*0.11,fill:PANELBG,stroke:up.role==='in'?ACC:INK,'stroke-width':1.8}));
+      svg.appendChild(el('circle',{cx:ctr.x,cy:ctr.y,r:2,fill:up.role==='in'?ACC:INK}));
+    }
+  });
+}
+
+/* ---------- isometric panel: the whole layer, one fixed standard view ---------- */
+var ISO_AZ=0.72, ISO_EL=-0.5, CELL=2.0;
+function isoProject(p){
+  var ca=Math.cos(ISO_AZ),sa=Math.sin(ISO_AZ);
+  var x=p[0]*ca-p[1]*sa, y=p[0]*sa+p[1]*ca, z=p[2];
+  var ce=Math.cos(ISO_EL),se=Math.sin(ISO_EL);
+  var y2=y*ce-z*se, z2=y*se+z*ce;
+  return {vx:x, vy:y2, vz:z2};
+}
+function drawIsoPanel(svg,x,y,w,h,label){
+  panelFrame(svg,x,y,w,h,label);
+  var innerY=y+22, innerH=h-30;
+  var s=Math.min(w,innerH)/(GRIDN*CELL*1.9);
+  var ctr={x:x+w/2, y:innerY+innerH*0.56};
+  function place(p3){
+    var v=isoProject(p3);
+    return {x:ctr.x+v.vx*s, y:ctr.y-v.vz*s-v.vy*s*0.32, depth:v.vy};
+  }
+  function cellOff(r,c){
+    return [(c-(GRIDN-1)/2)*CELL, ((GRIDN-1)/2-r)*CELL, 0];
+  }
+
+  // floor mesh, one connected grid rather than nine loose tiles
+  var half=GRIDN*CELL/2, z0=-CELL/2;
+  for(var i=0;i<=GRIDN;i++){
+    var gx=-half+i*CELL;
+    var a=place([gx,-half,z0]), b=place([gx,half,z0]);
+    svg.appendChild(el('line',{x1:a.x.toFixed(1),y1:a.y.toFixed(1),x2:b.x.toFixed(1),y2:b.y.toFixed(1),
+      stroke:LINE,'stroke-width':0.75,opacity:0.5}));
+    var c1=place([-half,gx,z0]), c2=place([half,gx,z0]);
+    svg.appendChild(el('line',{x1:c1.x.toFixed(1),y1:c1.y.toFixed(1),x2:c2.x.toFixed(1),y2:c2.y.toFixed(1),
+      stroke:LINE,'stroke-width':0.75,opacity:0.5}));
+  }
+
+  var items=[];
+  LAYOUT.forEach(function(item){
+    var off=cellOff(item.r,item.c);
+    item.streams.forEach(function(st){
+      var p3=(st.type==='straight'?straight3(st.from,st.to):elbow3(st.from,st.to,14))
+        .map(function(p){return [p[0]+off[0],p[1]+off[1],p[2]+off[2]];});
+      var pts=p3.map(place);
+      items.push({depth:pts.reduce(function(a,p){return a+p.depth;},0)/pts.length, kind:'chan', pts:pts});
+    });
+    item.ports.forEach(function(p){
+      var v=V[p.dir];
+      var w3=[v[0]*PR+off[0],v[1]*PR+off[1],v[2]*PR+off[2]];
+      var pt=place(w3);
+      items.push({depth:pt.depth, kind:'port', pt:pt, role:p.role});
+    });
+  });
+  items.sort(function(a,b){return a.depth-b.depth;});
+  items.forEach(function(it){
+    if(it.kind==='chan'){
+      svg.appendChild(el('path',{d:'M '+it.pts.map(function(p){return p.x.toFixed(1)+' '+p.y.toFixed(1);}).join(' L '),
+        fill:'none',stroke:INK,'stroke-width':3.2,'stroke-linecap':'round','stroke-linejoin':'round'}));
+    } else {
+      svg.appendChild(el('circle',{cx:it.pt.x.toFixed(1),cy:it.pt.y.toFixed(1),r:4.2,
+        fill:it.role==='in'?ACC:PANELBG,stroke:INK,'stroke-width':1.4}));
+    }
+  });
+}
+
+/* ---------- cut list: parts only ---------- */
+function drawCutList(svg,x,y,w,h){
+  svg.appendChild(el('rect',{x:x,y:y,width:w,height:h,fill:PANELBG,stroke:INK,'stroke-width':1}));
+  svg.appendChild(txt(x+8,y+15,'CUT LIST',{size:9,fill:DIMC,ls:'1px',weight:700}));
+  var counts={}, order=[];
+  LAYOUT.forEach(function(i){ if(!(i.part in counts)){counts[i.part]=0;order.push(i.part);} counts[i.part]++; });
+  order.sort();
+  var cols=3, rowH=16, colW=(w-24)/cols;
+  order.forEach(function(name,i){
+    var col=Math.floor(i/Math.ceil(order.length/cols)), row=i%Math.ceil(order.length/cols);
+    var cx=x+12+col*colW, cy=y+34+row*rowH;
+    svg.appendChild(txt(cx,cy,name,{size:9.5,fill:INK}));
+    svg.appendChild(txt(cx+colW-14,cy,'×'+counts[name],{size:9.5,fill:ACC,anchor:'end',weight:700}));
+  });
+  var total=LAYOUT.length;
+  svg.appendChild(txt(x+w-12,y+h-8,order.length+' distinct parts · '+total+' total',
+    {size:8.5,fill:DIMC,anchor:'end'}));
+}
+
+/* ---------- export ---------- */
+function exportPNG(){
+  var svg=document.getElementById('sheet');
+  var scale=2.5;
+  var clone=svg.cloneNode(true);
+  clone.setAttribute('width',SHEET_W); clone.setAttribute('height',SHEET_H);
+  var svgStr=new XMLSerializer().serializeToString(clone);
+  var blob=new Blob([svgStr],{type:'image/svg+xml;charset=utf-8'});
+  var url=URL.createObjectURL(blob);
+  var img=new Image();
+  img.onload=function(){
+    var canvas=document.createElement('canvas');
+    canvas.width=SHEET_W*scale; canvas.height=SHEET_H*scale;
+    var ctx=canvas.getContext('2d');
+    ctx.fillStyle=PAPER; ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.drawImage(img,0,0,canvas.width,canvas.height);
+    URL.revokeObjectURL(url);
+    canvas.toBlob(function(pngBlob){
+      var a=document.createElement('a');
+      a.href=URL.createObjectURL(pngBlob);
+      a.download=(state.jobName||'pipegrid-layer').replace(/[^\w-]+/g,'_')+'.png';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    },'image/png');
+  };
+  img.onerror=function(){ alert('Export failed — could not rasterize the sheet.'); };
+  img.src=url;
+}
+
+document.getElementById('jobName').addEventListener('input',function(){ state.jobName=this.value; render(); });
+document.getElementById('layerName').addEventListener('input',function(){ state.layerName=this.value; render(); });
+document.getElementById('isoToggle').addEventListener('click',function(){
+  state.showIso=!state.showIso;
+  this.textContent='ISO VIEW: '+(state.showIso?'ON':'OFF');
+  this.classList.toggle('on',state.showIso);
+  render();
+});
+document.getElementById('pngBtn').addEventListener('click',exportPNG);
+document.getElementById('printBtn').addEventListener('click',function(){ window.print(); });
+
+render();
+window.__pgSheet={render:render,state:state,exportPNG:exportPNG,LAYOUT:LAYOUT,SHEET_W:SHEET_W,SHEET_H:SHEET_H};
+})();
+</script>
+</body>
+</html>
