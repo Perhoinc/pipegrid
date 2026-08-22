@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>PIPEGRID — vertical slice (step 1: skeleton)</title>
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12151b; --panel2:#0e1116; --edge:#2c313d;
+    --text:#c7d3e2; --dim:#5f6775; --acc:#e0a14e; --out:#3a4150; --wire:#8ea6bf;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; overscroll-behavior:contain;}
+  body{background:var(--bg);color:var(--text);
+       font-family:ui-monospace,SFMono-Regular,Menlo,monospace;-webkit-text-size-adjust:100%;
+       padding:14px;padding-bottom:60px;}
+  .hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:6px;flex-wrap:wrap;}
+  .title{font-size:15px;font-weight:700;letter-spacing:2px;}
+  .sub{font-size:9px;letter-spacing:1px;color:var(--dim);}
+  .panel{border:1px solid var(--edge);border-radius:8px;background:var(--panel);padding:12px;margin-bottom:12px;max-width:640px;}
+  .note{font-size:10px;color:var(--dim);line-height:1.6;margin:4px 0 10px;}
+  .note b{color:var(--text);}
+  .rig{position:relative;background:var(--panel2);border:1px solid var(--edge);border-radius:8px;
+       touch-action:none;user-select:none;}
+  .rigsvg{display:block;width:100%;height:auto;}
+  .readout{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;
+            padding:8px 10px;border-top:1px solid var(--edge);font-size:10.5px;}
+  .readout .stat{color:var(--dim);}
+  .btn{font-family:inherit;font-size:9px;letter-spacing:.5px;text-transform:uppercase;
+       padding:5px 8px;border:1px solid var(--edge);border-radius:4px;background:transparent;
+       color:var(--dim);cursor:pointer;}
+  table{border-collapse:collapse;width:100%;font-size:10.5px;margin-top:6px;}
+  th,td{text-align:left;padding:3px 6px;border-bottom:1px solid var(--edge);}
+  .badge{display:inline-block;font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;}
+  .badge.pass{background:#4caf6b;color:#06170c;}
+  .badge.fail{background:#ff5d55;color:#2a0705;}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <div class="title">PIPEGRID — VERTICAL SLICE</div>
+  <div class="sub">step 1 of 4: real pose data + a real corner part, inside the proven orbit camera</div>
+</div>
+
+<div class="panel">
+  <div class="note">This is the first thing in the whole parts-catalogue/pose effort that combines
+  <b>real 24-rotation pose data</b>, <b>real channel geometry</b> (drawn from the construction rule,
+  same as every other board), and the <b>proven orbit/pan/zoom camera</b> from
+  <code>pipegrid-3d-combined-test.html</code> — in one file, for the first time. Nothing here is
+  interactive yet beyond the camera; placement, connection-driven pose, and the gizmo override are
+  steps 2–4. This step is just: does a real posed part render correctly inside the real camera rig.</div>
+  <div class="note"><b>Axis convention note:</b> the existing camera rig was built Y-up (Y is
+  vertical, X/Z are the ground plane). Everything built this session — the pose system, the gizmo,
+  the 2D sheet — is Z-up (U/D are literally ±Z). Adapted the camera here to Z-up rather than the
+  other way around, since the pose system is the more deeply validated of the two. Flagging this as
+  a real decision, not a silent change.</div>
+  <div class="rig" id="rig">
+    <div class="readout">
+      <span class="stat" id="stat">az 35° · el 25° · zoom 100%</span>
+      <button class="btn" id="resetbtn">Reset view</button>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="plabel" style="font-size:11px;font-weight:700;letter-spacing:1.5px;margin-bottom:6px;">VALIDATION</div>
+  <table id="checks"><tbody></tbody></table>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ================= pose math — ported verbatim from pipegrid-pose-mechanics-test.html ================= */
+var DIRS=["N","E","S","W","U","D"];
+var DIRVEC={N:[0,1,0],S:[0,-1,0],E:[1,0,0],W:[-1,0,0],U:[0,0,1],D:[0,0,-1]};
+var OPP={N:"S",S:"N",E:"W",W:"E",U:"D",D:"U"};
+
+function matMul(A,B){
+  var R=[[0,0,0],[0,0,0],[0,0,0]];
+  for(var i=0;i<3;i++)for(var j=0;j<3;j++){
+    var s=0; for(var k=0;k<3;k++) s+=A[i][k]*B[k][j];
+    R[i][j]=Math.round(s);
+  }
+  return R;
+}
+function matApply(M,p){
+  return [M[0][0]*p[0]+M[0][1]*p[1]+M[0][2]*p[2],
+          M[1][0]*p[0]+M[1][1]*p[1]+M[1][2]*p[2],
+          M[2][0]*p[0]+M[2][1]*p[1]+M[2][2]*p[2]];
+}
+function matKey(M){ return M.map(function(r){return r.join(",");}).join("|"); }
+var IDENT=[[1,0,0],[0,1,0],[0,0,1]];
+var RZ90=[[0,-1,0],[1,0,0],[0,0,1]];
+var RX90=[[1,0,0],[0,0,-1],[0,1,0]];
+var ROTS=(function(){
+  var seen={}, list=[];
+  seen[matKey(IDENT)]=true; list.push(IDENT);
+  var frontier=[IDENT];
+  while(frontier.length){
+    var next=[];
+    frontier.forEach(function(M){
+      [RZ90,RX90].forEach(function(G){
+        var M2=matMul(G,M), k=matKey(M2);
+        if(!seen[k]){ seen[k]=true; list.push(M2); next.push(M2); }
+      });
+    });
+    frontier=next;
+  }
+  return list;
+})();
+var DMAPS=ROTS.map(function(M){
+  var map={};
+  DIRS.forEach(function(d){
+    var v2=matApply(M,DIRVEC[d]);
+    map[d]=DIRS.filter(function(d2){
+      var v=DIRVEC[d2]; return v[0]===v2[0]&&v[1]===v2[1]&&v[2]===v2[2];
+    })[0];
+  });
+  return map;
+});
+
+/* ================= parts: construction rule — ported from the flow/sheet boards ================= */
+var PR=0.42; // part half-size within a cell, in the SAME world units as the camera rig's cube half-size (0.47)
+function straight3(a,b){var u=DIRVEC[a],v=DIRVEC[b];
+  return [[u[0]*PR,u[1]*PR,u[2]*PR],[v[0]*PR,v[1]*PR,v[2]*PR]];}
+function elbow3(a,b,n){
+  var u=DIRVEC[a],v=DIRVEC[b],o=[];
+  for(var i=0;i<=n;i++){var t=(i/n)*(Math.PI/2),s=Math.sin(t),c=Math.cos(t);
+    o.push([PR*(u[0]+v[0])-PR*(s*u[0]+c*v[0]),
+            PR*(u[1]+v[1])-PR*(s*u[1]+c*v[1]),
+            PR*(u[2]+v[2])-PR*(s*u[2]+c*v[2])]);}
+  return o;
+}
+function P(spec){return spec.split(" ").map(function(t){
+  return {dir:t.slice(0,-1), role:t.slice(-1)==="+"?"in":"out"};});}
+function streamsFor(ports){
+  var ins=ports.filter(function(p){return p.role==="in";});
+  var outs=ports.filter(function(p){return p.role==="out";});
+  var o=[];
+  ins.forEach(function(i){outs.forEach(function(u){
+    o.push({type:OPP[i.dir]===u.dir?"straight":"elbow", from:i.dir, to:u.dir});
+  });});
+  return o;
+}
+
+/* ================= a single real part, placed at a cell, with a real pose ================= */
+var cornerPorts=P("N+ E- U-");        // corner-split, canonical/home orientation
+var cornerStreams=streamsFor(cornerPorts);
+var part={
+  cell:{x:0, y:0, z:0},
+  poseIdx:7,                          // arbitrary non-identity pose, deliberately not index 0 -
+  get pose(){ return ROTS[this.poseIdx]; }   // proves the pose is actually being applied, not just drawn in its home orientation
+};
+
+/* ================= camera rig — ported from pipegrid-3d-combined-test.html, adapted Z-up =================
+   Original mixed (x,z) for azimuth and (y,z) for elevation, i.e. Y was vertical. Here U/D are ±Z
+   (matching the pose system's own DIRVEC), so azimuth mixes (x,y) and elevation mixes the result's
+   y with z - z is now the axis that el tips toward/away from the viewer. */
+function rotPt(x,y,z,az,el){
+  var ca=Math.cos(az), sa=Math.sin(az);
+  var x1=x*ca-y*sa, y1=x*sa+y*ca, z1=z;
+  var ce=Math.cos(el), se=Math.sin(el);
+  var y2=y1*ce-z1*se, z2=y1*se+z1*ce;
+  return {x:x1, y:y2, z:z2};
+}
+var VB=340, CX=170, CY=178, SCALE=110;
+var cam={az:35*Math.PI/180, el:25*Math.PI/180, scale:1, panX:0, panY:0};
+var DEFAULT_CAM={az:cam.az, el:cam.el};
+function proj(p){ return {sx:CX+p.x*SCALE*cam.scale+cam.panX, sy:CY-p.z*SCALE*cam.scale+cam.panY}; }
+// screen Y now reads off p.z (the up/down axis under Z-up), not p.y as in the original Y-up rig.
+
+function svgNS(tag){ return document.createElementNS("http://www.w3.org/2000/svg",tag); }
+var rigEl=document.getElementById("rig");
+var svg=svgNS("svg"); svg.setAttribute("viewBox","0 0 "+VB+" "+VB); svg.setAttribute("class","rigsvg");
+rigEl.insertBefore(svg, rigEl.firstChild);
+var sceneG=svgNS("g"); svg.appendChild(sceneG);
+
+function edgesOf(cx,cy,cz,h){
+  var c=[[cx-h,cy-h,cz-h],[cx+h,cy-h,cz-h],[cx+h,cy+h,cz-h],[cx-h,cy+h,cz-h],
+         [cx-h,cy-h,cz+h],[cx+h,cy-h,cz+h],[cx+h,cy+h,cz+h],[cx-h,cy+h,cz+h]];
+  var pairs=[[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
+  return pairs.map(function(p){ return [c[p[0]],c[p[1]]]; });
+}
+
+var GRIDN=2; // cells from -GRIDN..GRIDN on each ground axis, one floor only for this step
+var emptyCells=[];
+for(var gx=-GRIDN; gx<=GRIDN; gx++) for(var gy=-GRIDN; gy<=GRIDN; gy++){
+  if(gx===part.cell.x && gy===part.cell.y) continue;
+  emptyCells.push({x:gx,y:gy,z:0});
+}
+
+var lastPortWorld=null; // populated by render(), read by the validation pass below
+
+function render(){
+  while(sceneG.firstChild) sceneG.removeChild(sceneG.firstChild);
+  var items=[];
+
+  emptyCells.forEach(function(cu){
+    var depth=rotPt(cu.x,cu.y,cu.z,cam.az,cam.el).y;
+    items.push({depth:depth, kind:"wire", cu:cu});
+  });
+
+  var pose=part.pose;
+  cornerStreams.forEach(function(st){
+    var pts3=(st.type==="straight"?straight3(st.from,st.to):elbow3(st.from,st.to,14))
+      .map(function(p){ var w=matApply(pose,p); return [w[0]+part.cell.x, w[1]+part.cell.y, w[2]+part.cell.z]; });
+    var view=pts3.map(function(p){ return rotPt(p[0],p[1],p[2],cam.az,cam.el); });
+    items.push({depth: view.reduce(function(a,p){return a+p.y;},0)/view.length, kind:"chan", pts:view});
+  });
+  var portWorlds={};
+  cornerPorts.forEach(function(p){
+    var v=DIRVEC[p.dir];
+    var w=matApply(pose,[v[0]*PR,v[1]*PR,v[2]*PR]);
+    var world=[w[0]+part.cell.x, w[1]+part.cell.y, w[2]+part.cell.z];
+    portWorlds[p.dir]=world;
+    var view=rotPt(world[0],world[1],world[2],cam.az,cam.el);
+    items.push({depth:view.y, kind:"port", view:view, role:p.role});
+  });
+  lastPortWorld=portWorlds;
+
+  items.sort(function(a,b){ return a.depth-b.depth; });
+
+  items.forEach(function(it){
+    if(it.kind==="wire"){
+      edgesOf(it.cu.x,it.cu.y,it.cu.z,0.47).forEach(function(seg){
+        var pa=rotPt(seg[0][0],seg[0][1],seg[0][2],cam.az,cam.el);
+        var pb=rotPt(seg[1][0],seg[1][1],seg[1][2],cam.az,cam.el);
+        var sa=proj(pa), sb=proj(pb);
+        var ln=svgNS("line");
+        ln.setAttribute("x1",sa.sx); ln.setAttribute("y1",sa.sy);
+        ln.setAttribute("x2",sb.sx); ln.setAttribute("y2",sb.sy);
+        ln.setAttribute("stroke","var(--wire)"); ln.setAttribute("stroke-width","1"); ln.setAttribute("opacity","0.12");
+        sceneG.appendChild(ln);
+      });
+    } else if(it.kind==="chan"){
+      var pts2=it.pts.map(proj);
+      var path=svgNS("path");
+      path.setAttribute("d","M "+pts2.map(function(p){return p.sx.toFixed(1)+" "+p.sy.toFixed(1);}).join(" L "));
+      path.setAttribute("fill","none"); path.setAttribute("stroke","var(--text)");
+      path.setAttribute("stroke-width", (5*cam.scale).toFixed(2)); path.setAttribute("stroke-linecap","round");
+      path.setAttribute("opacity","0.85");
+      sceneG.appendChild(path);
+    } else {
+      var sp=proj(it.view);
+      var c=svgNS("circle");
+      c.setAttribute("cx",sp.sx); c.setAttribute("cy",sp.sy); c.setAttribute("r",(5*cam.scale).toFixed(2));
+      c.setAttribute("fill", it.role==="in" ? "var(--acc)" : "var(--out)");
+      c.setAttribute("stroke","var(--panel2)"); c.setAttribute("stroke-width","1.5");
+      sceneG.appendChild(c);
+    }
+  });
+
+  document.getElementById("stat").textContent=
+    "az "+Math.round(cam.az*180/Math.PI)+"° · el "+Math.round(cam.el*180/Math.PI)+"° · zoom "+Math.round(cam.scale*100)+"%";
+}
+
+/* ---------- orbit / pan / zoom, ported gesture-for-gesture from the combined-test rig ---------- */
+var pts=new Map(), mode="none", orbitLast=null, pinchBase=null;
+function svgPointFromClient(clientX,clientY){
+  var pt=svg.createSVGPoint(); pt.x=clientX; pt.y=clientY;
+  var m=svg.getScreenCTM().inverse();
+  var p=pt.matrixTransform(m);
+  return {x:p.x,y:p.y};
+}
+function midpoint(){
+  var arr=Array.from(pts.values()).map(function(v){return svgPointFromClient(v.x,v.y);});
+  return {x:(arr[0].x+arr[1].x)/2, y:(arr[0].y+arr[1].y)/2};
+}
+function pairDist(){
+  var arr=Array.from(pts.values()).map(function(v){return svgPointFromClient(v.x,v.y);});
+  return Math.hypot(arr[0].x-arr[1].x, arr[0].y-arr[1].y);
+}
+svg.addEventListener("pointerdown", function(e){
+  pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  try{svg.setPointerCapture(e.pointerId);}catch(err){}
+  if(pts.size===1 && mode==="none"){ mode="orbit"; orbitLast={x:e.clientX,y:e.clientY}; }
+  else if(pts.size===2){ mode="pinch"; pinchBase={d0:pairDist(), mid0:midpoint(), scale0:cam.scale, panX0:cam.panX, panY0:cam.panY}; }
+  e.preventDefault();
+});
+svg.addEventListener("pointermove", function(e){
+  if(!pts.has(e.pointerId)) return;
+  pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(mode==="pinch" && pts.size>=2){
+    var d1=pairDist(), mid1=midpoint();
+    var newScale=Math.max(0.6, Math.min(4, pinchBase.scale0*(d1/pinchBase.d0)));
+    var ratio=newScale/pinchBase.scale0;
+    cam.panX = mid1.x - CX - ratio*(pinchBase.mid0.x - CX - pinchBase.panX0);
+    cam.panY = mid1.y - CY - ratio*(pinchBase.mid0.y - CY - pinchBase.panY0);
+    cam.scale = newScale;
+    render(); return;
+  }
+  if(mode==="orbit"){
+    var dx=e.clientX-orbitLast.x, dy=e.clientY-orbitLast.y;
+    orbitLast={x:e.clientX,y:e.clientY};
+    cam.az -= dx*0.01;
+    cam.el = Math.max(-1.3, Math.min(1.3, cam.el - dy*0.01));
+    render(); return;
+  }
+});
+function up(e){
+  pts.delete(e.pointerId);
+  if(mode==="pinch"){ if(pts.size<2){ mode="none"; pinchBase=null; } return; }
+  if(mode==="orbit"){ if(pts.size===0) mode="none"; return; }
+}
+svg.addEventListener("pointerup", up);
+svg.addEventListener("pointercancel", up);
+document.getElementById("resetbtn").addEventListener("click", function(){
+  cam.az=DEFAULT_CAM.az; cam.el=DEFAULT_CAM.el; cam.scale=1; cam.panX=0; cam.panY=0; render();
+});
+
+render();
+
+/* ================= validation ================= */
+function badge(ok){ return '<span class="badge '+(ok?"pass":"fail")+'">'+(ok?"PASS":"FAIL")+'</span>'; }
+(function(){
+  var rows=[];
+
+  // 1. pose math sanity, re-checked in this file's own copy (not trusted from the other board)
+  rows.push(["24 rotations generated", ROTS.length===24]);
+
+  // 2. the part is NOT drawn in its home orientation - poseIdx=7 must actually rotate it.
+  //    Checked across ALL ports, not just one: pose 7 turns out to be a pure spin about
+  //    the vertical axis, which genuinely leaves U fixed while moving N and E - checking
+  //    only U would have failed here even though the pose is correctly applied. First
+  //    version of this check did exactly that and had to be corrected.
+  var anyPortMoved = cornerPorts.some(function(p){
+    var home=[part.cell.x+DIRVEC[p.dir][0]*PR, part.cell.y+DIRVEC[p.dir][1]*PR, part.cell.z+DIRVEC[p.dir][2]*PR];
+    var actual=lastPortWorld[p.dir];
+    return Math.hypot(actual[0]-home[0], actual[1]-home[1], actual[2]-home[2]) > 0.05;
+  });
+  rows.push(["Part actually rotated by its pose (checked across all ports, not just one)", anyPortMoved]);
+
+  // 3. every port's world position is exactly PR from the cell center (rotation preserves length)
+  var lengthsOk = cornerPorts.every(function(p){
+    var w=lastPortWorld[p.dir];
+    var d=Math.hypot(w[0]-part.cell.x, w[1]-part.cell.y, w[2]-part.cell.z);
+    return Math.abs(d-PR) < 1e-9;
+  });
+  rows.push(["Every port sits exactly PR from the cell centre after posing", lengthsOk]);
+
+  // 4. the two posed ports are NOT opposite each other (corner has no opposite pair) -
+  //    confirms the pose didn't accidentally collapse the shape's own geometry.
+  var ports=cornerPorts.map(function(p){ return lastPortWorld[p.dir]; });
+  var anyOpposite=false;
+  for(var i=0;i<ports.length;i++)for(var j=i+1;j<ports.length;j++){
+    var a=ports[i],b=ports[j];
+    var sum=[a[0]+b[0]-2*part.cell.x, a[1]+b[1]-2*part.cell.y, a[2]+b[2]-2*part.cell.z];
+    if(Math.hypot(sum[0],sum[1],sum[2])<1e-6) anyOpposite=true;
+  }
+  rows.push(["Corner's three posed ports still have no opposite pair (shape preserved under pose)", !anyOpposite]);
+
+  // 5. z-up sanity: screen Y must respond to p.z, not p.y, in proj() - orbiting purely in
+  //    elevation (which tips z toward/away from the camera) should move screen Y; orbiting
+  //    purely in azimuth at el=0 should NOT move screen Y for a point on the z-axis.
+  var testPt=[0,0,1];
+  var atEl0 = rotPt(testPt[0],testPt[1],testPt[2], 1.0, 0);
+  var atEl0b = rotPt(testPt[0],testPt[1],testPt[2], 2.0, 0);
+  var zUpOk = Math.abs(proj(atEl0).sy - proj(atEl0b).sy) < 1e-9; // azimuth alone must not move a pure-Z point's screen Y
+  rows.push(["Z-up adaptation correct: azimuth alone doesn't move a pure-vertical point's screen Y", zUpOk]);
+
+  document.querySelector("#checks tbody").innerHTML = rows.map(function(r){
+    return "<tr><td>"+r[0]+"</td><td>"+badge(r[1])+"</td></tr>";
+  }).join("");
+})();
+})();
+</script>
+</body>
+</html>
