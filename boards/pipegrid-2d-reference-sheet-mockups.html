@@ -26,6 +26,10 @@
   .slidefield{display:flex;flex-direction:column;min-width:190px;}
   .slidefield .readout{font-size:9.5px;color:var(--acc);font-variant-numeric:tabular-nums;}
   input[type=range]{width:100%;accent-color:var(--acc);}
+  .anglerow{display:flex;align-items:center;gap:6px;}
+  input[type=number]{font-family:inherit;font-size:11px;background:var(--bg);color:var(--acc);
+       border:1px solid var(--edge);border-radius:4px;padding:4px 5px;width:58px;text-align:right;}
+  .anglerow span{font-size:9.5px;color:var(--dim);}
   .btn{font-family:inherit;font-size:10px;letter-spacing:.5px;text-transform:uppercase;
        padding:8px 11px;border:1px solid var(--edge);border-radius:4px;background:transparent;
        color:var(--text);cursor:pointer;align-self:flex-end;}
@@ -70,12 +74,14 @@
   </div>
   <div class="ctrls">
     <div class="slidefield">
-      <label>Iso elevation (roll toward viewer) <span class="readout" id="elRead"></span></label>
-      <input type="range" id="elSlider" min="-180" max="180" step="1" />
+      <label>Iso elevation (roll toward viewer)</label>
+      <input type="range" id="elSlider" min="-180" max="180" step="0.1" />
+      <div class="anglerow"><input type="number" id="elInput" min="-180" max="180" step="0.1" /><span>°</span></div>
     </div>
     <div class="slidefield">
-      <label>Iso azimuth (turn) <span class="readout" id="azRead"></span></label>
-      <input type="range" id="azSlider" min="-180" max="180" step="1" />
+      <label>Iso azimuth (turn)</label>
+      <input type="range" id="azSlider" min="-180" max="180" step="0.1" />
+      <div class="anglerow"><input type="number" id="azInput" min="-180" max="180" step="0.1" /><span>°</span></div>
     </div>
     <button class="btn" id="angleReset">RESET TO DEFAULT</button>
   </div>
@@ -499,18 +505,29 @@ document.getElementById('pngBtn').addEventListener('click',exportPNG);
 document.getElementById('printBtn').addEventListener('click',function(){ window.print(); });
 
 var elSlider=document.getElementById('elSlider'), azSlider=document.getElementById('azSlider');
-var elRead=document.getElementById('elRead'), azRead=document.getElementById('azRead');
-function syncAngleReadouts(){
-  elRead.textContent=state.isoElDeg+'°'; azRead.textContent=state.isoAzDeg+'°';
+var elInput=document.getElementById('elInput'), azInput=document.getElementById('azInput');
+function clampAngle(v){ return Math.max(-180, Math.min(180, v)); }
+function syncAngleControls(){
+  elSlider.value=state.isoElDeg; azSlider.value=state.isoAzDeg;
+  elInput.value=state.isoElDeg; azInput.value=state.isoAzDeg;
 }
-elSlider.value=state.isoElDeg; azSlider.value=state.isoAzDeg;
-syncAngleReadouts();
-elSlider.addEventListener('input',function(){ state.isoElDeg=+this.value; syncAngleReadouts(); render(); });
-azSlider.addEventListener('input',function(){ state.isoAzDeg=+this.value; syncAngleReadouts(); render(); });
+syncAngleControls();
+elSlider.addEventListener('input',function(){ state.isoElDeg=+this.value; elInput.value=this.value; render(); });
+azSlider.addEventListener('input',function(){ state.isoAzDeg=+this.value; azInput.value=this.value; render(); });
+elInput.addEventListener('input',function(){
+  if(this.value===''||isNaN(+this.value)) return;
+  state.isoElDeg=clampAngle(+this.value); elSlider.value=state.isoElDeg; render();
+});
+azInput.addEventListener('input',function(){
+  if(this.value===''||isNaN(+this.value)) return;
+  state.isoAzDeg=clampAngle(+this.value); azSlider.value=state.isoAzDeg; render();
+});
+// typed value snaps back into view on blur, so a stray "-400" doesn't sit there unresolved
+elInput.addEventListener('blur',function(){ this.value=state.isoElDeg; });
+azInput.addEventListener('blur',function(){ this.value=state.isoAzDeg; });
 document.getElementById('angleReset').addEventListener('click',function(){
   state.isoAzDeg=DEFAULT_AZ_DEG; state.isoElDeg=DEFAULT_EL_DEG;
-  elSlider.value=state.isoElDeg; azSlider.value=state.isoAzDeg;
-  syncAngleReadouts(); render();
+  syncAngleControls(); render();
 });
 
 render();
