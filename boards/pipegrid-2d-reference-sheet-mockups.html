@@ -63,7 +63,8 @@
   <div class="ctrls">
     <div class="field"><label>Job name</label><input type="text" id="jobName" placeholder="e.g. Harbour piece, north wing" /></div>
     <div class="field"><label>Layer</label><input type="text" id="layerName" value="Layer 2 of 5" /></div>
-    <button class="btn on" id="isoToggle">ISO VIEW: ON</button>
+    <button class="btn on" id="isoToggle">ISO PANEL: ON</button>
+    <button class="btn on" id="planThumbToggle">PLAN ISO OVERLAY: ON</button>
     <button class="btn primary" id="pngBtn">EXPORT PNG</button>
     <button class="btn" id="printBtn">PRINT / SAVE AS PDF</button>
   </div>
@@ -161,8 +162,10 @@ var SHEET_W=1000, SHEET_H=760, MARGIN=22;
 var TB_H=76;                       // title block height
 var GAP=14;
 
-var DEFAULT_AZ_DEG=+(0.72*180/Math.PI).toFixed(1), DEFAULT_EL_DEG=+(-0.5*180/Math.PI).toFixed(1);
-var state={jobName:'', layerName:'Layer 2 of 5', showIso:true,
+// Settled 2026-08-21: owner found 20 deg roll / 50 deg turn by hunting with the
+// sliders across the full 360-degree range. Fixed default from here on.
+var DEFAULT_AZ_DEG=50, DEFAULT_EL_DEG=20;
+var state={jobName:'', layerName:'Layer 2 of 5', showIso:true, showPlanThumbs:true,
            isoAzDeg:DEFAULT_AZ_DEG, isoElDeg:DEFAULT_EL_DEG};
 
 function render(){
@@ -264,6 +267,39 @@ function drawPlanPanel(svg,x,y,w,h,label){
     if(up){
       svg.appendChild(el('circle',{cx:ctr.x,cy:ctr.y,r:cs*0.11,fill:PANELBG,stroke:up.role==='in'?ACC:INK,'stroke-width':1.8}));
       svg.appendChild(el('circle',{cx:ctr.x,cy:ctr.y,r:2,fill:up.role==='in'?ACC:INK}));
+    }
+    if(state.showPlanThumbs){
+      drawCellThumbnail(svg, item, ox+item.c*cs, oy+item.r*cs, cs);
+    }
+  });
+}
+
+// Per-cell iso overlay on the PLAN itself — this is the toggle the owner actually
+// asked for originally (treatment B's per-cell thumbnails), distinct from the
+// separate whole-layer iso PANEL toggle below. Uses the same settled angle as
+// that panel so the two stay visually consistent.
+function drawCellThumbnail(svg, item, ox, oy, cs){
+  var size=cs*0.34, tx=ox+cs-size/2-4, ty=oy+cs-size/2-4, sc=size*0.42;
+  svg.appendChild(el('rect',{x:tx-size/2,y:ty-size/2,width:size,height:size,rx:2,
+    fill:PANELBG,stroke:LINE,'stroke-width':0.75,opacity:0.92}));
+  var draw=[];
+  item.streams.forEach(function(st){
+    var p3=st.type==='straight'?straight3(st.from,st.to):elbow3(st.from,st.to,10);
+    var vw=p3.map(function(p){var v=isoProject(p);return {x:tx+v.vx*sc,y:ty-v.vz*sc-v.vy*sc*0.32,d:v.vy};});
+    draw.push({d:vw.reduce(function(a,p){return a+p.d;},0)/vw.length, kind:'chan', pts:vw});
+  });
+  item.ports.forEach(function(p){
+    var v=V[p.dir], w=isoProject([v[0]*PR,v[1]*PR,v[2]*PR]);
+    draw.push({d:w.vy, kind:'port', x:tx+w.vx*sc, y:ty-w.vz*sc-w.vy*sc*0.32, role:p.role});
+  });
+  draw.sort(function(a,b){return a.d-b.d;});
+  draw.forEach(function(d){
+    if(d.kind==='chan'){
+      svg.appendChild(el('path',{d:'M '+d.pts.map(function(p){return p.x.toFixed(1)+' '+p.y.toFixed(1);}).join(' L '),
+        fill:'none',stroke:INK,'stroke-width':1.3,'stroke-linecap':'round',opacity:0.9}));
+    } else {
+      svg.appendChild(el('circle',{cx:d.x.toFixed(1),cy:d.y.toFixed(1),r:1.6,
+        fill:d.role==='in'?ACC:PANELBG,stroke:INK,'stroke-width':0.9}));
     }
   });
 }
@@ -399,8 +435,14 @@ document.getElementById('jobName').addEventListener('input',function(){ state.jo
 document.getElementById('layerName').addEventListener('input',function(){ state.layerName=this.value; render(); });
 document.getElementById('isoToggle').addEventListener('click',function(){
   state.showIso=!state.showIso;
-  this.textContent='ISO VIEW: '+(state.showIso?'ON':'OFF');
+  this.textContent='ISO PANEL: '+(state.showIso?'ON':'OFF');
   this.classList.toggle('on',state.showIso);
+  render();
+});
+document.getElementById('planThumbToggle').addEventListener('click',function(){
+  state.showPlanThumbs=!state.showPlanThumbs;
+  this.textContent='PLAN ISO OVERLAY: '+(state.showPlanThumbs?'ON':'OFF');
+  this.classList.toggle('on',state.showPlanThumbs);
   render();
 });
 document.getElementById('pngBtn').addEventListener('click',exportPNG);
