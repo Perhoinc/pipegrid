@@ -3,11 +3,12 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-<title>PIPEGRID — vertical slice (step 2: connection-driven placement)</title>
+<title>PIPEGRID — vertical slice (step 3: gizmo override)</title>
 <style>
   :root{
     --bg:#0b0d10; --panel:#12151b; --panel2:#0e1116; --edge:#2c313d;
     --text:#c7d3e2; --dim:#5f6775; --acc:#e0a14e; --out:#3a4150; --wire:#8ea6bf;
+    --ax:#d8534f; --ay:#5aa469; --az:#4a7fb5;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html,body{margin:0; overscroll-behavior:contain;}
@@ -39,16 +40,16 @@
 <body>
 <div class="hdr">
   <div class="title">PIPEGRID — VERTICAL SLICE</div>
-  <div class="sub">step 2 of 4: tap a port, a new corner appears already connected</div>
+  <div class="sub">step 3 of 4: the gizmo appears on a newly-placed part, ported from the settled mockup</div>
 </div>
 
 <div class="panel">
-  <div class="note"><b>Tap any amber or grey ring</b> on the seed corner to place a new corner-split
-  connected to it — the app works out where it goes and which of the 24 poses makes the connection
-  real, the same way described for the real app: drag/tap from a port, the app infers a pose that
-  satisfies that one connection. Fixing one port's direction leaves 4 of the 24 poses valid; this
-  step always takes the first one it finds — reaching the other 3 is the gizmo's job (step 3, not
-  built yet). <b>Drag empty space</b> to orbit, still works exactly as in step 1.</div>
+  <div class="note"><b>Tap any ring</b> on the seed corner to place a new corner-split connected to
+  it, same as step 2. The three coloured rings that appear on the <b>new</b> part are the gizmo,
+  ported straight from <code>pipegrid-pose-gizmo-mockups.html</code>: drag a ring to turn the part —
+  it follows your finger's angle, an amber dashed ghost shows where it'll land, and it snaps to the
+  nearest quarter turn on release. Drag a diamond handle to shift the part a whole cell. This is the
+  control that reaches the other 3 valid poses step 2 couldn't. <b>Drag empty space</b> to orbit.</div>
   <div class="note"><b>Axis convention note:</b> the existing camera rig was built Y-up (Y is
   vertical, X/Z are the ground plane). Everything built this session — the pose system, the gizmo,
   the 2D sheet — is Z-up (U/D are literally ±Z). Adapted the camera here to Z-up rather than the
@@ -62,6 +63,7 @@
         <button class="btn" id="resetbtn">Reset view</button>
       </span>
     </div>
+    <div class="readout"><span class="stat" id="gizmostat">no part selected</span></div>
   </div>
 </div>
 
@@ -172,6 +174,72 @@ function connectingPose(existingWorldDir, existingRole, newShapePorts){
   return {poseIdx:poseIdx, connPort:connPort, requiredWorldDir:requiredWorldDir, requiredRole:requiredRole};
 }
 
+/* ================= gizmo (step 3) — ported from pipegrid-pose-gizmo-mockups.html =================
+   That mockup's camera used the exact same Z-up rotation formula as this file's rotPt (both
+   derived independently but landed on the same convention), so the ring/angle math ports over
+   mechanically - the only real change is projecting through THIS file's live, orbit-able camera
+   (rotPt + proj, with real scale/pan) instead of the mockup's fixed one. */
+function mulF(A,B){var R=[[0,0,0],[0,0,0],[0,0,0]];
+  for(var i=0;i<3;i++)for(var j=0;j<3;j++){var s=0;for(var k=0;k<3;k++)s+=A[i][k]*B[k][j];R[i][j]=s;}
+  return R;}
+var GIZMO_RX=[[1,0,0],[0,0,-1],[0,1,0]], GIZMO_RY=[[0,0,1],[0,1,0],[-1,0,0]], GIZMO_RZ=[[0,-1,0],[1,0,0],[0,0,1]];
+var GIZMO_AXES=[
+  {id:"x", M:GIZMO_RX, e1:[0,1,0], e2:[0,0,1], col:"var(--ax)", name:"E–W",
+   cont:function(t){var c=Math.cos(t),s=Math.sin(t);return [[1,0,0],[0,c,-s],[0,s,c]];}},
+  {id:"y", M:GIZMO_RY, e1:[0,0,1], e2:[1,0,0], col:"var(--ay)", name:"N–S",
+   cont:function(t){var c=Math.cos(t),s=Math.sin(t);return [[c,0,s],[0,1,0],[-s,0,c]];}},
+  {id:"z", M:GIZMO_RZ, e1:[1,0,0], e2:[0,1,0], col:"var(--az)", name:"U–D",
+   cont:function(t){var c=Math.cos(t),s=Math.sin(t);return [[c,-s,0],[s,c,0],[0,0,1]];}}
+];
+GIZMO_AXES.forEach(function(a){
+  a.ring=function(t){var c=Math.cos(t),s=Math.sin(t); return [a.e1[0]*c+a.e2[0]*s, a.e1[1]*c+a.e2[1]*s, a.e1[2]*c+a.e2[2]*s]; };
+});
+var GIZMO_RING_R=0.62, GIZMO_ARROW_L=0.8;
+function pc(p){ return proj(rotPt(p[0],p[1],p[2],cam.az,cam.el)); }
+function gizmoCellArr(part){ return [part.cell.x, part.cell.y, part.cell.z]; }
+function ringPoints(axis, cellArr){
+  var pts=[];
+  for(var i=0;i<=72;i++){
+    var t=(i/72)*Math.PI*2, u=axis.ring(t);
+    pts.push([u[0]*GIZMO_RING_R+cellArr[0], u[1]*GIZMO_RING_R+cellArr[1], u[2]*GIZMO_RING_R+cellArr[2]]);
+  }
+  return pts;
+}
+function arrowEnds(axis, cellArr){
+  var u=axis.id==="x"?[1,0,0]:axis.id==="y"?[0,1,0]:[0,0,1];
+  return [[cellArr[0]+u[0]*GIZMO_ARROW_L,cellArr[1]+u[1]*GIZMO_ARROW_L,cellArr[2]+u[2]*GIZMO_ARROW_L],
+          [cellArr[0]-u[0]*GIZMO_ARROW_L,cellArr[1]-u[1]*GIZMO_ARROW_L,cellArr[2]-u[2]*GIZMO_ARROW_L]];
+}
+function ringAngleAt(axis, cellArr, pt){
+  var o=pc(cellArr);
+  var A=pc([cellArr[0]+axis.e1[0]*GIZMO_RING_R, cellArr[1]+axis.e1[1]*GIZMO_RING_R, cellArr[2]+axis.e1[2]*GIZMO_RING_R]);
+  var B=pc([cellArr[0]+axis.e2[0]*GIZMO_RING_R, cellArr[1]+axis.e2[1]*GIZMO_RING_R, cellArr[2]+axis.e2[2]*GIZMO_RING_R]);
+  var ax=A.sx-o.sx, ay=A.sy-o.sy, bx=B.sx-o.sx, by=B.sy-o.sy;
+  var det=ax*by-ay*bx;
+  var px=pt.x-o.sx, py=pt.y-o.sy;
+  if(Math.abs(det)<1e-3){
+    var m=Math.hypot(ax,ay)||1;
+    return {angle:(px*ax+py*ay)/m/GIZMO_RING_R, degenerate:true};
+  }
+  var c=( by*px - bx*py)/det, s=(-ay*px + ax*py)/det;
+  return {angle:Math.atan2(s,c), degenerate:false};
+}
+function snapQuarter(t){ return Math.round(t/(Math.PI/2)); }
+
+var gizmoPartIdx=null;   // which part currently shows the gizmo, or null
+var gizmoDrag=null;      // {type:'rot'|'move', axis, basePose, prev, live} | {type:'move', axis, base:[x,y,z]}
+
+function gizmoLiveMatrix(){
+  if(gizmoDrag && gizmoDrag.type==="rot") return mulF(gizmoDrag.axis.cont(gizmoDrag.live), gizmoDrag.basePose);
+  return ROTS[parts[gizmoPartIdx].poseIdx];
+}
+function gizmoSnapMatrix(){
+  if(!(gizmoDrag && gizmoDrag.type==="rot")) return ROTS[parts[gizmoPartIdx].poseIdx];
+  var n=((snapQuarter(gizmoDrag.live)%4)+4)%4, M=gizmoDrag.basePose;
+  for(var i=0;i<n;i++) M=matMul(gizmoDrag.axis.M,M);
+  return M;
+}
+
 /* ================= camera rig — ported from pipegrid-3d-combined-test.html, adapted Z-up =================
    Original mixed (x,z) for azimuth and (y,z) for elevation, i.e. Y was vertical. Here U/D are ±Z
    (matching the pose system's own DIRVEC), so azimuth mixes (x,y) and elevation mixes the result's
@@ -235,7 +303,9 @@ function render(){
   // thing shared a scene. Building it in from the start this time rather than
   // waiting to rediscover the bug with two real parts on screen.
   parts.forEach(function(part, partIdx){
-    var pose=ROTS[part.poseIdx];
+    // while actively turning this part's gizmo, draw the live free-angle preview;
+    // otherwise (and for every other part) draw its actual committed pose.
+    var pose = (gizmoDrag && gizmoDrag.type==="rot" && partIdx===gizmoPartIdx) ? gizmoLiveMatrix() : ROTS[part.poseIdx];
     var cellDepth=rotPt(part.cell.x,part.cell.y,part.cell.z,cam.az,cam.el).y;
     part.streams.forEach(function(st){
       var pts3=(st.type==="straight"?straight3(st.from,st.to):elbow3(st.from,st.to,14))
@@ -289,6 +359,72 @@ function render(){
     }
   });
 
+  // ---------- gizmo overlay: always drawn on top, not depth-tested against the scene ----------
+  if(gizmoPartIdx!=null && parts[gizmoPartIdx]){
+    var gp=parts[gizmoPartIdx], cellArr=gizmoCellArr(gp);
+    var Msnap=gizmoSnapMatrix();
+
+    if(gizmoDrag && gizmoDrag.type==="rot"){
+      gp.streams.forEach(function(s){
+        var p3=(s.type==="straight"?straight3(s.from,s.to):elbow3(s.from,s.to,14))
+          .map(function(p){ var w=matApply(Msnap,p); return pc([w[0]+cellArr[0],w[1]+cellArr[1],w[2]+cellArr[2]]); });
+        var path=svgNS("path");
+        path.setAttribute("d","M "+p3.map(function(p){return p.sx.toFixed(1)+" "+p.sy.toFixed(1);}).join(" L "));
+        path.setAttribute("fill","none"); path.setAttribute("stroke","var(--acc)"); path.setAttribute("stroke-width","2");
+        path.setAttribute("stroke-linecap","round"); path.setAttribute("stroke-dasharray","4 5"); path.setAttribute("opacity","0.75");
+        sceneG.appendChild(path);
+      });
+    }
+
+    GIZMO_AXES.forEach(function(axis){
+      var e=arrowEnds(axis,cellArr).map(pc);
+      var isActiveMove = gizmoDrag && gizmoDrag.type==="move" && gizmoDrag.axis.id===axis.id;
+      var ln=svgNS("line");
+      ln.setAttribute("x1",e[0].sx.toFixed(1)); ln.setAttribute("y1",e[0].sy.toFixed(1));
+      ln.setAttribute("x2",e[1].sx.toFixed(1)); ln.setAttribute("y2",e[1].sy.toFixed(1));
+      ln.setAttribute("stroke",axis.col); ln.setAttribute("stroke-width","1.5");
+      ln.setAttribute("opacity",isActiveMove?"0.95":"0.4"); ln.setAttribute("stroke-dasharray","3 4");
+      sceneG.appendChild(ln);
+      e.forEach(function(p){
+        var r=svgNS("rect");
+        r.setAttribute("x",(p.sx-4).toFixed(1)); r.setAttribute("y",(p.sy-4).toFixed(1));
+        r.setAttribute("width","8"); r.setAttribute("height","8"); r.setAttribute("fill",axis.col);
+        r.setAttribute("opacity",isActiveMove?"1":"0.65");
+        r.setAttribute("transform","rotate(45 "+p.sx.toFixed(1)+" "+p.sy.toFixed(1)+")");
+        sceneG.appendChild(r);
+      });
+    });
+
+    GIZMO_AXES.forEach(function(axis){
+      var pts=ringPoints(axis,cellArr).map(function(p){ return {v:rotPt(p[0],p[1],p[2],cam.az,cam.el)}; });
+      pts.forEach(function(o){ o.p=proj(o.v); });
+      var active=gizmoDrag && gizmoDrag.type==="rot" && gizmoDrag.axis.id===axis.id;
+      var segs=[[]];
+      for(var i=0;i<pts.length;i++){
+        var far=pts[i].v.y>0.02;
+        if(i>0 && far!==(pts[i-1].v.y>0.02)) segs.push([]);
+        segs[segs.length-1].push({p:pts[i].p, far:far});
+      }
+      segs.forEach(function(sg){
+        if(sg.length<2) return;
+        var path=svgNS("path");
+        path.setAttribute("d","M "+sg.map(function(o){return o.p.sx.toFixed(1)+" "+o.p.sy.toFixed(1);}).join(" L "));
+        path.setAttribute("fill","none"); path.setAttribute("stroke",axis.col);
+        path.setAttribute("stroke-width",active?"5":"3");
+        path.setAttribute("opacity", sg[0].far ? (active?"0.4":"0.18") : (active?"1":"0.7"));
+        path.setAttribute("stroke-linecap","round");
+        sceneG.appendChild(path);
+      });
+    });
+
+    var turning=gizmoDrag && gizmoDrag.type==="rot";
+    document.getElementById("gizmostat").textContent = turning
+      ? "turning "+gizmoDrag.axis.name+" "+(gizmoDrag.live*180/Math.PI).toFixed(0)+"° → snaps to "+((((snapQuarter(gizmoDrag.live)%4)+4)%4)*90)+"°"
+      : "gizmo on new part · pose "+(gp.poseIdx+1)+" of 24 · cell "+cellArr.join(",");
+  } else {
+    document.getElementById("gizmostat").textContent = "no part selected";
+  }
+
   document.getElementById("stat").textContent=
     "az "+Math.round(cam.az*180/Math.PI)+"° · el "+Math.round(cam.el*180/Math.PI)+"° · zoom "+Math.round(cam.scale*100)+"%";
 }
@@ -318,6 +454,7 @@ function placeConnectedPart(fromPort){
     cell:targetCell, poseIdx:result.poseIdx};
   parts.push(newPart);
   lastPlacement={fromPort:fromPort, newPartIdx:parts.length-1, connResult:result, targetCell:targetCell};
+  gizmoPartIdx=lastPlacement.newPartIdx;   // gizmo appears on the part you just placed
   return lastPlacement;
 }
 
@@ -337,14 +474,55 @@ function pairDist(){
   var arr=Array.from(pts.values()).map(function(v){return svgPointFromClient(v.x,v.y);});
   return Math.hypot(arr[0].x-arr[1].x, arr[0].y-arr[1].y);
 }
+function hitGizmoRing(pt){
+  if(gizmoPartIdx==null) return null;
+  var cellArr=gizmoCellArr(parts[gizmoPartIdx]);
+  var best=null;
+  GIZMO_AXES.forEach(function(axis){
+    var pts3=ringPoints(axis,cellArr);
+    for(var i=0;i<pts3.length;i++){
+      var p=pc(pts3[i]);
+      var dd=Math.hypot(p.sx-pt.x,p.sy-pt.y);
+      if(dd<14 && (!best||dd<best.dist)) best={axis:axis,dist:dd};
+    }
+  });
+  return best;
+}
+function hitGizmoArrow(pt){
+  if(gizmoPartIdx==null) return null;
+  var cellArr=gizmoCellArr(parts[gizmoPartIdx]);
+  var best=null;
+  GIZMO_AXES.forEach(function(axis){
+    arrowEnds(axis,cellArr).forEach(function(e,k){
+      var p=pc(e);
+      var dd=Math.hypot(p.sx-pt.x,p.sy-pt.y);
+      if(dd<15 && (!best||dd<best.dist)) best={axis:axis,dist:dd,sign:k===0?1:-1};
+    });
+  });
+  return best;
+}
+
 svg.addEventListener("pointerdown", function(e){
   pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
   try{svg.setPointerCapture(e.pointerId);}catch(err){}
   if(pts.size===1 && mode==="none"){
     var p=svgPointFromClient(e.clientX,e.clientY);
-    var hit=nearestPortWithin(p.x,p.y,CAPTURE_R);
-    if(hit){ mode="connect"; pendingPort=hit; }
-    else { mode="orbit"; orbitLast={x:e.clientX,y:e.clientY}; }
+    var ringHit=hitGizmoRing(p), arrowHit=hitGizmoArrow(p);
+    var portHit = (ringHit||arrowHit) ? null : nearestPortWithin(p.x,p.y,CAPTURE_R); // gizmo wins when both present
+    if(arrowHit && (!ringHit || arrowHit.dist<ringHit.dist)){
+      var gp0=parts[gizmoPartIdx];
+      mode="gizmoMove";
+      gizmoDrag={type:"move", axis:arrowHit.axis, start:p, base:[gp0.cell.x,gp0.cell.y,gp0.cell.z]};
+    } else if(ringHit){
+      var cellArr0=gizmoCellArr(parts[gizmoPartIdx]);
+      var a0=ringAngleAt(ringHit.axis,cellArr0,p);
+      mode="gizmoRot";
+      gizmoDrag={type:"rot", axis:ringHit.axis, basePose:ROTS[parts[gizmoPartIdx].poseIdx], prev:a0.angle, live:0};
+    } else if(portHit){
+      mode="connect"; pendingPort=portHit;
+    } else {
+      mode="orbit"; orbitLast={x:e.clientX,y:e.clientY};
+    }
   }
   else if(pts.size===2){ mode="pinch"; pinchBase={d0:pairDist(), mid0:midpoint(), scale0:cam.scale, panX0:cam.panX, panY0:cam.panY}; }
   e.preventDefault();
@@ -368,11 +546,53 @@ svg.addEventListener("pointermove", function(e){
     cam.el = Math.max(-1.3, Math.min(1.3, cam.el - dy*0.01));
     render(); return;
   }
+  if(mode==="gizmoRot"){
+    var pt=svgPointFromClient(e.clientX,e.clientY);
+    var cellArr=gizmoCellArr(parts[gizmoPartIdx]);
+    var cur=ringAngleAt(gizmoDrag.axis,cellArr,pt).angle;
+    var d=cur-gizmoDrag.prev;
+    while(d>Math.PI) d-=Math.PI*2;
+    while(d<-Math.PI) d+=Math.PI*2;
+    gizmoDrag.live+=d; gizmoDrag.prev=cur;
+    render(); return;
+  }
+  if(mode==="gizmoMove"){
+    var pt2=svgPointFromClient(e.clientX,e.clientY);
+    var dx2=pt2.x-gizmoDrag.start.x, dy2=pt2.y-gizmoDrag.start.y;
+    var axIdx=gizmoDrag.axis.id==="x"?0:gizmoDrag.axis.id==="y"?1:2;
+    var refv=[axIdx===0?1:0, axIdx===1?1:0, axIdx===2?1:0];
+    var ref=pc(refv), org=pc([0,0,0]);
+    var ux=ref.sx-org.sx, uy=ref.sy-org.sy, m=Math.hypot(ux,uy)||1;
+    var along=(dx2*ux+dy2*uy)/m;
+    var steps=Math.round(along/40);
+    var next=gizmoDrag.base.slice(); next[axIdx]=Math.max(-GRIDN, Math.min(GRIDN, gizmoDrag.base[axIdx]+steps));
+    var wouldMove = next[0]!==parts[gizmoPartIdx].cell.x || next[1]!==parts[gizmoPartIdx].cell.y || next[2]!==parts[gizmoPartIdx].cell.z;
+    if(wouldMove && !isOccupied(next[0],next[1],next[2])){
+      parts[gizmoPartIdx].cell={x:next[0], y:next[1], z:next[2]};
+      render();
+    }
+    return;
+  }
 });
 function up(e){
   pts.delete(e.pointerId);
   if(mode==="pinch"){ if(pts.size<2){ mode="none"; pinchBase=null; } return; }
   if(mode==="orbit"){ if(pts.size===0) mode="none"; return; }
+  if(mode==="gizmoRot"){
+    if(pts.size===0){
+      var n=((snapQuarter(gizmoDrag.live)%4)+4)%4, M=gizmoDrag.basePose;
+      for(var i=0;i<n;i++) M=matMul(gizmoDrag.axis.M,M);
+      var newIdx=ROTS.findIndex(function(R){ return matKey(R)===matKey(M); });
+      parts[gizmoPartIdx].poseIdx = newIdx;
+      mode="none"; gizmoDrag=null;
+      render(); runValidation();
+    }
+    return;
+  }
+  if(mode==="gizmoMove"){
+    if(pts.size===0){ mode="none"; gizmoDrag=null; render(); runValidation(); }
+    return;
+  }
   if(mode==="connect"){
     if(pts.size===0){
       placeConnectedPart(pendingPort);
@@ -389,13 +609,20 @@ document.getElementById("resetbtn").addEventListener("click", function(){
   cam.az=DEFAULT_CAM.az; cam.el=DEFAULT_CAM.el; cam.scale=1; cam.panX=0; cam.panY=0; render();
 });
 document.getElementById("undobtn").addEventListener("click", function(){
-  if(parts.length>1){ parts.pop(); lastPlacement=null; render(); runValidation(); }
+  if(parts.length>1){
+    if(gizmoPartIdx===parts.length-1) gizmoPartIdx=null;
+    parts.pop(); lastPlacement=null; render(); runValidation();
+  }
 });
 
 render();
 
 /* ================= validation ================= */
 function badge(ok){ return '<span class="badge '+(ok?"pass":"fail")+'">'+(ok?"PASS":"FAIL")+'</span>'; }
+// A neutral status, not a pass/fail - for facts the gizmo is EXPECTED to be able to change
+// (rotating or moving a placed part can legitimately break its original connection; that's
+// not a bug, it's the general-purpose override doing exactly what it's for).
+function status(ok,yes,no){ return '<span class="badge" style="background:'+(ok?"#4a7fb5":"#8a95a6")+';color:#0b0d10">'+(ok?yes:no)+'</span>'; }
 function runValidation(){
   var rows=[];
   var seed=parts[0];
@@ -446,29 +673,49 @@ function runValidation(){
     rows.push(["Connecting pose is one of the 24 valid rotations", cr.poseIdx>=0 && cr.poseIdx<24]);
 
     var roleOk = cr.requiredRole !== fp.role;
-    rows.push(["New port's role is the opposite of the port it connects to (in↔out)", roleOk]);
+    rows.push(["New port's role is the opposite of the port it connects to (in↔out) — fixed at placement, the gizmo can't change it", badge(roleOk)]);
 
+    // From here down: whether the ORIGINAL connection is still geometrically real right
+    // now. The gizmo is a general override, not constrained to preserve it - rotating or
+    // moving the new part can legitimately break these, same as it would in a real CAD
+    // tool. Status, not a requirement: it's fine for these to say "broken" after you've
+    // used the gizmo. They're only expected all-intact immediately after step 2's tap.
     var newWorldDir=DMAPS[np.poseIdx][cr.connPort.dir];
     var dirOk = newWorldDir === OPP[fp.worldDir];
-    rows.push(["New part's connecting port actually faces back toward the existing one", dirOk]);
+    rows.push(["Connecting port still faces back toward the original part", status(dirOk,"INTACT","REORIENTED AWAY")]);
 
-    var cellOk = np.cell.x===lastPlacement.targetCell.x && np.cell.y===lastPlacement.targetCell.y && np.cell.z===lastPlacement.targetCell.z
-                 && (np.cell.x-parts[fp.partIdx].cell.x)===DIRVEC[fp.worldDir][0]
+    var cellOk = (np.cell.x-parts[fp.partIdx].cell.x)===DIRVEC[fp.worldDir][0]
                  && (np.cell.y-parts[fp.partIdx].cell.y)===DIRVEC[fp.worldDir][1]
                  && (np.cell.z-parts[fp.partIdx].cell.z)===DIRVEC[fp.worldDir][2];
-    rows.push(["New part sits exactly one cell over, in the direction the tapped port faces", cellOk]);
+    rows.push(["Still sits exactly one cell over from the original part", status(cellOk,"INTACT","MOVED")]);
 
-    // The real geometric proof: the existing port and the new port should sit on the same
-    // line, one full grid-unit's effective gap apart (1 - 2*PR) - not just "roughly near
-    // each other", an exact position following from the pose math and the cell placement.
+    // The real geometric proof, when both of the above hold: the two ports should sit on
+    // the same line, one full grid-unit's effective gap apart (1 - 2*PR) - not just
+    // "roughly near each other", an exact position following from the pose math.
     var existP=lastPortWorld[fp.partIdx][fp.dir], newP=lastPortWorld[lastPlacement.newPartIdx][cr.connPort.dir];
     var expected=[existP[0]+DIRVEC[fp.worldDir][0]*(1-2*PR), existP[1]+DIRVEC[fp.worldDir][1]*(1-2*PR), existP[2]+DIRVEC[fp.worldDir][2]*(1-2*PR)];
     var gapOk = Math.hypot(newP[0]-expected[0], newP[1]-expected[1], newP[2]-expected[2]) < 1e-9;
-    rows.push(["The two connected ports land at exactly the expected gap apart, not just roughly aligned", gapOk]);
+    if(dirOk && cellOk){
+      // connection should still be geometrically exact - THIS combination is a real
+      // requirement: if direction and cell both still match placement, the gap must too.
+      rows.push(["Ports land at exactly the expected gap apart (geometry consistent with an intact connection)", badge(gapOk)]);
+    } else {
+      rows.push(["Port gap distance", status(false,"","N/A — connection already reoriented/moved above")]);
+    }
+  }
+
+  // ---- step 3's own check: gizmo commits must always land on a real, valid pose ----
+  if(gizmoPartIdx!=null && parts[gizmoPartIdx]){
+    var gpi=parts[gizmoPartIdx].poseIdx;
+    rows.push(["Gizmo-selected part's committed pose is a valid index (matKey lookup didn't miss)", gpi>=0 && gpi<24]);
   }
 
   document.querySelector("#checks tbody").innerHTML = rows.map(function(r){
-    return "<tr><td>"+r[0]+"</td><td>"+badge(r[1])+"</td></tr>";
+    // r[1] is either a raw boolean (needs badge()) or already-rendered HTML from
+    // badge()/status() (the connection-status rows above, which had to pick their own
+    // renderer per-branch) - pass pre-rendered HTML through untouched either way.
+    var cell = (typeof r[1]==="string") ? r[1] : badge(r[1]);
+    return "<tr><td>"+r[0]+"</td><td>"+cell+"</td></tr>";
   }).join("");
 }
 runValidation();
