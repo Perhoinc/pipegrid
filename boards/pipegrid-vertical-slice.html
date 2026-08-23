@@ -8,7 +8,12 @@
   :root{
     --bg:#0b0d10; --panel:#12151b; --panel2:#0e1116; --edge:#2c313d;
     --text:#c7d3e2; --dim:#5f6775; --acc:#e0a14e; --out:#3a4150; --wire:#8ea6bf;
-    --ax:#d8534f; --ay:#5aa469; --az:#4a7fb5;
+    --ax:#d8534f; --ay:#5aa469; --az:#4a7fb5; --indbg:rgba(18,21,27,0.65);
+  }
+  body[data-theme="light"]{
+    --bg:#eef1f5; --panel:#ffffff; --panel2:#f4f6f9; --edge:#d3d9e2;
+    --text:#232a35; --dim:#7a8494; --acc:#c97a1f; --out:#9aa4b3; --wire:#5b6b80;
+    --ax:#c0392b; --ay:#3f8f52; --az:#2f6ea8; --indbg:rgba(244,246,249,0.72);
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html,body{margin:0; overscroll-behavior:contain;}
@@ -16,6 +21,7 @@
        font-family:ui-monospace,SFMono-Regular,Menlo,monospace;-webkit-text-size-adjust:100%;
        padding:14px;padding-bottom:60px;}
   .hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:6px;flex-wrap:wrap;}
+  .hdr .themebtn{margin-left:auto;}
   .title{font-size:15px;font-weight:700;letter-spacing:2px;}
   .sub{font-size:9px;letter-spacing:1px;color:var(--dim);}
   .panel{border:1px solid var(--edge);border-radius:8px;background:var(--panel);padding:12px;margin-bottom:12px;max-width:640px;}
@@ -41,6 +47,7 @@
 <div class="hdr">
   <div class="title">PIPEGRID — VERTICAL SLICE</div>
   <div class="sub">proving the connect/gizmo loop generalizes past one hard-coded shape, before scaling to the full catalogue</div>
+  <button class="btn themebtn" id="themebtn">LIGHT</button>
 </div>
 
 <div class="panel">
@@ -466,8 +473,50 @@ function render(){
     document.getElementById("gizmostat").textContent = "no part selected";
   }
 
+  drawAxisIndicator();
+
   document.getElementById("stat").textContent=
     "az "+Math.round(cam.az*180/Math.PI)+"° · el "+Math.round(cam.el*180/Math.PI)+"° · zoom "+Math.round(cam.scale*100)+"%";
+}
+
+// Owner's fix for the "which way is actually up" illusion when orbiting underneath a
+// part: a small fixed axis triad, top-right corner, independent of zoom/pan and drawn
+// last so it always sits on top of the scene. Uses ONLY the camera's rotation (never
+// world position or cam.scale), coloured to match the gizmo's own axis colours so the
+// two reinforce each other rather than introducing a second colour vocabulary.
+var AXIS_IND_R=24, AXIS_IND_CX=VB-32, AXIS_IND_CY=32;
+function drawAxisIndicator(){
+  var dirs=[{v:[0,1,0],col:"var(--ay)",label:"N"},
+            {v:[1,0,0],col:"var(--ax)",label:"E"},
+            {v:[0,0,1],col:"var(--az)",label:"U"}];
+  var bg=svgNS("circle");
+  bg.setAttribute("cx",AXIS_IND_CX); bg.setAttribute("cy",AXIS_IND_CY); bg.setAttribute("r",AXIS_IND_R+11);
+  bg.setAttribute("fill","var(--indbg)"); bg.setAttribute("stroke","var(--edge)"); bg.setAttribute("stroke-width","1");
+  sceneG.appendChild(bg);
+  var items=dirs.map(function(d){
+    var view=rotPt(d.v[0],d.v[1],d.v[2],cam.az,cam.el);
+    return {label:d.label, col:d.col, depth:view.y,
+      sx:AXIS_IND_CX+view.x*AXIS_IND_R, sy:AXIS_IND_CY-view.z*AXIS_IND_R};
+  });
+  items.sort(function(a,b){ return a.depth-b.depth; }); // nearer axis drawn on top, same rule as the scene
+  items.forEach(function(it){
+    var ln=svgNS("line");
+    ln.setAttribute("x1",AXIS_IND_CX); ln.setAttribute("y1",AXIS_IND_CY);
+    ln.setAttribute("x2",it.sx.toFixed(1)); ln.setAttribute("y2",it.sy.toFixed(1));
+    ln.setAttribute("stroke",it.col); ln.setAttribute("stroke-width","2.5"); ln.setAttribute("stroke-linecap","round");
+    sceneG.appendChild(ln);
+    var dot=svgNS("circle");
+    dot.setAttribute("cx",it.sx.toFixed(1)); dot.setAttribute("cy",it.sy.toFixed(1)); dot.setAttribute("r","3");
+    dot.setAttribute("fill",it.col);
+    sceneG.appendChild(dot);
+    var t=svgNS("text");
+    t.setAttribute("x",(AXIS_IND_CX+(it.sx-AXIS_IND_CX)*1.32).toFixed(1));
+    t.setAttribute("y",(AXIS_IND_CY+(it.sy-AXIS_IND_CY)*1.32+3).toFixed(1));
+    t.setAttribute("fill",it.col); t.setAttribute("font-size","10"); t.setAttribute("font-weight","700");
+    t.setAttribute("text-anchor","middle"); t.setAttribute("font-family","inherit");
+    t.textContent=it.label;
+    sceneG.appendChild(t);
+  });
 }
 
 /* ---------- connection-driven placement: tap a port, a new part appears connected ---------- */
@@ -669,7 +718,15 @@ svg.addEventListener("pointermove", function(e){
     var dx=e.clientX-orbitLast.x, dy=e.clientY-orbitLast.y;
     orbitLast={x:e.clientX,y:e.clientY};
     cam.az -= dx*0.01;
-    cam.el = Math.max(-1.3, Math.min(1.3, cam.el - dy*0.01));
+    // Flipped per owner feedback: dragging down should tip the TOP of the scene toward
+    // the viewer (you end up looking more from above), the standard trackball feel.
+    // Traced it rather than just flipping blindly: increasing el moves a point that's
+    // "straight ahead" (world +Y) toward smaller screen-Y (proj subtracts p.z, and el
+    // rotates +Y's world-Z component positive as el increases) - i.e. it rises toward
+    // the TOP of the screen, which is exactly what happens when a camera pitches DOWN
+    // (tilt your own head down and the horizon rises in your view). So "el increases"
+    // IS "look more from above", which is what dragging down should now produce.
+    cam.el = Math.max(-1.3, Math.min(1.3, cam.el + dy*0.01));
     render(); return;
   }
   if(mode==="gizmoRot"){
@@ -765,7 +822,15 @@ function selectShape(key){
   });
 })();
 
+document.getElementById("themebtn").addEventListener("click", function(){
+  var isLight=document.body.getAttribute("data-theme")==="light";
+  document.body.setAttribute("data-theme", isLight?"":"light");
+  this.textContent=isLight?"LIGHT":"DARK";
+  render();
+});
+
 render();
+window.__pgSlice={parts:parts, get gizmoPartIdx(){return gizmoPartIdx;}, get mode(){return mode;}};
 
 /* ================= validation ================= */
 function badge(ok){ return '<span class="badge '+(ok?"pass":"fail")+'">'+(ok?"PASS":"FAIL")+'</span>'; }
