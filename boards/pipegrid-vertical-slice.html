@@ -177,11 +177,24 @@ var parts=[
 //   this file until now, only ever proven in the static mockup boards.
 // - T (tsplit): the first part combining a straight AND an elbow segment in one
 //   piece (anchor on the run: straight to the run's far end, elbow to the branch).
+// - T (tsplitb / Y): the SAME three ports as tsplit (N,S,E - an opposite pair plus
+//   one more), but the anchor sits on the branch instead of the run. That single
+//   difference makes it come out all-elbow despite having a real opposite pair in
+//   its own port set - the T-vs-Y distinction that was a whole saga earlier in this
+//   project's mockup work, now proven to hold in the actual interactive pipeline,
+//   not just the static boards.
+// - cross, xjunc (adjacent inlets): the first BALANCED/mixing shape - two ports of
+//   EACH role, not one minority port against the rest. Stresses connectingPose's
+//   port-role filter on both sides at once (T only ever had ambiguity on its out
+//   side); this is also the "new" xjunc variant confirmed active earlier in the
+//   project, distinct from the opposite-inlet xjunc that always existed.
 var SHAPES={
-  corner:   {label:"corner-split",             spec:"N+ E- U-"},
-  elbow:    {label:"elbow, directional",       spec:"N+ E-"},
-  straight: {label:"straight, directional",    spec:"N+ S-"},
-  tsplit:   {label:"T, tsplit (anchor on run)",spec:"N+ S- E-"}
+  corner:   {label:"corner-split",                  spec:"N+ E- U-"},
+  elbow:    {label:"elbow, directional",             spec:"N+ E-"},
+  straight: {label:"straight, directional",          spec:"N+ S-"},
+  tsplit:   {label:"T, tsplit (anchor on run)",      spec:"N+ S- E-"},
+  tsplitb:  {label:"T, tsplitb / Y (anchor branch)", spec:"E+ N- S-"},
+  xjunc:    {label:"cross, xjunc (adjacent inlets)", spec:"N+ E+ S- W-"}
 };
 var selectedShapeKey="corner";
 
