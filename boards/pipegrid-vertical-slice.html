@@ -63,7 +63,8 @@
   a real decision, not a silent change.</div>
   <div class="rig" id="rig">
     <div class="readout">
-      <span class="stat">Next part: <button class="btn on" id="shapeCorner">CORNER</button><button class="btn" id="shapeElbow">ELBOW</button></span>
+      <span class="stat">Next part:</span>
+      <span id="shapePicker"></span>
     </div>
     <div class="readout">
       <span class="stat" id="stat">az 35° · el 25° · zoom 100%</span>
@@ -166,15 +167,21 @@ var parts=[
    cell:{x:0, y:0, z:0}, poseIdx:7}    // same seed part as step 1, unchanged
 ];
 
-// The second shape (step 5): proves connection-driven placement and the gizmo
-// generalize past the one hard-coded corner-split, before scaling to the full
-// catalogue's ~40 flow topologies. Elbow is the sharpest contrast available - 2
-// ports instead of 3, a different pose-count (24 vs 24 here, but for a genuinely
-// different structural reason - see PIPEGRID-PARTS-SPEC.md's elbow=12 bare/24
-// directional entry).
+// Scaling toward the full catalogue, one shape at a time, each picked to stress a
+// structural difference the earlier ones didn't:
+// - corner, elbow: both single-anchor, all-elbow (corner has no opposite pair at
+//   all; elbow's 2 ports are merely adjacent). Neither ever renders a STRAIGHT
+//   connection stream in this interactive view.
+// - straight: the first genuinely straight-type connection here - corner/elbow are
+//   both all-elbow, so streamsFor's "straight if opposite" branch was untested in
+//   this file until now, only ever proven in the static mockup boards.
+// - T (tsplit): the first part combining a straight AND an elbow segment in one
+//   piece (anchor on the run: straight to the run's far end, elbow to the branch).
 var SHAPES={
-  corner: {label:"corner-split", spec:"N+ E- U-"},
-  elbow:  {label:"elbow, directional", spec:"N+ E-"}
+  corner:   {label:"corner-split",             spec:"N+ E- U-"},
+  elbow:    {label:"elbow, directional",       spec:"N+ E-"},
+  straight: {label:"straight, directional",    spec:"N+ S-"},
+  tsplit:   {label:"T, tsplit (anchor on run)",spec:"N+ S- E-"}
 };
 var selectedShapeKey="corner";
 
@@ -708,11 +715,21 @@ document.getElementById("undobtn").addEventListener("click", function(){
 });
 function selectShape(key){
   selectedShapeKey=key;
-  document.getElementById("shapeCorner").classList.toggle("on", key==="corner");
-  document.getElementById("shapeElbow").classList.toggle("on", key==="elbow");
+  Object.keys(SHAPES).forEach(function(k){
+    document.getElementById("shapeBtn_"+k).classList.toggle("on", k===key);
+  });
 }
-document.getElementById("shapeCorner").addEventListener("click", function(){ selectShape("corner"); });
-document.getElementById("shapeElbow").addEventListener("click", function(){ selectShape("elbow"); });
+(function(){
+  var picker=document.getElementById("shapePicker");
+  Object.keys(SHAPES).forEach(function(k){
+    var b=document.createElement("button");
+    b.className="btn"+(k===selectedShapeKey?" on":"");
+    b.id="shapeBtn_"+k;
+    b.textContent=k.toUpperCase();
+    b.addEventListener("click", function(){ selectShape(k); });
+    picker.appendChild(b);
+  });
+})();
 
 render();
 
