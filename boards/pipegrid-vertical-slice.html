@@ -572,6 +572,24 @@ function hitGizmoArrow(pt){
 }
 
 svg.addEventListener("pointerdown", function(e){
+  // Self-heal a stuck gesture state. Traced the owner's report to an exact mechanism:
+  // a real touchscreen can drop the up/cancel event for one finger of a two-finger
+  // gesture entirely (the OS briefly claiming that finger for its own purposes and
+  // never handing an end event back to the page). up()'s pinch branch resets `mode`
+  // to "none" as soon as pts.size drops BELOW 2 - it only takes the surviving
+  // finger's up to do that - but the abandoned finger's entry is never removed from
+  // `pts`, since nothing ever calls delete() for it. So the map ends up holding a
+  // stale leftover pointer while mode already says "none" - a state that should be
+  // structurally impossible, since "none" means no gesture is believed active at
+  // all. The next fresh single-finger drag then pushes pts.size to 2 (one live
+  // finger, one frozen years-old point), which matches the "size===2" branch below
+  // and starts a phantom pinch instead of an orbit - exactly "stuck in zoom/pan".
+  // Whenever a genuinely new pointer arrives and finds leftover entries sitting
+  // alongside mode "none", those entries are provably stale - safe to clear
+  // unconditionally, since a live gesture would have kept mode off "none".
+  if(mode==="none" && pts.size>0 && !pts.has(e.pointerId)){
+    pts.clear();
+  }
   pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
   try{svg.setPointerCapture(e.pointerId);}catch(err){}
   if(pts.size===1 && mode==="none"){
@@ -621,6 +639,9 @@ svg.addEventListener("pointerdown", function(e){
 });
 svg.addEventListener("pointermove", function(e){
   if(!pts.has(e.pointerId)) return;
+  e.preventDefault(); // only pointerdown called this before - kept the browser from ever
+  // fully committing to its own native gesture (page pinch-zoom/scroll) mid-drag, which
+  // is one real way a pointer can stop delivering events without an up/cancel at all.
   pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
   if(mode==="pinch" && pts.size>=2){
     var d1=pairDist(), mid1=midpoint();
