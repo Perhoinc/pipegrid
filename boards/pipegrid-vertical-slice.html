@@ -50,9 +50,10 @@
   it follows your finger's angle, an amber dashed ghost shows where it'll land, and it snaps to the
   nearest quarter turn on release. Drag a diamond handle to shift the part a whole cell. This is the
   control that reaches the other 3 valid poses step 2 couldn't. <b>Drag empty space</b> to orbit.
-  <b>Tap anywhere that isn't the gizmo to dismiss it</b> — that tap only dismisses, it won't also
-  place a part, even on a port — then tap a fresh port normally to keep the chain going. Tap an
-  already-connected port to bring its part's gizmo back.</div>
+  <b>Tap an open port while the gizmo is up and it just dismisses</b> — that tap doesn't also place a
+  part — then tap it again normally to keep the chain going. To bring a part's gizmo back,
+  <b>tap anywhere along its drawn pipe</b>, or tap one of its ports that's already connected —
+  either reselects it directly, no dismiss step needed first.</div>
   <div class="note"><b>Axis convention note:</b> the existing camera rig was built Y-up (Y is
   vertical, X/Z are the ground plane). Everything built this session — the pose system, the gizmo,
   the 2D sheet — is Z-up (U/D are literally ±Z). Adapted the camera here to Z-up rather than the
@@ -441,6 +442,47 @@ function nearestPortWithin(x,y,r){
   visiblePorts.forEach(function(v){ var d=Math.hypot(x-v.sx,y-v.sy); if(d<bd){bd=d;best=v;} });
   return bd<=r ? best : null;
 }
+// Pure predicate, no mutation - lets pointerdown classify a port as "would place
+// something" vs "dead end" BEFORE deciding what the tap should do, without actually
+// running placeConnectedPart's side effects.
+function portCanConnect(fromPort){
+  var existingCell=parts[fromPort.partIdx].cell;
+  var targetCell={
+    x:existingCell.x+DIRVEC[fromPort.worldDir][0],
+    y:existingCell.y+DIRVEC[fromPort.worldDir][1],
+    z:existingCell.z+DIRVEC[fromPort.worldDir][2]
+  };
+  if(targetCell.x<-GRIDN||targetCell.x>GRIDN||targetCell.y<-GRIDN||targetCell.y>GRIDN) return false;
+  if(isOccupied(targetCell.x,targetCell.y,targetCell.z)) return false;
+  var result=connectingPose(fromPort.worldDir, fromPort.role, P("N+ E- U-"));
+  return !!(result && result.poseIdx>=0);
+}
+function distToSegment(px,py,ax,ay,bx,by){
+  var dx=bx-ax, dy=by-ay, len2=dx*dx+dy*dy;
+  var t = len2>0 ? Math.max(0,Math.min(1, ((px-ax)*dx+(py-ay)*dy)/len2)) : 0;
+  return Math.hypot(px-(ax+t*dx), py-(ay+t*dy));
+}
+// Owner's fix for reselection being "too complicated" (only a dead port worked, and
+// nothing marks which port that is): tapping anywhere along a part's actual drawn pipe
+// now reselects it too. Recomputes each part's screen-space geometry fresh rather than
+// caching render()'s points, since camera/pose can change between renders.
+var BODY_HIT_R=14;
+function hitPartBody(pt){
+  var best=null;
+  parts.forEach(function(part, partIdx){
+    var pose=ROTS[part.poseIdx];
+    part.streams.forEach(function(st){
+      var pts3=(st.type==="straight"?straight3(st.from,st.to):elbow3(st.from,st.to,14))
+        .map(function(p){ var w=matApply(pose,p); return [w[0]+part.cell.x, w[1]+part.cell.y, w[2]+part.cell.z]; });
+      var pts2=pts3.map(function(p){ return proj(rotPt(p[0],p[1],p[2],cam.az,cam.el)); });
+      for(var i=0;i<pts2.length-1;i++){
+        var d=distToSegment(pt.x,pt.y,pts2[i].sx,pts2[i].sy,pts2[i+1].sx,pts2[i+1].sy);
+        if(d<BODY_HIT_R && (!best||d<best.dist)) best={partIdx:partIdx, dist:d};
+      }
+    });
+  });
+  return best;
+}
 function placeConnectedPart(fromPort){
   var existingCell=parts[fromPort.partIdx].cell;
   var targetCell={
@@ -511,15 +553,6 @@ svg.addEventListener("pointerdown", function(e){
   if(pts.size===1 && mode==="none"){
     var p=svgPointFromClient(e.clientX,e.clientY);
     var ringHit=hitGizmoRing(p), arrowHit=hitGizmoArrow(p);
-    // Owner's fix for the gizmo getting in the way of connecting further parts: any tap
-    // that isn't ON the gizmo dismisses it first. This tap is spent dismissing only - it
-    // doesn't also place a part or orbit, even if it's sitting right on a port. Reselecting
-    // the part (see the port-tap handling below) is what brings the gizmo back.
-    if(gizmoPartIdx!=null && !ringHit && !arrowHit){
-      gizmoPartIdx=null; gizmoDrag=null; render();
-      e.preventDefault(); return;
-    }
-    var portHit = (ringHit||arrowHit) ? null : nearestPortWithin(p.x,p.y,CAPTURE_R); // gizmo wins when both present
     if(arrowHit && (!ringHit || arrowHit.dist<ringHit.dist)){
       var gp0=parts[gizmoPartIdx];
       mode="gizmoMove";
@@ -529,10 +562,34 @@ svg.addEventListener("pointerdown", function(e){
       var a0=ringAngleAt(ringHit.axis,cellArr0,p);
       mode="gizmoRot";
       gizmoDrag={type:"rot", axis:ringHit.axis, basePose:ROTS[parts[gizmoPartIdx].poseIdx], prev:a0.angle, live:0};
-    } else if(portHit){
-      mode="connect"; pendingPort=portHit;
     } else {
-      mode="orbit"; orbitLast={x:e.clientX,y:e.clientY};
+      // Ports sit AT the tips of a part's channel paths, so a port-tap and a body-tap
+      // can be nearly coincident right at the tip - a pure distance comparison let the
+      // body hit win by a hair there, silently turning a port tap into a reselect
+      // instead of a placement. Fixed by giving any port inside its own capture radius
+      // absolute priority; the body hit-test only gets a say when no port claims the tap.
+      var portHit=nearestPortWithin(p.x,p.y,CAPTURE_R);
+      if(portHit){
+        if(portCanConnect(portHit)){
+          // Placing IS a side effect, so if a different part's gizmo is up, this tap
+          // still only dismisses it first - unchanged from the owner's original fix.
+          if(gizmoPartIdx!=null){ gizmoPartIdx=null; render(); }
+          else { mode="connect"; pendingPort=portHit; }
+        } else {
+          // Dead end (occupied neighbour, or off the demo grid) - reselect its owner
+          // directly, one tap, no dismiss step needed since nothing is being placed.
+          gizmoPartIdx=portHit.partIdx; gizmoDrag=null; mode="none"; render();
+        }
+      } else {
+        var bodyHit=hitPartBody(p);
+        if(bodyHit){
+          gizmoPartIdx=bodyHit.partIdx; gizmoDrag=null; mode="none"; render();
+        } else if(gizmoPartIdx!=null){
+          gizmoPartIdx=null; render();
+        } else {
+          mode="orbit"; orbitLast={x:e.clientX,y:e.clientY};
+        }
+      }
     }
   }
   else if(pts.size===2){ mode="pinch"; pinchBase={d0:pairDist(), mid0:midpoint(), scale0:cam.scale, panX0:cam.panX, panY0:cam.panY}; }
