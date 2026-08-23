@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-<title>PIPEGRID — vertical slice (step 3: gizmo override)</title>
+<title>PIPEGRID — vertical slice (second shape: elbow)</title>
 <style>
   :root{
     --bg:#0b0d10; --panel:#12151b; --panel2:#0e1116; --edge:#2c313d;
@@ -40,7 +40,7 @@
 <body>
 <div class="hdr">
   <div class="title">PIPEGRID — VERTICAL SLICE</div>
-  <div class="sub">step 3 of 4: the gizmo appears on a newly-placed part, ported from the settled mockup</div>
+  <div class="sub">proving the connect/gizmo loop generalizes past one hard-coded shape, before scaling to the full catalogue</div>
 </div>
 
 <div class="panel">
@@ -53,13 +53,18 @@
   <b>Tap an open port while the gizmo is up and it just dismisses</b> — that tap doesn't also place a
   part — then tap it again normally to keep the chain going. To bring a part's gizmo back,
   <b>tap anywhere along its drawn pipe</b>, or tap one of its ports that's already connected —
-  either reselects it directly, no dismiss step needed first.</div>
+  either reselects it directly, no dismiss step needed first. <b>Pick CORNER or ELBOW</b> above to
+  choose what the next tap-to-connect placement is — this is the step proving the connection/pose
+  logic generalizes past a single hard-coded shape, on the way to the full catalogue.</div>
   <div class="note"><b>Axis convention note:</b> the existing camera rig was built Y-up (Y is
   vertical, X/Z are the ground plane). Everything built this session — the pose system, the gizmo,
   the 2D sheet — is Z-up (U/D are literally ±Z). Adapted the camera here to Z-up rather than the
   other way around, since the pose system is the more deeply validated of the two. Flagging this as
   a real decision, not a silent change.</div>
   <div class="rig" id="rig">
+    <div class="readout">
+      <span class="stat">Next part: <button class="btn on" id="shapeCorner">CORNER</button><button class="btn" id="shapeElbow">ELBOW</button></span>
+    </div>
     <div class="readout">
       <span class="stat" id="stat">az 35° · el 25° · zoom 100%</span>
       <span>
@@ -160,6 +165,18 @@ var parts=[
   {shape:"corner-split", ports:cornerPorts, streams:cornerStreams,
    cell:{x:0, y:0, z:0}, poseIdx:7}    // same seed part as step 1, unchanged
 ];
+
+// The second shape (step 5): proves connection-driven placement and the gizmo
+// generalize past the one hard-coded corner-split, before scaling to the full
+// catalogue's ~40 flow topologies. Elbow is the sharpest contrast available - 2
+// ports instead of 3, a different pose-count (24 vs 24 here, but for a genuinely
+// different structural reason - see PIPEGRID-PARTS-SPEC.md's elbow=12 bare/24
+// directional entry).
+var SHAPES={
+  corner: {label:"corner-split", spec:"N+ E- U-"},
+  elbow:  {label:"elbow, directional", spec:"N+ E-"}
+};
+var selectedShapeKey="corner";
 
 /* ================= connection-driven pose inference (step 2) =================
    Given the port you tapped — its WORLD direction and role, on an already-placed
@@ -454,7 +471,7 @@ function portCanConnect(fromPort){
   };
   if(targetCell.x<-GRIDN||targetCell.x>GRIDN||targetCell.y<-GRIDN||targetCell.y>GRIDN) return false;
   if(isOccupied(targetCell.x,targetCell.y,targetCell.z)) return false;
-  var result=connectingPose(fromPort.worldDir, fromPort.role, P("N+ E- U-"));
+  var result=connectingPose(fromPort.worldDir, fromPort.role, P(SHAPES[selectedShapeKey].spec));
   return !!(result && result.poseIdx>=0);
 }
 function distToSegment(px,py,ax,ay,bx,by){
@@ -492,10 +509,10 @@ function placeConnectedPart(fromPort){
   };
   if(targetCell.x<-GRIDN||targetCell.x>GRIDN||targetCell.y<-GRIDN||targetCell.y>GRIDN) return null; // off the demo grid
   if(isOccupied(targetCell.x,targetCell.y,targetCell.z)) return null; // already something there
-  var newPorts=P("N+ E- U-"); // step 2 keeps placing corner-splits; varying the shape is a later step
+  var newPorts=P(SHAPES[selectedShapeKey].spec);
   var result=connectingPose(fromPort.worldDir, fromPort.role, newPorts);
   if(!result || result.poseIdx<0) return null;
-  var newPart={shape:"corner-split", ports:newPorts, streams:streamsFor(newPorts),
+  var newPart={shape:SHAPES[selectedShapeKey].label, ports:newPorts, streams:streamsFor(newPorts),
     cell:targetCell, poseIdx:result.poseIdx};
   parts.push(newPart);
   lastPlacement={fromPort:fromPort, newPartIdx:parts.length-1, connResult:result, targetCell:targetCell};
@@ -689,6 +706,13 @@ document.getElementById("undobtn").addEventListener("click", function(){
     parts.pop(); lastPlacement=null; render(); runValidation();
   }
 });
+function selectShape(key){
+  selectedShapeKey=key;
+  document.getElementById("shapeCorner").classList.toggle("on", key==="corner");
+  document.getElementById("shapeElbow").classList.toggle("on", key==="elbow");
+}
+document.getElementById("shapeCorner").addEventListener("click", function(){ selectShape("corner"); });
+document.getElementById("shapeElbow").addEventListener("click", function(){ selectShape("elbow"); });
 
 render();
 
@@ -724,16 +748,25 @@ function runValidation(){
   });
   rows.push(["Every port on every part sits exactly PR from its own cell centre", lengthsOk]);
 
+  // General, shape-agnostic version of the old corner-only "no opposite pair" check:
+  // whichever canonical port-pairs are opposite in a shape's HOME orientation must
+  // still be opposite after posing, and pairs that weren't opposite at home must not
+  // become opposite either. Corner and elbow both have zero such pairs, so this still
+  // reduces to the old check for them - but it no longer silently assumes every future
+  // shape will share that property, which straight/T (added when scaling to the full
+  // catalogue) will not.
   var shapeOk = parts.every(function(part,pi){
     var pts=part.ports.map(function(p){ return lastPortWorld[pi][p.dir]; });
     for(var i=0;i<pts.length;i++)for(var j=i+1;j<pts.length;j++){
       var a=pts[i],b=pts[j];
       var sum=[a[0]+b[0]-2*part.cell.x, a[1]+b[1]-2*part.cell.y, a[2]+b[2]-2*part.cell.z];
-      if(Math.hypot(sum[0],sum[1],sum[2])<1e-6) return false;
+      var isOppositeNow = Math.hypot(sum[0],sum[1],sum[2])<1e-6;
+      var wasOppositeAtHome = OPP[part.ports[i].dir]===part.ports[j].dir;
+      if(isOppositeNow !== wasOppositeAtHome) return false;
     }
     return true;
   });
-  rows.push(["Every placed corner still has no opposite port pair (shape preserved under every pose used)", shapeOk]);
+  rows.push(["Every part's opposite/non-opposite port relationships preserved under its pose", shapeOk]);
 
   var testPt=[0,0,1];
   var atEl0 = rotPt(testPt[0],testPt[1],testPt[2], 1.0, 0);
