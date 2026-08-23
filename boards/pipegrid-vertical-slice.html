@@ -49,7 +49,10 @@
   ported straight from <code>pipegrid-pose-gizmo-mockups.html</code>: drag a ring to turn the part —
   it follows your finger's angle, an amber dashed ghost shows where it'll land, and it snaps to the
   nearest quarter turn on release. Drag a diamond handle to shift the part a whole cell. This is the
-  control that reaches the other 3 valid poses step 2 couldn't. <b>Drag empty space</b> to orbit.</div>
+  control that reaches the other 3 valid poses step 2 couldn't. <b>Drag empty space</b> to orbit.
+  <b>Tap anywhere that isn't the gizmo to dismiss it</b> — that tap only dismisses, it won't also
+  place a part, even on a port — then tap a fresh port normally to keep the chain going. Tap an
+  already-connected port to bring its part's gizmo back.</div>
   <div class="note"><b>Axis convention note:</b> the existing camera rig was built Y-up (Y is
   vertical, X/Z are the ground plane). Everything built this session — the pose system, the gizmo,
   the 2D sheet — is Z-up (U/D are literally ±Z). Adapted the camera here to Z-up rather than the
@@ -508,6 +511,14 @@ svg.addEventListener("pointerdown", function(e){
   if(pts.size===1 && mode==="none"){
     var p=svgPointFromClient(e.clientX,e.clientY);
     var ringHit=hitGizmoRing(p), arrowHit=hitGizmoArrow(p);
+    // Owner's fix for the gizmo getting in the way of connecting further parts: any tap
+    // that isn't ON the gizmo dismisses it first. This tap is spent dismissing only - it
+    // doesn't also place a part or orbit, even if it's sitting right on a port. Reselecting
+    // the part (see the port-tap handling below) is what brings the gizmo back.
+    if(gizmoPartIdx!=null && !ringHit && !arrowHit){
+      gizmoPartIdx=null; gizmoDrag=null; render();
+      e.preventDefault(); return;
+    }
     var portHit = (ringHit||arrowHit) ? null : nearestPortWithin(p.x,p.y,CAPTURE_R); // gizmo wins when both present
     if(arrowHit && (!ringHit || arrowHit.dist<ringHit.dist)){
       var gp0=parts[gizmoPartIdx];
@@ -595,7 +606,14 @@ function up(e){
   }
   if(mode==="connect"){
     if(pts.size===0){
-      placeConnectedPart(pendingPort);
+      var placement=placeConnectedPart(pendingPort);
+      if(!placement){
+        // this port couldn't spawn anything (already connected, or off the demo grid) -
+        // rather than a dead tap, treat it as reselecting its owner's gizmo. This is the
+        // "reappear when you reselect the part" half of the fix: tap any of a part's
+        // already-occupied ports to bring its gizmo back.
+        gizmoPartIdx=pendingPort.partIdx;
+      }
       mode="none"; pendingPort=null;
       render();
       runValidation();
