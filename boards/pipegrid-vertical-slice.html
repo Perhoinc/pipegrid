@@ -375,7 +375,13 @@ function render(){
     });
   });
 
-  items.sort(function(a,b){ return (a.cellDepth-b.cellDepth)||(a.cellIdx-b.cellIdx)||(a.depth-b.depth); });
+  // rotPt's returned .y is camera-space depth, but SMALLER values are nearer the
+  // viewer (proven via an unambiguous overhead case: el=90 deg, a physically-higher
+  // point must be nearer that camera, yet rotPt gives it the smaller y). Painter's
+  // algorithm needs farthest-first so nearer geometry draws last/on top - descending
+  // sort on the two real depth tiers achieves that. cellIdx stays ascending; it's a
+  // stable tiebreak with no depth meaning of its own, not a near/far signal.
+  items.sort(function(a,b){ return (b.cellDepth-a.cellDepth)||(a.cellIdx-b.cellIdx)||(b.depth-a.depth); });
 
   items.forEach(function(it){
     if(it.kind==="wire"){
@@ -504,7 +510,7 @@ function drawAxisIndicator(){
     return {label:d.label, col:d.col, depth:view.y,
       sx:AXIS_IND_CX+view.x*AXIS_IND_R, sy:AXIS_IND_CY-view.z*AXIS_IND_R};
   });
-  items.sort(function(a,b){ return a.depth-b.depth; }); // nearer axis drawn on top, same rule as the scene
+  items.sort(function(a,b){ return b.depth-a.depth; }); // nearer axis drawn on top, same corrected rule as the scene
   items.forEach(function(it){
     var ln=svgNS("line");
     ln.setAttribute("x1",AXIS_IND_CX); ln.setAttribute("y1",AXIS_IND_CY);
