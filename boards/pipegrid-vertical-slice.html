@@ -218,6 +218,15 @@ var SHAPES={
   cthrumx3: {label:"corner-through, mixing (U+N in)",    spec:"U+ N+ D- E-"},
   cthrumx4: {label:"corner-through, mixing (U+E in)",    spec:"U+ E+ D- N-"},
   fiveway:  {label:"five-way, apex split (starfish)",  spec:"U+ N- E- S- W-"},
+  fivewayflat: {label:"five-way, flat-port split",      spec:"N+ S- E- W- U-"},
+  fivewayam:   {label:"five-way, apex merge (starfish)", spec:"N+ E+ S+ W+ U-"},
+  fivewaymf:   {label:"five-way, flat-port merge",       spec:"E+ S+ W+ U+ N-"},
+  five3a_split:{label:"five-way, mixing apex+flat in",   spec:"U+ N+ E- S- W-"},
+  five3a_merge:{label:"five-way, mixing apex+flat out",  spec:"E+ S+ W+ U- N-"},
+  five3b_split:{label:"five-way, mixing opposite-flat in",  spec:"N+ S+ E- W- U-"},
+  five3b_merge:{label:"five-way, mixing opposite-flat out", spec:"E+ W+ U+ N- S-"},
+  five3c_split:{label:"five-way, mixing adjacent-flat in",  spec:"N+ E+ S- W- U-"},
+  five3c_merge:{label:"five-way, mixing adjacent-flat out", spec:"S+ W+ U+ N- E-"},
   sixway:   {label:"six-way, single-anchor split",     spec:"N+ S- E- W- U- D-"}
 };
 var selectedShapeKey="corner";
