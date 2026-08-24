@@ -401,6 +401,14 @@ function render(){
       path.setAttribute("d","M "+pts2.map(function(p){return p.sx.toFixed(1)+" "+p.sy.toFixed(1);}).join(" L "));
       path.setAttribute("fill","none"); path.setAttribute("stroke","var(--text)");
       path.setAttribute("stroke-width", (5*cam.scale).toFixed(2)); path.setAttribute("stroke-linecap","round");
+      // Owner's fix for the sharp spike artifact at acute viewing angles: an elbow arc's
+      // screen-space projection can fold back on itself when viewed near edge-on (its
+      // 3D tangent points mostly toward/away from the camera), so consecutive points in
+      // the path can turn sharply. Default stroke-linejoin is "miter", which draws a
+      // pointed spike at any sharp joint under the miter-limit (4) - measured ~2.9 at the
+      // reported case, well under that limit, so it wasn't even falling back to a bevel.
+      // Round joins make that same joint a smooth curve instead of a point.
+      path.setAttribute("stroke-linejoin","round");
       // Owner's fix for ports reading as "too solid" when they should be hidden: this
       // was translucent (0.85) while ports were fully opaque (1, no opacity set at all -
       // see below). SVG has no z-buffer, only paint order, so occlusion ONLY works if
@@ -431,7 +439,8 @@ function render(){
         var path=svgNS("path");
         path.setAttribute("d","M "+p3.map(function(p){return p.sx.toFixed(1)+" "+p.sy.toFixed(1);}).join(" L "));
         path.setAttribute("fill","none"); path.setAttribute("stroke","var(--acc)"); path.setAttribute("stroke-width","2");
-        path.setAttribute("stroke-linecap","round"); path.setAttribute("stroke-dasharray","4 5"); path.setAttribute("opacity","0.75");
+        path.setAttribute("stroke-linecap","round"); path.setAttribute("stroke-linejoin","round");
+        path.setAttribute("stroke-dasharray","4 5"); path.setAttribute("opacity","0.75");
         sceneG.appendChild(path);
       });
     }
