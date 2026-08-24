@@ -227,7 +227,14 @@ var SHAPES={
   five3b_merge:{label:"five-way, mixing opposite-flat out", spec:"E+ W+ U+ N- S-"},
   five3c_split:{label:"five-way, mixing adjacent-flat in",  spec:"N+ E+ S- W- U-"},
   five3c_merge:{label:"five-way, mixing adjacent-flat out", spec:"S+ W+ U+ N- E-"},
-  sixway:   {label:"six-way, single-anchor split",     spec:"N+ S- E- W- U- D-"}
+  sixway:   {label:"six-way, single-anchor split",     spec:"N+ S- E- W- U- D-"},
+  sixwaym:  {label:"six-way, single-anchor merge",     spec:"S+ E+ W+ U+ D+ N-"},
+  sixoppin:  {label:"six-way, mixing opposite-pair in",  spec:"N+ S+ E- W- U- D-"},
+  sixoppout: {label:"six-way, mixing opposite-pair out", spec:"E+ W+ U+ D+ N- S-"},
+  sixadjin:  {label:"six-way, mixing adjacent-pair in",  spec:"N+ E+ S- W- U- D-"},
+  sixadjout: {label:"six-way, mixing adjacent-pair out", spec:"S+ W+ U+ D+ N- E-"},
+  six33t:      {label:"six-way, 3-in-3-out T-type",       spec:"N+ S+ E+ W- U- D-"},
+  six33corner: {label:"six-way, 3-in-3-out corner-type",  spec:"N+ E+ U+ S- W- D-"}
 };
 var selectedShapeKey="corner";
 
