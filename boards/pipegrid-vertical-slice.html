@@ -717,7 +717,17 @@ svg.addEventListener("pointermove", function(e){
   if(mode==="orbit"){
     var dx=e.clientX-orbitLast.x, dy=e.clientY-orbitLast.y;
     orbitLast={x:e.clientX,y:e.clientY};
-    cam.az -= dx*0.01;
+    // Flipped per owner feedback: swiping right should turn the view right (content
+    // slides left under your finger, the standard "grab the camera" orbit feel), not
+    // left. Traced it: proj() reads screen-X straight off p.x, which az alone controls
+    // (el never touches x1 - the two are fully independent in this projection, so this
+    // couldn't have been introduced by the elevation fix, just not separately noticed
+    // until it was). At az=0 the world-North point sits at screen-x=0; DECREASING az
+    // (the old "-= dx", meaning a rightward swipe decreased az) pushed that point's x1
+    // POSITIVE - content sliding right under a rightward swipe, direct-manipulation
+    // "spin the globe" behaviour, not "turn the camera". Flipped to match the camera-
+    // turn convention the tilt fix now also uses.
+    cam.az += dx*0.01;
     // Flipped per owner feedback: dragging down should tip the TOP of the scene toward
     // the viewer (you end up looking more from above), the standard trackball feel.
     // Traced it rather than just flipping blindly: increasing el moves a point that's
