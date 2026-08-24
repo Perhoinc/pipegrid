@@ -201,7 +201,9 @@ var SHAPES={
   straight: {label:"straight, directional",          spec:"N+ S-"},
   tsplit:   {label:"T, tsplit (anchor on run)",      spec:"N+ S- E-"},
   tsplitb:  {label:"T, tsplitb / Y (anchor branch)", spec:"E+ N- S-"},
-  xjunc:    {label:"cross, xjunc (adjacent inlets)", spec:"N+ E+ S- W-"}
+  xjunc:    {label:"cross, xjunc (adjacent inlets)", spec:"N+ E+ S- W-"},
+  cap:      {label:"cap (single opening)",           spec:"N+"},
+  cthru:    {label:"corner-through (stem+2 arms)",   spec:"U+ D- N- E-"}
 };
 var selectedShapeKey="corner";
 
