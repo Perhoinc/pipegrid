@@ -395,7 +395,13 @@ function render(){
       path.setAttribute("d","M "+pts2.map(function(p){return p.sx.toFixed(1)+" "+p.sy.toFixed(1);}).join(" L "));
       path.setAttribute("fill","none"); path.setAttribute("stroke","var(--text)");
       path.setAttribute("stroke-width", (5*cam.scale).toFixed(2)); path.setAttribute("stroke-linecap","round");
-      path.setAttribute("opacity","0.85");
+      // Owner's fix for ports reading as "too solid" when they should be hidden: this
+      // was translucent (0.85) while ports were fully opaque (1, no opacity set at all -
+      // see below). SVG has no z-buffer, only paint order, so occlusion ONLY works if
+      // whatever's drawn on top is actually opaque enough to hide what's underneath -
+      // an 0.85-opaque channel can never fully cover a fully-opaque port behind it,
+      // regardless of whether the draw order itself is correct. Full opacity here is
+      // what makes painter's algorithm actually occlude, not just reorder.
       sceneG.appendChild(path);
     } else {
       var sp=proj(it.view);
