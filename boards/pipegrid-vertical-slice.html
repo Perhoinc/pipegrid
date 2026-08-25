@@ -81,6 +81,20 @@
       </span>
     </div>
     <div class="readout"><span class="stat" id="gizmostat">no part selected</span></div>
+    <div class="readout">
+      <span class="stat">Save file (no legacy format - fresh schema, no old boards exist to migrate):</span>
+      <span>
+        <button class="btn" id="savebtn">Save to box below</button>
+        <button class="btn" id="loadbtn">Load from box below</button>
+      </span>
+    </div>
+    <div class="readout" style="display:block;">
+      <textarea id="savedata" spellcheck="false" style="width:100%;height:70px;box-sizing:border-box;
+        font-family:inherit;font-size:9px;background:var(--panel2);color:var(--text);
+        border:1px solid var(--edge);border-radius:4px;padding:6px;resize:vertical;"
+        placeholder="Save writes JSON here. Paste JSON here and Load to restore it."></textarea>
+      <span class="stat" id="savestat"></span>
+    </div>
   </div>
 </div>
 
@@ -170,7 +184,7 @@ function streamsFor(ports){
 var cornerPorts=P("N+ E- U-");        // corner-split, canonical/home orientation
 var cornerStreams=streamsFor(cornerPorts);
 var parts=[
-  {shape:"corner-split", ports:cornerPorts, streams:cornerStreams,
+  {shape:"corner-split", shapeKey:"corner", ports:cornerPorts, streams:cornerStreams,
    cell:{x:0, y:0, z:0}, poseIdx:7}    // same seed part as step 1, unchanged
 ];
 
@@ -635,12 +649,52 @@ function placeConnectedPart(fromPort){
   var newPorts=P(SHAPES[selectedShapeKey].spec);
   var result=connectingPose(fromPort.worldDir, fromPort.role, newPorts);
   if(!result || result.poseIdx<0) return null;
-  var newPart={shape:SHAPES[selectedShapeKey].label, ports:newPorts, streams:streamsFor(newPorts),
-    cell:targetCell, poseIdx:result.poseIdx};
+  var newPart={shape:SHAPES[selectedShapeKey].label, shapeKey:selectedShapeKey, ports:newPorts,
+    streams:streamsFor(newPorts), cell:targetCell, poseIdx:result.poseIdx};
   parts.push(newPart);
   lastPlacement={fromPort:fromPort, newPartIdx:parts.length-1, connResult:result, targetCell:targetCell};
   gizmoPartIdx=lastPlacement.newPartIdx;   // gizmo appears on the part you just placed
   return lastPlacement;
+}
+
+/* ---------- save / load: fresh schema, no legacy app to migrate from (owner confirmed
+   2026-08-25 no old boards exist) - so the only state worth storing per part is what
+   isn't already derivable from the shape key: cell position and pose index. ports/
+   streams are recomputed from SHAPES[shapeKey].spec on load, same as at placement time. */
+var SAVE_SCHEMA=1;
+function serializeBoard(){
+  return {
+    schema: SAVE_SCHEMA,
+    camera: {az:cam.az, el:cam.el, scale:cam.scale, panX:cam.panX, panY:cam.panY},
+    parts: parts.map(function(p){
+      return {shape:p.shapeKey, cell:{x:p.cell.x, y:p.cell.y, z:p.cell.z}, poseIdx:p.poseIdx};
+    })
+  };
+}
+function loadBoard(data){
+  if(!data || data.schema!==SAVE_SCHEMA) throw new Error("unrecognized save schema: "+(data&&data.schema));
+  if(!Array.isArray(data.parts) || data.parts.length===0) throw new Error("save data has no parts");
+  var newParts=data.parts.map(function(rec,idx){
+    var def=SHAPES[rec.shape];
+    if(!def) throw new Error("part "+idx+": unknown shape key \""+rec.shape+"\"");
+    if(!(Number.isInteger(rec.poseIdx) && rec.poseIdx>=0 && rec.poseIdx<24)) throw new Error("part "+idx+": invalid poseIdx "+rec.poseIdx);
+    if(!rec.cell || !Number.isInteger(rec.cell.x) || !Number.isInteger(rec.cell.y) || !Number.isInteger(rec.cell.z)) throw new Error("part "+idx+": invalid cell");
+    var ports=P(def.spec);
+    return {shape:def.label, shapeKey:rec.shape, ports:ports, streams:streamsFor(ports),
+      cell:{x:rec.cell.x, y:rec.cell.y, z:rec.cell.z}, poseIdx:rec.poseIdx};
+  });
+  var occ={};
+  newParts.forEach(function(p,idx){
+    var k=p.cell.x+","+p.cell.y+","+p.cell.z;
+    if(occ[k]!==undefined) throw new Error("parts "+occ[k]+" and "+idx+" both occupy cell "+k);
+    occ[k]=idx;
+  });
+  parts=newParts;
+  gizmoPartIdx=null; gizmoDrag=null; lastPlacement=null; mode="none"; pts.clear();
+  if(data.camera){
+    cam.az=data.camera.az; cam.el=data.camera.el; cam.scale=data.camera.scale;
+    cam.panX=data.camera.panX; cam.panY=data.camera.panY;
+  }
 }
 
 /* ---------- orbit / pan / zoom, ported gesture-for-gesture from the combined-test rig ---------- */
@@ -868,6 +922,21 @@ document.getElementById("undobtn").addEventListener("click", function(){
     parts.pop(); lastPlacement=null; render(); runValidation();
   }
 });
+document.getElementById("savebtn").addEventListener("click", function(){
+  document.getElementById("savedata").value=JSON.stringify(serializeBoard(), null, 1);
+  document.getElementById("savestat").textContent=parts.length+" part(s) saved";
+});
+document.getElementById("loadbtn").addEventListener("click", function(){
+  var statEl=document.getElementById("savestat");
+  try{
+    var data=JSON.parse(document.getElementById("savedata").value);
+    loadBoard(data);
+    render(); runValidation();
+    statEl.textContent=parts.length+" part(s) loaded";
+  }catch(e){
+    statEl.textContent="Load failed: "+e.message;
+  }
+});
 function selectShape(key){
   selectedShapeKey=key;
   Object.keys(SHAPES).forEach(function(k){
@@ -894,7 +963,8 @@ document.getElementById("themebtn").addEventListener("click", function(){
 });
 
 render();
-window.__pgSlice={parts:parts, get gizmoPartIdx(){return gizmoPartIdx;}, get mode(){return mode;}};
+window.__pgSlice={get parts(){return parts;}, get gizmoPartIdx(){return gizmoPartIdx;}, get mode(){return mode;},
+  serializeBoard:serializeBoard, loadBoard:loadBoard};
 
 /* ================= validation ================= */
 function badge(ok){ return '<span class="badge '+(ok?"pass":"fail")+'">'+(ok?"PASS":"FAIL")+'</span>'; }
