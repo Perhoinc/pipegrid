@@ -99,6 +99,23 @@
 </div>
 
 <div class="panel">
+  <div class="plabel" style="font-size:11px;font-weight:700;letter-spacing:1.5px;margin-bottom:6px;">2D REFERENCE VIEW</div>
+  <div class="note">Reads the exact same <code>parts</code> array as the 3D view above - no separate
+  state, no export/import step. Plan view drops the U/D axis (looking straight down); iso view uses
+  the settled 20&deg;/50&deg; angle from <code>pipegrid-2d-reference-sheet-mockups.html</code>. Both
+  show one Z-layer at a time - pick which layer with the selector.</div>
+  <div class="readout">
+    <span class="stat">Layer:</span>
+    <span id="layerPicker"></span>
+    <span class="stat" id="layerstat"></span>
+  </div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;">
+    <div class="rig" style="flex:1;min-width:220px;"><svg id="planSvg" class="rigsvg" viewBox="0 0 300 300"></svg></div>
+    <div class="rig" style="flex:1;min-width:220px;"><svg id="isoSvg" class="rigsvg" viewBox="0 0 300 300"></svg></div>
+  </div>
+</div>
+
+<div class="panel">
   <div class="plabel" style="font-size:11px;font-weight:700;letter-spacing:1.5px;margin-bottom:6px;">VALIDATION</div>
   <table id="checks"><tbody></tbody></table>
 </div>
@@ -545,6 +562,171 @@ function render(){
 
   document.getElementById("stat").textContent=
     "az "+Math.round(cam.az*180/Math.PI)+"° · el "+Math.round(cam.el*180/Math.PI)+"° · zoom "+Math.round(cam.scale*100)+"%";
+
+  renderReferenceView();
+}
+
+/* ================= 2D reference view: same parts array, two more projections =================
+   Reads `parts` directly - no export, no separate copy of state. A part's world-oriented
+   points come from the exact same matApply(ROTS[part.poseIdx], canonicalPoint) the 3D
+   view above already uses; only the FINAL projection differs (drop U/D for plan, rotate
+   by the settled iso angle for iso). Shows one Z-layer at a time, picked from whichever
+   z values are actually occupied - z has no fixed bound (only x/y are grid-limited), so
+   the picker is built from real part positions rather than assuming a fixed range. */
+var currentRefLayer=0;
+var REF_CELL=64;      // plan-view cell size, px
+var ISO_CELL=2.0, ISO_S=34;   // iso-view cell size (world units) and its pixel scale
+var REF_AZ_DEG=50, REF_EL_DEG=20;   // settled angle from pipegrid-2d-reference-sheet-mockups.html - do not change without asking
+
+function occupiedLayers(){
+  var set={};
+  parts.forEach(function(p){ set[p.cell.z]=true; });
+  var list=Object.keys(set).map(Number);
+  list.sort(function(a,b){return a-b;});
+  if(list.indexOf(0)<0) list.push(0), list.sort(function(a,b){return a-b;});
+  return list;
+}
+
+function refIsoProject(p){
+  var az=REF_AZ_DEG*Math.PI/180, el=REF_EL_DEG*Math.PI/180;
+  var ca=Math.cos(az), sa=Math.sin(az);
+  var x=p[0]*ca-p[1]*sa, y=p[0]*sa+p[1]*ca, z=p[2];
+  var ce=Math.cos(el), se=Math.sin(el);
+  var y2=y*ce-z*se, z2=y*se+z*ce;
+  return {vx:x, vy:y2, vz:z2};
+}
+
+function renderReferenceView(){
+  var layers=occupiedLayers();
+  var picker=document.getElementById("layerPicker");
+  if(layers.indexOf(currentRefLayer)<0) currentRefLayer=layers[0];
+  picker.innerHTML="";
+  layers.forEach(function(z){
+    var b=document.createElement("button");
+    b.className="btn"+(z===currentRefLayer?" on":"");
+    b.textContent="Z="+z;
+    b.addEventListener("click", function(){ currentRefLayer=z; renderReferenceView(); });
+    picker.appendChild(b);
+  });
+  var layerParts=parts.filter(function(p){ return p.cell.z===currentRefLayer; });
+  document.getElementById("layerstat").textContent=layerParts.length+" part(s) on this layer";
+
+  drawPlanView(layerParts);
+  drawIsoView(layerParts);
+}
+
+function drawPlanView(layerParts){
+  var svg=document.getElementById("planSvg");
+  while(svg.firstChild) svg.removeChild(svg.firstChild);
+  var VBP=REF_CELL*(2*GRIDN+1);
+  svg.setAttribute("viewBox","0 0 "+VBP+" "+VBP);
+  function ctr(cell){ return {x:VBP/2+cell.x*REF_CELL, y:VBP/2-cell.y*REF_CELL}; }
+  // grid
+  for(var gx=-GRIDN; gx<=GRIDN; gx++) for(var gy=-GRIDN; gy<=GRIDN; gy++){
+    var c=ctr({x:gx,y:gy});
+    var r=svgNS("rect");
+    r.setAttribute("x",c.x-REF_CELL/2); r.setAttribute("y",c.y-REF_CELL/2);
+    r.setAttribute("width",REF_CELL); r.setAttribute("height",REF_CELL);
+    r.setAttribute("fill","none"); r.setAttribute("stroke","var(--wire)"); r.setAttribute("stroke-width","0.75"); r.setAttribute("opacity","0.4");
+    svg.appendChild(r);
+  }
+  layerParts.forEach(function(part){
+    var c=ctr(part.cell);
+    var pose=ROTS[part.poseIdx];
+    function planPt(p){
+      var w=matApply(pose,p);
+      return {x:c.x+w[0]*(REF_CELL/2), y:c.y-w[1]*(REF_CELL/2)};
+    }
+    // p.dir is the shape's CANONICAL/home-orientation direction, not where the port
+    // actually faces after this part's pose - that's DMAPS[poseIdx][p.dir], the same
+    // lookup the 3D renderer already uses. Checking p.dir directly here was a real bug:
+    // it would only ever match a shape whose home orientation happens to already use
+    // U/D, never a part that got rotated so some OTHER port now points up/down.
+    var up=part.ports.filter(function(p){return DMAPS[part.poseIdx][p.dir]==="U";})[0];
+    var dn=part.ports.filter(function(p){return DMAPS[part.poseIdx][p.dir]==="D";})[0];
+    if(dn){
+      var dc=svgNS("circle");
+      dc.setAttribute("cx",c.x); dc.setAttribute("cy",c.y); dc.setAttribute("r",REF_CELL*0.16);
+      dc.setAttribute("fill","none"); dc.setAttribute("stroke","var(--wire)"); dc.setAttribute("stroke-width","2"); dc.setAttribute("opacity","0.6");
+      svg.appendChild(dc);
+    }
+    part.streams.forEach(function(s){
+      var p3=(s.type==="straight"?straight3(s.from,s.to):elbow3(s.from,s.to,16));
+      var pts=p3.map(planPt);
+      var span=Math.max.apply(null,pts.map(function(p){return Math.hypot(p.x-c.x,p.y-c.y);}));
+      if(span<3) return;
+      var path=svgNS("path");
+      path.setAttribute("d","M "+pts.map(function(p){return p.x.toFixed(1)+" "+p.y.toFixed(1);}).join(" L "));
+      path.setAttribute("fill","none"); path.setAttribute("stroke","var(--text)"); path.setAttribute("stroke-width","4");
+      path.setAttribute("stroke-linecap","round"); path.setAttribute("stroke-linejoin","round");
+      svg.appendChild(path);
+    });
+    part.ports.forEach(function(p){
+      var worldDir=DMAPS[part.poseIdx][p.dir];
+      if(worldDir==="U"||worldDir==="D") return;
+      var v=DIRVEC[p.dir], q=planPt([v[0]*PR,v[1]*PR,v[2]*PR]);
+      var pc2=svgNS("circle");
+      pc2.setAttribute("cx",q.x.toFixed(1)); pc2.setAttribute("cy",q.y.toFixed(1)); pc2.setAttribute("r","3.4");
+      pc2.setAttribute("fill", p.role==="in"?"var(--acc)":"var(--panel)"); pc2.setAttribute("stroke","var(--text)"); pc2.setAttribute("stroke-width","1.6");
+      svg.appendChild(pc2);
+    });
+    if(up){
+      var uc=svgNS("circle");
+      uc.setAttribute("cx",c.x); uc.setAttribute("cy",c.y); uc.setAttribute("r",REF_CELL*0.11);
+      uc.setAttribute("fill","var(--panel)"); uc.setAttribute("stroke",up.role==="in"?"var(--acc)":"var(--text)"); uc.setAttribute("stroke-width","1.8");
+      svg.appendChild(uc);
+      var ud=svgNS("circle");
+      ud.setAttribute("cx",c.x); ud.setAttribute("cy",c.y); ud.setAttribute("r","2");
+      ud.setAttribute("fill",up.role==="in"?"var(--acc)":"var(--text)");
+      svg.appendChild(ud);
+    }
+  });
+}
+
+function drawIsoView(layerParts){
+  var svg=document.getElementById("isoSvg");
+  while(svg.firstChild) svg.removeChild(svg.firstChild);
+  var VBI=300;
+  svg.setAttribute("viewBox","0 0 "+VBI+" "+VBI);
+  var ctr={x:VBI/2, y:VBI*0.56};
+  function place(p3){
+    var v=refIsoProject(p3);
+    return {x:ctr.x+v.vx*ISO_S, y:ctr.y-v.vz*ISO_S-v.vy*ISO_S*0.32, depth:v.vy};
+  }
+  var items=[];
+  layerParts.forEach(function(part,partIdx){
+    var off=[part.cell.x*ISO_CELL, part.cell.y*ISO_CELL, 0];
+    var cellDepth=place(off).depth;
+    var pose=ROTS[part.poseIdx];
+    part.streams.forEach(function(st){
+      var p3=(st.type==="straight"?straight3(st.from,st.to):elbow3(st.from,st.to,14))
+        .map(function(p){ var w=matApply(pose,p); return [w[0]+off[0],w[1]+off[1],w[2]+off[2]]; });
+      var pts=p3.map(place);
+      items.push({cellDepth:cellDepth, cellIdx:partIdx,
+        depth:pts.reduce(function(a,p){return a+p.depth;},0)/pts.length, kind:"chan", pts:pts});
+    });
+    part.ports.forEach(function(p){
+      var v=DIRVEC[p.dir];
+      var w=matApply(pose,[v[0]*PR,v[1]*PR,v[2]*PR]);
+      var pt=place([w[0]+off[0],w[1]+off[1],w[2]+off[2]]);
+      items.push({cellDepth:cellDepth, cellIdx:partIdx, depth:pt.depth, kind:"port", pt:pt, role:p.role});
+    });
+  });
+  items.sort(function(a,b){ return (a.cellDepth-b.cellDepth)||(a.cellIdx-b.cellIdx)||(a.depth-b.depth); });
+  items.forEach(function(it){
+    if(it.kind==="chan"){
+      var path=svgNS("path");
+      path.setAttribute("d","M "+it.pts.map(function(p){return p.x.toFixed(1)+" "+p.y.toFixed(1);}).join(" L "));
+      path.setAttribute("fill","none"); path.setAttribute("stroke","var(--text)"); path.setAttribute("stroke-width","3.2");
+      path.setAttribute("stroke-linecap","round"); path.setAttribute("stroke-linejoin","round");
+      svg.appendChild(path);
+    } else {
+      var c2=svgNS("circle");
+      c2.setAttribute("cx",it.pt.x.toFixed(1)); c2.setAttribute("cy",it.pt.y.toFixed(1)); c2.setAttribute("r","4.2");
+      c2.setAttribute("fill", it.role==="in"?"var(--acc)":"var(--panel)"); c2.setAttribute("stroke","var(--text)"); c2.setAttribute("stroke-width","1.4");
+      svg.appendChild(c2);
+    }
+  });
 }
 
 // Owner's fix for the "which way is actually up" illusion when orbiting underneath a
