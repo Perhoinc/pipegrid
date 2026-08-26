@@ -358,7 +358,11 @@ function snapQuarter(t){ return Math.round(t/(Math.PI/2)); }
 
 var gizmoPartIdx=null;   // which part currently shows the gizmo, or null
 var gizmoDrag=null;      // {type:'rot'|'move', axis, basePose, prev, live} | {type:'move', axis, base:[x,y,z]}
-var connectDrag=null;    // {prep, liveIdx} while mode==="connect" - which of the 4 valid poses is live
+var connectDrag=null;    // {prep, prevAngle, live, liveIdx} while mode==="connect"
+// >1 means a full 90-degree pose step commits with LESS than 90 degrees of actual
+// drag arc - owner asked for more sensitivity than the gizmo's own 1:1 tracking.
+// Tunable; raise further if it still feels like it needs more travel per pose.
+var PLACE_DRAG_SENSITIVITY=1.8;
 
 function gizmoLiveMatrix(){
   if(gizmoDrag && gizmoDrag.type==="rot") return mulF(gizmoDrag.axis.cont(gizmoDrag.live), gizmoDrag.basePose);
@@ -1021,7 +1025,17 @@ svg.addEventListener("pointerdown", function(e){
             var prep=prepareConnection(portHit);
             if(prep){
               mode="connect"; pendingPort=portHit;
-              connectDrag={prep:prep, liveIdx:0};
+              // prev/live mirror the gizmo's OWN rotation tracking exactly (see
+              // mode==="gizmoRot" below): live accumulates the DELTA between
+              // consecutive frames, starting at 0 wherever the finger happens to
+              // land, rather than reading an absolute angle off the connecting
+              // port's own fixed axis. That fixed-axis version is the real bug an
+              // earlier pass shipped: the very first pointermove could jump to
+              // any of the 4 poses depending on which direction your finger
+              // happened to already be from the port, with zero relation to
+              // which way you actually dragged.
+              var a0=ringAngleAt(prep.axis, prep.portWorldPos, p).angle;
+              connectDrag={prep:prep, prevAngle:a0, live:0, liveIdx:0};
             }
           }
         } else {
@@ -1112,14 +1126,22 @@ svg.addEventListener("pointermove", function(e){
     return;
   }
   if(mode==="connect"){
-    // Owner's chosen design: dragging around the connecting port spins the new part
-    // through its 4 valid poses live, same angle-tracking approach as the gizmo ring
-    // (reused directly - portWorldPos plays the role cellArr does there), landing on
-    // whichever pose is showing when released. A stationary tap never moves the angle
-    // off 0, so liveIdx stays 0 - identical to the old single-pose-on-tap behaviour.
+    // Fixed per owner feedback ("gesture needs to be more sensitive and I don't get
+    // what gesture accumulates to what direction"): accumulate the DELTA between
+    // consecutive frames (exactly the gizmoRot pattern above), not an absolute angle
+    // off the port's own fixed axis - that version's very first pointermove could
+    // jump to any of the 4 poses depending on which direction your finger already
+    // happened to be from the port, unrelated to which way you dragged. A
+    // sensitivity multiplier on top (owner also asked for more of it) makes a full
+    // pose-cycle take noticeably less physical drag than 90 degrees of true arc.
     var pt3=svgPointFromClient(e.clientX,e.clientY);
-    var ang=ringAngleAt(connectDrag.prep.axis, connectDrag.prep.portWorldPos, pt3).angle;
-    connectDrag.liveIdx=(((Math.round(ang/(Math.PI/2)))%4)+4)%4;
+    var cur=ringAngleAt(connectDrag.prep.axis, connectDrag.prep.portWorldPos, pt3).angle;
+    var d=cur-connectDrag.prevAngle;
+    while(d>Math.PI) d-=Math.PI*2;
+    while(d<-Math.PI) d+=Math.PI*2;
+    connectDrag.live += d*PLACE_DRAG_SENSITIVITY;
+    connectDrag.prevAngle = cur;
+    connectDrag.liveIdx=(((Math.round(connectDrag.live/(Math.PI/2)))%4)+4)%4;
     render();
     return;
   }
