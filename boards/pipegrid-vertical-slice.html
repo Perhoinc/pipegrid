@@ -306,6 +306,24 @@ var GIZMO_AXES=[
 GIZMO_AXES.forEach(function(a){
   a.ring=function(t){var c=Math.cos(t),s=Math.sin(t); return [a.e1[0]*c+a.e2[0]*s, a.e1[1]*c+a.e2[1]*s, a.e1[2]*c+a.e2[2]*s]; };
 });
+// Each GIZMO_AXES entry already fixes exactly one of the 3 principal axes (x=E/W,
+// y=N/S, z=U/D) under its own 90-degree step matrix - reused below for placement's
+// pose-cycling drag, since "the 4 poses that keep one connection fixed" IS exactly
+// "the 4 rotations about that connection's own axis" (a direction's stabilizer in the
+// 24-rotation group has order 4, matching the already-established 24/6=4 fact).
+var AXIS_FOR_DIR={N:GIZMO_AXES[1], S:GIZMO_AXES[1], E:GIZMO_AXES[0], W:GIZMO_AXES[0], U:GIZMO_AXES[2], D:GIZMO_AXES[2]};
+function poseSequenceFor(axis, basePoseIdx){
+  // Walks the 4 poses in true rotational order around the connection axis (not
+  // just "whichever 4 DMAPS entries match", which need not be contiguous) - so a
+  // steady drag cycles through them smoothly instead of jumping unpredictably.
+  var seq=[], M=ROTS[basePoseIdx];
+  for(var i=0;i<4;i++){
+    var mk=matKey(M);
+    seq.push(ROTS.findIndex(function(R){ return matKey(R)===mk; }));
+    M=matMul(axis.M, M);
+  }
+  return seq;
+}
 var GIZMO_RING_R=0.62, GIZMO_ARROW_L=0.8;
 function pc(p){ return proj(rotPt(p[0],p[1],p[2],cam.az,cam.el)); }
 function gizmoCellArr(part){ return [part.cell.x, part.cell.y, part.cell.z]; }
@@ -340,6 +358,7 @@ function snapQuarter(t){ return Math.round(t/(Math.PI/2)); }
 
 var gizmoPartIdx=null;   // which part currently shows the gizmo, or null
 var gizmoDrag=null;      // {type:'rot'|'move', axis, basePose, prev, live} | {type:'move', axis, base:[x,y,z]}
+var connectDrag=null;    // {prep, liveIdx} while mode==="connect" - which of the 4 valid poses is live
 
 function gizmoLiveMatrix(){
   if(gizmoDrag && gizmoDrag.type==="rot") return mulF(gizmoDrag.axis.cont(gizmoDrag.live), gizmoDrag.basePose);
@@ -491,6 +510,24 @@ function render(){
     }
   });
 
+  // ---------- placement-drag ghost: live preview of whichever of the 4 valid poses
+  // the drag is currently over, same dashed styling as the gizmo's own rotation
+  // ghost so the two read as the same kind of thing (a landing preview, not a mark). ----------
+  if(mode==="connect" && connectDrag){
+    var prep=connectDrag.prep, ghostPose=ROTS[prep.poseSeq[connectDrag.liveIdx]], tc=prep.targetCell;
+    var ghostPorts=prep.newPorts, ghostStreams=streamsFor(ghostPorts);
+    ghostStreams.forEach(function(s){
+      var p3=(s.type==="straight"?straight3(s.from,s.to):elbow3(s.from,s.to,14))
+        .map(function(p){ var w=matApply(ghostPose,p); return pc([w[0]+tc.x,w[1]+tc.y,w[2]+tc.z]); });
+      var path=svgNS("path");
+      path.setAttribute("d","M "+p3.map(function(p){return p.sx.toFixed(1)+" "+p.sy.toFixed(1);}).join(" L "));
+      path.setAttribute("fill","none"); path.setAttribute("stroke","var(--acc)"); path.setAttribute("stroke-width","2");
+      path.setAttribute("stroke-linecap","round"); path.setAttribute("stroke-linejoin","round");
+      path.setAttribute("stroke-dasharray","4 5"); path.setAttribute("opacity","0.75");
+      sceneG.appendChild(path);
+    });
+  }
+
   // ---------- gizmo overlay: always drawn on top, not depth-tested against the scene ----------
   if(gizmoPartIdx!=null && parts[gizmoPartIdx]){
     var gp=parts[gizmoPartIdx], cellArr=gizmoCellArr(gp);
@@ -554,6 +591,9 @@ function render(){
     document.getElementById("gizmostat").textContent = turning
       ? "turning "+gizmoDrag.axis.name+" "+(gizmoDrag.live*180/Math.PI).toFixed(0)+"° → snaps to "+((((snapQuarter(gizmoDrag.live)%4)+4)%4)*90)+"°"
       : "gizmo on new part · pose "+(gp.poseIdx+1)+" of 24 · cell "+cellArr.join(",");
+  } else if(mode==="connect" && connectDrag){
+    document.getElementById("gizmostat").textContent =
+      "placing · pose "+(connectDrag.liveIdx+1)+" of 4 valid for this connection · release to commit";
   } else {
     document.getElementById("gizmostat").textContent = "no part selected";
   }
@@ -819,7 +859,10 @@ function hitPartBody(pt){
   });
   return best;
 }
-function placeConnectedPart(fromPort){
+// Split into prepare (pure, no mutation - runs at pointerdown to decide whether this
+// tap is even placeable, same validity checks as before) and commit (runs at
+// pointerup, once the placement drag has picked which of the 4 poses to land on).
+function prepareConnection(fromPort){
   var existingCell=parts[fromPort.partIdx].cell;
   var targetCell={
     x:existingCell.x+DIRVEC[fromPort.worldDir][0],
@@ -831,10 +874,16 @@ function placeConnectedPart(fromPort){
   var newPorts=P(SHAPES[selectedShapeKey].spec);
   var result=connectingPose(fromPort.worldDir, fromPort.role, newPorts);
   if(!result || result.poseIdx<0) return null;
-  var newPart={shape:SHAPES[selectedShapeKey].label, shapeKey:selectedShapeKey, ports:newPorts,
-    streams:streamsFor(newPorts), cell:targetCell, poseIdx:result.poseIdx};
+  var axis=AXIS_FOR_DIR[fromPort.worldDir];
+  var poseSeq=poseSequenceFor(axis, result.poseIdx);
+  return {targetCell:targetCell, newPorts:newPorts, connResult:result, axis:axis, poseSeq:poseSeq,
+    portWorldPos:lastPortWorld[fromPort.partIdx][fromPort.dir]};
+}
+function commitConnection(fromPort, prep, poseIdx){
+  var newPart={shape:SHAPES[selectedShapeKey].label, shapeKey:selectedShapeKey, ports:prep.newPorts,
+    streams:streamsFor(prep.newPorts), cell:prep.targetCell, poseIdx:poseIdx};
   parts.push(newPart);
-  lastPlacement={fromPort:fromPort, newPartIdx:parts.length-1, connResult:result, targetCell:targetCell};
+  lastPlacement={fromPort:fromPort, newPartIdx:parts.length-1, connResult:prep.connResult, targetCell:prep.targetCell};
   gizmoPartIdx=lastPlacement.newPartIdx;   // gizmo appears on the part you just placed
   return lastPlacement;
 }
@@ -968,7 +1017,13 @@ svg.addEventListener("pointerdown", function(e){
           // Placing IS a side effect, so if a different part's gizmo is up, this tap
           // still only dismisses it first - unchanged from the owner's original fix.
           if(gizmoPartIdx!=null){ gizmoPartIdx=null; render(); }
-          else { mode="connect"; pendingPort=portHit; }
+          else {
+            var prep=prepareConnection(portHit);
+            if(prep){
+              mode="connect"; pendingPort=portHit;
+              connectDrag={prep:prep, liveIdx:0};
+            }
+          }
         } else {
           // Dead end (occupied neighbour, or off the demo grid) - reselect its owner
           // directly, one tap, no dismiss step needed since nothing is being placed.
@@ -1056,6 +1111,18 @@ svg.addEventListener("pointermove", function(e){
     }
     return;
   }
+  if(mode==="connect"){
+    // Owner's chosen design: dragging around the connecting port spins the new part
+    // through its 4 valid poses live, same angle-tracking approach as the gizmo ring
+    // (reused directly - portWorldPos plays the role cellArr does there), landing on
+    // whichever pose is showing when released. A stationary tap never moves the angle
+    // off 0, so liveIdx stays 0 - identical to the old single-pose-on-tap behaviour.
+    var pt3=svgPointFromClient(e.clientX,e.clientY);
+    var ang=ringAngleAt(connectDrag.prep.axis, connectDrag.prep.portWorldPos, pt3).angle;
+    connectDrag.liveIdx=(((Math.round(ang/(Math.PI/2)))%4)+4)%4;
+    render();
+    return;
+  }
 });
 function up(e){
   pts.delete(e.pointerId);
@@ -1078,15 +1145,8 @@ function up(e){
   }
   if(mode==="connect"){
     if(pts.size===0){
-      var placement=placeConnectedPart(pendingPort);
-      if(!placement){
-        // this port couldn't spawn anything (already connected, or off the demo grid) -
-        // rather than a dead tap, treat it as reselecting its owner's gizmo. This is the
-        // "reappear when you reselect the part" half of the fix: tap any of a part's
-        // already-occupied ports to bring its gizmo back.
-        gizmoPartIdx=pendingPort.partIdx;
-      }
-      mode="none"; pendingPort=null;
+      commitConnection(pendingPort, connectDrag.prep, connectDrag.prep.poseSeq[connectDrag.liveIdx]);
+      mode="none"; pendingPort=null; connectDrag=null;
       render();
       runValidation();
     }
@@ -1146,7 +1206,7 @@ document.getElementById("themebtn").addEventListener("click", function(){
 
 render();
 window.__pgSlice={get parts(){return parts;}, get gizmoPartIdx(){return gizmoPartIdx;}, get mode(){return mode;},
-  serializeBoard:serializeBoard, loadBoard:loadBoard};
+  get connectDrag(){return connectDrag;}, serializeBoard:serializeBoard, loadBoard:loadBoard};
 
 /* ================= validation ================= */
 function badge(ok){ return '<span class="badge '+(ok?"pass":"fail")+'">'+(ok?"PASS":"FAIL")+'</span>'; }
