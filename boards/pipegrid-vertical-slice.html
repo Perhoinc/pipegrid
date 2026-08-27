@@ -327,11 +327,12 @@ function poseSequenceFor(axis, basePoseIdx){
 var GIZMO_RING_R=0.62, GIZMO_ARROW_L=0.8;
 function pc(p){ return proj(rotPt(p[0],p[1],p[2],cam.az,cam.el)); }
 function gizmoCellArr(part){ return [part.cell.x, part.cell.y, part.cell.z]; }
-function ringPoints(axis, cellArr){
+function ringPoints(axis, cellArr, radius){
+  radius = radius===undefined ? GIZMO_RING_R : radius;
   var pts=[];
   for(var i=0;i<=72;i++){
     var t=(i/72)*Math.PI*2, u=axis.ring(t);
-    pts.push([u[0]*GIZMO_RING_R+cellArr[0], u[1]*GIZMO_RING_R+cellArr[1], u[2]*GIZMO_RING_R+cellArr[2]]);
+    pts.push([u[0]*radius+cellArr[0], u[1]*radius+cellArr[1], u[2]*radius+cellArr[2]]);
   }
   return pts;
 }
@@ -513,6 +514,37 @@ function render(){
       sceneG.appendChild(c);
     }
   });
+
+  // ---------- placement-drag guide ring: owner's ask, after asking what gesture was
+  // even being tracked - the gizmo's OWN rotation has a visible ring to drag along,
+  // placement had none, just a ghost jumping between poses with nothing showing the
+  // "dial" underneath it. Same near/far segment technique as the gizmo ring, but
+  // deliberately faint/thin (this is a guide, not a control you grab) and a smaller
+  // radius (PLACE_RING_R, not GIZMO_RING_R) since it's centered on a single port
+  // rather than a whole cell - the gizmo's own radius would overshoot into
+  // neighbouring cells from here. ----------
+  var PLACE_RING_R=0.3;
+  if(mode==="connect" && connectDrag){
+    var pcp=connectDrag.prep.portWorldPos;
+    ringPoints(connectDrag.prep.axis, pcp, PLACE_RING_R).map(function(p){ return {v:rotPt(p[0],p[1],p[2],cam.az,cam.el)}; })
+      .map(function(o){ o.p=proj(o.v); return o; })
+      .reduce(function(segs,o,i,arr){
+        var far=o.v.y>0.02;
+        if(i>0 && far!==(arr[i-1].v.y>0.02)) segs.push([]);
+        segs[segs.length-1].push({p:o.p, far:far});
+        return segs;
+      }, [[]])
+      .forEach(function(sg){
+        if(sg.length<2) return;
+        var path=svgNS("path");
+        path.setAttribute("d","M "+sg.map(function(o){return o.p.sx.toFixed(1)+" "+o.p.sy.toFixed(1);}).join(" L "));
+        path.setAttribute("fill","none"); path.setAttribute("stroke",connectDrag.prep.axis.col);
+        path.setAttribute("stroke-width","2");
+        path.setAttribute("opacity", sg[0].far ? "0.15" : "0.5");
+        path.setAttribute("stroke-linecap","round");
+        sceneG.appendChild(path);
+      });
+  }
 
   // ---------- placement-drag ghost: live preview of whichever of the 4 valid poses
   // the drag is currently over, same dashed styling as the gizmo's own rotation
