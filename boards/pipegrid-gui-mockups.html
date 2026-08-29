@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>PIPEGRID — GUI treatment mockups</title>
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12151b; --panel2:#0e1116; --edge:#2c313d;
+    --text:#c7d3e2; --dim:#5f6775; --acc:#e0a14e; --out:#3a4150; --wire:#8ea6bf;
+    --ax:#d8534f; --ay:#5aa469; --az:#4a7fb5;
+  }
+  body[data-theme="light"]{
+    --bg:#eef1f5; --panel:#ffffff; --panel2:#f4f6f9; --edge:#d3d9e2;
+    --text:#232a35; --dim:#7a8494; --acc:#c97a1f; --out:#9aa4b3; --wire:#5b6b80;
+    --ax:#c0392b; --ay:#3f8f52; --az:#2f6ea8;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;}
+  body{background:var(--bg);color:var(--text);
+       font-family:ui-monospace,SFMono-Regular,Menlo,monospace;-webkit-text-size-adjust:100%;
+       padding:16px;padding-bottom:80px;}
+  .hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:6px;flex-wrap:wrap;}
+  .title{font-size:15px;font-weight:700;letter-spacing:2px;}
+  .sub{font-size:9px;letter-spacing:1px;color:var(--dim);}
+  .hdr .themebtn{margin-left:auto;}
+  .btn{font-family:inherit;font-size:10px;letter-spacing:.5px;text-transform:uppercase;
+       padding:7px 9px;border:1px solid var(--edge);border-radius:4px;background:transparent;
+       color:var(--text);cursor:pointer;}
+  .btn.on{border-color:var(--acc);color:var(--acc);}
+  .note{font-size:11px;color:var(--dim);line-height:1.65;margin:6px 0 16px;max-width:760px;}
+  .note b{color:var(--text);}
+  .compare{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start;}
+  .treat{width:340px;}
+  .treat h2{font-size:12px;letter-spacing:1.5px;margin:0 0 4px;color:var(--acc);}
+  .treat .verdict{font-size:10.5px;color:var(--dim);line-height:1.6;margin:10px 0 22px;}
+  .treat .verdict b{color:var(--text);}
+  .frame{width:340px;height:472px;border:1px solid var(--edge);border-radius:22px;
+         background:var(--panel2);overflow:hidden;position:relative;box-shadow:0 8px 24px rgba(0,0,0,0.35);}
+  .frame .notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:110px;height:18px;
+         background:var(--bg);border-radius:0 0 12px 12px;z-index:30;}
+
+  /* ---- shared scene illustration: identical hand-placed content in every treatment,
+     so the comparison is about chrome/layout, not different example boards ---- */
+  .scene{position:absolute;inset:0;background:var(--panel2);}
+  .scene svg{width:100%;height:100%;display:block;}
+
+  /* ---- shared shape-glyph language: one simple line icon per connectivity family,
+     reused across every treatment's picker rather than 39 bespoke drawings ---- */
+  .glyph{stroke:var(--text);stroke-width:6;fill:none;stroke-linecap:round;}
+  .glyph-port{fill:var(--acc);}
+
+  /* ===================== Treatment A: overlay HUD ===================== */
+  .A .toolbar{position:absolute;left:10px;right:10px;bottom:10px;display:flex;gap:8px;align-items:center;
+      background:color-mix(in srgb, var(--panel) 88%, transparent);backdrop-filter:blur(6px);
+      border:1px solid var(--edge);border-radius:14px;padding:8px;z-index:20;}
+  .A .iconbtn{width:38px;height:38px;border-radius:10px;border:1px solid var(--edge);background:var(--panel2);
+      display:flex;align-items:center;justify-content:center;color:var(--text);font-size:15px;flex:none;}
+  .A .shapepill{flex:1;display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--edge);
+      border-radius:10px;padding:0 10px;height:38px;color:var(--text);font-size:10.5px;letter-spacing:.5px;}
+  .A .shapepill svg{width:20px;height:20px;flex:none;}
+  .A .hud{position:absolute;top:12px;left:12px;right:12px;display:flex;justify-content:space-between;
+      font-size:8.5px;color:var(--dim);letter-spacing:.5px;z-index:20;pointer-events:none;}
+  .A .hud span{background:color-mix(in srgb, var(--panel2) 70%, transparent);padding:3px 7px;border-radius:6px;}
+  .A .cornerbtns{position:absolute;top:10px;right:10px;display:flex;gap:6px;z-index:20;}
+  .A .cornerbtns .iconbtn{width:30px;height:30px;font-size:12px;border-radius:8px;
+      background:color-mix(in srgb, var(--panel) 88%, transparent);}
+  .A .sheet{position:absolute;left:0;right:0;bottom:0;height:62%;background:var(--panel);
+      border-top:1px solid var(--edge);border-radius:16px 16px 0 0;z-index:40;
+      transform:translateY(100%);transition:transform .25s ease;display:flex;flex-direction:column;}
+  .A .sheet.open{transform:translateY(0);}
+  .A .sheethandle{width:34px;height:4px;background:var(--edge);border-radius:2px;margin:8px auto;flex:none;}
+  .A .sheetbody{overflow-y:auto;padding:0 12px 12px;}
+  .A .tier{font-size:9px;letter-spacing:1px;color:var(--dim);margin:10px 0 6px;}
+  .A .tiergrid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;}
+  .A .tile{aspect-ratio:1;border:1px solid var(--edge);border-radius:8px;background:var(--panel2);
+      display:flex;align-items:center;justify-content:center;}
+  .A .tile svg{width:60%;height:60%;}
+  .A .tile.on{border-color:var(--acc);}
+
+  /* ===================== Treatment B: persistent side panel ===================== */
+  .B{display:flex;height:100%;}
+  .B .canvaswrap{flex:1;position:relative;min-width:0;}
+  .B .side{width:118px;flex:none;background:var(--panel);border-left:1px solid var(--edge);
+      overflow-y:auto;display:flex;flex-direction:column;}
+  .B .sidehead{padding:8px 8px 4px;font-size:8.5px;letter-spacing:1px;color:var(--dim);
+      border-bottom:1px solid var(--edge);}
+  .B .sec{border-bottom:1px solid var(--edge);}
+  .B .sechead{padding:7px 8px;font-size:8.5px;letter-spacing:.8px;color:var(--dim);display:flex;
+      justify-content:space-between;align-items:center;}
+  .B .tiergrid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:0 6px 8px;}
+  .B .tile{aspect-ratio:1;border:1px solid var(--edge);border-radius:6px;background:var(--panel2);
+      display:flex;align-items:center;justify-content:center;}
+  .B .tile svg{width:60%;height:60%;}
+  .B .tile.on{border-color:var(--acc);}
+  .B .rowbtns{display:flex;flex-direction:column;gap:5px;padding:6px 8px;}
+  .B .rowbtn{font-size:9px;letter-spacing:.4px;padding:6px 7px;border:1px solid var(--edge);border-radius:6px;
+      background:var(--panel2);color:var(--text);text-align:left;}
+  .B .hud{position:absolute;top:10px;left:10px;font-size:8.5px;color:var(--dim);
+      background:color-mix(in srgb, var(--panel2) 70%, transparent);padding:3px 7px;border-radius:6px;}
+  .B .refthumb{margin:6px 8px 8px;border:1px solid var(--edge);border-radius:6px;background:var(--panel2);
+      aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;font-size:8px;color:var(--dim);}
+
+  /* ===================== Treatment C: compact bottom dock ===================== */
+  .C .canvasfull{position:absolute;inset:0;}
+  .C .hud{position:absolute;top:10px;left:10px;right:10px;display:flex;justify-content:space-between;
+      font-size:8.5px;color:var(--dim);z-index:20;}
+  .C .hud span{background:color-mix(in srgb, var(--panel2) 70%, transparent);padding:3px 7px;border-radius:6px;}
+  .C .dock{position:absolute;left:0;right:0;bottom:0;height:58px;background:var(--panel);
+      border-top:1px solid var(--edge);display:flex;z-index:30;}
+  .C .dockbtn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+      color:var(--dim);font-size:8px;letter-spacing:.4px;}
+  .C .dockbtn.on{color:var(--acc);}
+  .C .dockbtn .ic{font-size:16px;}
+  .C .popover{position:absolute;left:8px;right:8px;bottom:66px;background:var(--panel);border:1px solid var(--edge);
+      border-radius:12px;max-height:280px;overflow-y:auto;z-index:35;box-shadow:0 -6px 20px rgba(0,0,0,0.3);
+      transform:translateY(8px);opacity:0;pointer-events:none;transition:.18s ease;}
+  .C .popover.open{transform:translateY(0);opacity:1;pointer-events:auto;}
+  .C .popoverhead{padding:9px 12px;font-size:9.5px;letter-spacing:1px;color:var(--dim);
+      border-bottom:1px solid var(--edge);}
+  .C .tier{font-size:9px;letter-spacing:1px;color:var(--dim);margin:8px 10px 5px;}
+  .C .tiergrid{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;padding:0 10px 10px;}
+  .C .tile{aspect-ratio:1;border:1px solid var(--edge);border-radius:7px;background:var(--panel2);
+      display:flex;align-items:center;justify-content:center;}
+  .C .tile svg{width:58%;height:58%;}
+  .C .tile.on{border-color:var(--acc);}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <div class="title">PIPEGRID — GUI TREATMENTS</div>
+  <div class="sub">three layout directions for the vertical slice's chrome, same scene and same 39-shape catalogue in each</div>
+  <button class="btn themebtn" id="themebtn">LIGHT</button>
+</div>
+<div class="note">
+  The current vertical slice's controls were built as plumbing to prove the mechanics (pose system,
+  gizmo, connect-drag, save/load) — never designed as something to actually use. This board is a real
+  design pass on the chrome around that proven 3D scene, not a change to any mechanic. <b>The scene
+  itself, the port/pipe rendering, and every gesture stay exactly as they are today</b> — what's under
+  comparison is only: where the shape picker lives and how it handles 39 shapes without becoming a wall
+  of tiny buttons, where camera/status readouts go, how board actions (undo/reset/save/load) are
+  reached, and how the 2D reference view gets accessed. Tap the shape-picker control or the dock/side
+  panel entries in each frame below — they're live enough to show the actual open/close behaviour, not
+  just a static screenshot.
+</div>
+
+<div class="compare">
+
+  <!-- ============================= TREATMENT A ============================= -->
+  <div class="treat">
+    <h2>A · OVERLAY HUD</h2>
+    <div class="frame A" id="frameA">
+      <div class="notch"></div>
+      <div class="scene" id="sceneA"></div>
+      <div class="hud"><span>az 92° · el 12°</span><span>pose 3 of 24</span></div>
+      <div class="cornerbtns">
+        <button class="iconbtn" title="Undo">↶</button>
+        <button class="iconbtn" title="Reset view">⟲</button>
+        <button class="iconbtn" title="Board (save/load)">⤓</button>
+        <button class="iconbtn" title="2D reference view">▦</button>
+      </div>
+      <div class="toolbar">
+        <button class="shapepill" id="pillA"></button>
+        <button class="iconbtn" title="Undo">↶</button>
+      </div>
+      <div class="sheet" id="sheetA">
+        <div class="sheethandle"></div>
+        <div class="sheetbody" id="sheetBodyA"></div>
+      </div>
+    </div>
+    <div class="verdict">
+      3D canvas gets the whole screen, edge to edge — closest to "3D is the app." Controls float on
+      top and mostly stay out of the way until touched. Tapping the current-shape pill slides up a
+      full sheet for picking a different one, tier by tier. <b>Tradeoff:</b> the floating buttons sit
+      directly over the scene, so at some camera angles they could obscure a part underneath them —
+      would need testing on the real device to see if that's ever actually a problem in practice.
+    </div>
+  </div>
+
+  <!-- ============================= TREATMENT B ============================= -->
+  <div class="treat">
+    <h2>B · PERSISTENT SIDE PANEL</h2>
+    <div class="frame B" id="frameB">
+      <div class="notch"></div>
+      <div class="canvaswrap">
+        <div class="scene" id="sceneB"></div>
+        <div class="hud">az 92° · el 12° · pose 3/24</div>
+      </div>
+      <div class="side">
+        <div class="sidehead">PIPEGRID</div>
+        <div class="sec">
+          <div class="sechead"><span>NEXT SHAPE</span></div>
+          <div id="sideBodyB"></div>
+        </div>
+        <div class="sec">
+          <div class="sechead"><span>BOARD</span></div>
+          <div class="rowbtns">
+            <button class="rowbtn">↶ Undo</button>
+            <button class="rowbtn">⟲ Reset view</button>
+            <button class="rowbtn">⤓ Save / Load</button>
+          </div>
+        </div>
+        <div class="sec">
+          <div class="sechead"><span>REFERENCE</span></div>
+          <div class="refthumb">plan + iso</div>
+        </div>
+      </div>
+    </div>
+    <div class="verdict">
+      A fixed tool panel, always visible, nothing to remember to open — closer to a conventional CAD
+      app. The 3D canvas gives up a real, permanent strip of width for it though (shown here at roughly
+      a third of the frame). <b>Tradeoff:</b> on an iPad in portrait this panel would need to become a
+      bottom strip instead of a side strip, which changes its shape and how much fits per row — worth
+      deciding whether that reflow should be automatic or the panel should just get harder to use in
+      portrait specifically.
+    </div>
+  </div>
+
+  <!-- ============================= TREATMENT C ============================= -->
+  <div class="treat">
+    <h2>C · COMPACT BOTTOM DOCK</h2>
+    <div class="frame C" id="frameC">
+      <div class="notch"></div>
+      <div class="canvasfull">
+        <div class="scene" id="sceneC"></div>
+      </div>
+      <div class="hud"><span>az 92° · el 12°</span><span>pose 3 of 24</span></div>
+      <div class="popover" id="popC">
+        <div class="popoverhead">NEXT SHAPE</div>
+        <div id="popBodyC"></div>
+      </div>
+      <div class="dock">
+        <button class="dockbtn on" id="dockShapeC"><span class="ic">◧</span>SHAPES</button>
+        <button class="dockbtn"><span class="ic">↶</span>UNDO</button>
+        <button class="dockbtn"><span class="ic">⟲</span>VIEW</button>
+        <button class="dockbtn"><span class="ic">⤓</span>BOARD</button>
+        <button class="dockbtn"><span class="ic">▦</span>2D</button>
+      </div>
+    </div>
+    <div class="verdict">
+      A native-iPadOS-style tab bar: five clearly-labelled destinations, each opening its own popover
+      above the dock rather than a full sheet. Reads the most like "a real app" of the three, at the
+      cost of a permanent (if slim) 58px strip that isn't scene. <b>Tradeoff:</b> five icons is already
+      a full dock — there's no obvious sixth slot left if something else needs top-level billing later
+      (e.g. a trace/flow mode, if that ever gets ported from the 2D app).
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+"use strict";
+var NS="http://www.w3.org/2000/svg";
+function el(tag,attrs){ var e=document.createElementNS(NS,tag); for(var k in attrs) e.setAttribute(k,attrs[k]); return e; }
+
+/* ---- shape catalogue: label + connectivity family (drives which glyph is reused) ---- */
+var SHAPES=[
+  {k:"cap",f:"cap",l:"Cap"},
+  {k:"straight",f:"straight",l:"Straight"},
+  {k:"elbow",f:"elbow",l:"Elbow"},
+  {k:"tsplit",f:"t",l:"T split"},{k:"tsplitb",f:"t",l:"T/Y split"},
+  {k:"tmerge",f:"t",l:"T merge"},{k:"tmergeb",f:"t",l:"T/Y merge"},
+  {k:"corner",f:"corner",l:"Corner split"},{k:"cornerm",f:"corner",l:"Corner merge"},
+  {k:"xjunc",f:"cross",l:"Cross (adj in)"},{k:"xjuncopp",f:"cross",l:"Cross (opp in)"},
+  {k:"xsplit",f:"cross",l:"Cross split"},{k:"xmerge",f:"cross",l:"Cross merge"},
+  {k:"cthru",f:"cthru",l:"Corner-thru stem"},{k:"cthruarm",f:"cthru",l:"Corner-thru arm"},
+  {k:"cthrusm",f:"cthru",l:"Corner-thru stem mg"},{k:"cthruam",f:"cthru",l:"Corner-thru arm mg"},
+  {k:"cthrumx1",f:"cthru",l:"Corner-thru mix 1"},{k:"cthrumx2",f:"cthru",l:"Corner-thru mix 2"},
+  {k:"cthrumx3",f:"cthru",l:"Corner-thru mix 3"},{k:"cthrumx4",f:"cthru",l:"Corner-thru mix 4"},
+  {k:"fiveway",f:"five",l:"5-way apex"},{k:"fivewayflat",f:"five",l:"5-way flat"},
+  {k:"fivewayam",f:"five",l:"5-way apex mg"},{k:"fivewaymf",f:"five",l:"5-way flat mg"},
+  {k:"five3a_split",f:"five",l:"5-way mix a"},{k:"five3a_merge",f:"five",l:"5-way mix a mg"},
+  {k:"five3b_split",f:"five",l:"5-way mix b"},{k:"five3b_merge",f:"five",l:"5-way mix b mg"},
+  {k:"five3c_split",f:"five",l:"5-way mix c"},{k:"five3c_merge",f:"five",l:"5-way mix c mg"},
+  {k:"sixway",f:"six",l:"6-way split"},{k:"sixwaym",f:"six",l:"6-way merge"},
+  {k:"sixoppin",f:"six",l:"6-way mix opp in"},{k:"sixoppout",f:"six",l:"6-way mix opp out"},
+  {k:"sixadjin",f:"six",l:"6-way mix adj in"},{k:"sixadjout",f:"six",l:"6-way mix adj out"},
+  {k:"six33t",f:"six",l:"6-way T-type"},{k:"six33corner",f:"six",l:"6-way corner-type"}
+];
+var TIERS=[
+  {label:"1 PORT", keys:["cap"]},
+  {label:"2 PORT", keys:["straight","elbow"]},
+  {label:"3 PORT", keys:["tsplit","tsplitb","tmerge","tmergeb","corner","cornerm"]},
+  {label:"4 PORT", keys:["xjunc","xjuncopp","xsplit","xmerge","cthru","cthruarm","cthrusm","cthruam","cthrumx1","cthrumx2","cthrumx3","cthrumx4"]},
+  {label:"5 PORT", keys:["fiveway","fivewayflat","fivewayam","fivewaymf","five3a_split","five3a_merge","five3b_split","five3b_merge","five3c_split","five3c_merge"]},
+  {label:"6 PORT", keys:["sixway","sixwaym","sixoppin","sixoppout","sixadjin","sixadjout","six33t","six33corner"]}
+];
+var BY_KEY={}; SHAPES.forEach(function(s){ BY_KEY[s.k]=s; });
+
+/* ---- one simple line glyph per connectivity family - not per flow topology. A real
+   in-app icon per exact variant (split vs merge, which arm is anchor, etc.) is a
+   follow-up detail for whichever treatment gets chosen, out of scope for comparing
+   layouts. viewBox is always 0 0 100 100, center 50,50. ---- */
+function glyphPaths(family){
+  var C=50, paths=[];
+  function line(x1,y1,x2,y2){ paths.push("M "+x1+" "+y1+" L "+x2+" "+y2); }
+  if(family==="cap"){ line(C,80,C,50); return {paths:paths, ports:[[C,50]]}; }
+  if(family==="straight"){ line(C,85,C,15); return {paths:paths, ports:[[C,15],[C,85]]}; }
+  if(family==="elbow"){ paths.push("M "+C+" 85 L "+C+" 50 L 85 50"); return {paths:paths, ports:[[C,85],[85,50]]}; }
+  if(family==="t"){ line(15,C,85,C); line(C,C,C,15); return {paths:paths, ports:[[15,C],[85,C],[C,15]]}; }
+  if(family==="corner"){ paths.push("M 15 85 L "+C+" 85 L "+C+" 50 L 85 50");
+    return {paths:paths, ports:[[15,85],[85,50],[C,15]], extraDot:[C,15]}; }
+  if(family==="cross"){ line(15,C,85,C); line(C,15,C,85); return {paths:paths, ports:[[15,C],[85,C],[C,15],[C,85]]}; }
+  if(family==="cthru"){ line(15,C,85,C); line(C,C,C,15); line(C+20,C-20,C+34,C-34);
+    return {paths:paths, ports:[[15,C],[85,C],[C,15]]}; }
+  if(family==="five"){ [0,72,144,216,288].forEach(function(deg){
+      var r=deg*Math.PI/180, x2=C+32*Math.cos(r), y2=C+32*Math.sin(r); line(C,C,x2,y2);
+    }); return {paths:paths, ports:[]}; }
+  if(family==="six"){ [0,60,120,180,240,300].forEach(function(deg){
+      var r=deg*Math.PI/180, x2=C+32*Math.cos(r), y2=C+32*Math.sin(r); line(C,C,x2,y2);
+    }); return {paths:paths, ports:[]}; }
+  return {paths:[], ports:[]};
+}
+function glyphSvg(family, opts){
+  opts=opts||{};
+  var g=glyphPaths(family);
+  var svg=el("svg",{viewBox:"0 0 100 100"});
+  g.paths.forEach(function(d){ svg.appendChild(el("path",{d:d, "class":"glyph"})); });
+  if(opts.dots!==false){
+    g.ports.forEach(function(p){ svg.appendChild(el("circle",{cx:p[0],cy:p[1],r:7,"class":"glyph-port"})); });
+  }
+  return svg;
+}
+function tile(shapeKey, onFirst){
+  var s=BY_KEY[shapeKey];
+  var b=document.createElement("button");
+  b.className="tile"+(onFirst?" on":"");
+  b.title=s.l;
+  b.appendChild(glyphSvg(s.f));
+  return b;
+}
+function fillTierGrid(container, onSelect){
+  container.innerHTML="";
+  TIERS.forEach(function(tier, ti){
+    var h=document.createElement("div"); h.className="tier"; h.textContent=tier.label;
+    container.appendChild(h);
+    var grid=document.createElement("div"); grid.className="tiergrid";
+    tier.keys.forEach(function(k,ki){
+      var t=tile(k, ti===0 && ki===0);
+      t.addEventListener("click", function(){
+        [].slice.call(container.querySelectorAll(".tile")).forEach(function(x){x.classList.remove("on");});
+        t.classList.add("on");
+        if(onSelect) onSelect(k);
+      });
+      grid.appendChild(t);
+    });
+    container.appendChild(grid);
+  });
+}
+
+/* ---- shared representative scene: a small hand-placed illustration (corner + elbow +
+   tsplit), identical across all three frames - purely to show real content sitting
+   under each chrome treatment, not a re-implementation of the 3D renderer. ---- */
+function buildScene(container){
+  var svg=el("svg",{viewBox:"0 0 300 420"});
+  function bg(){
+    for(var i=0;i<=6;i++){
+      svg.appendChild(el("line",{x1:20+i*44,y1:60,x2:20+i*44,y2:390,stroke:"var(--wire)","stroke-width":1,opacity:0.12}));
+      svg.appendChild(el("line",{x1:20,y1:60+i*44,x2:284,y2:60+i*44,stroke:"var(--wire)","stroke-width":1,opacity:0.12}));
+    }
+  }
+  bg();
+  function pipe(pts, w){
+    svg.appendChild(el("path",{d:"M "+pts.map(function(p){return p[0]+" "+p[1];}).join(" L "),
+      fill:"none", stroke:"var(--text)","stroke-width":w||10,"stroke-linecap":"round","stroke-linejoin":"round"}));
+  }
+  function port(x,y,inRole){
+    svg.appendChild(el("circle",{cx:x,cy:y,r:7,fill:inRole?"var(--acc)":"var(--panel)",
+      stroke:"var(--text)","stroke-width":2.4}));
+  }
+  // corner-ish joint
+  pipe([[80,220],[80,170],[130,170]]);
+  pipe([[80,220],[80,260]]);
+  port(80,260,true); port(130,170,false); port(80,170,false);
+  // elbow off to the right
+  pipe([[130,170],[195,170],[195,110]]);
+  port(195,110,false);
+  // tsplit lower
+  pipe([[80,220],[80,300],[150,300]]);
+  port(80,300,false); port(150,300,false);
+  container.innerHTML=""; container.appendChild(svg);
+}
+
+/* ---- wire up the three frames ---- */
+buildScene(document.getElementById("sceneA"));
+buildScene(document.getElementById("sceneB"));
+buildScene(document.getElementById("sceneC"));
+
+// Treatment A: pill + bottom sheet
+var pillA=document.getElementById("pillA");
+pillA.appendChild(glyphSvg("t"));
+pillA.appendChild(document.createTextNode("T SPLIT — TAP TO CHANGE"));
+fillTierGrid(document.getElementById("sheetBodyA"), function(k){
+  pillA.innerHTML=""; pillA.appendChild(glyphSvg(BY_KEY[k].f)); pillA.appendChild(document.createTextNode(BY_KEY[k].l.toUpperCase()+" — TAP TO CHANGE"));
+  document.getElementById("sheetA").classList.remove("open");
+});
+pillA.addEventListener("click", function(){ document.getElementById("sheetA").classList.toggle("open"); });
+
+// Treatment B: always-visible compact grid (just the first tier open by default,
+// others collapsed under their own headers to avoid an always-scrolling wall)
+(function(){
+  var body=document.getElementById("sideBodyB");
+  TIERS.forEach(function(tier, ti){
+    var head=document.createElement("div"); head.className="sechead";
+    head.innerHTML="<span>"+tier.label+"</span><span>"+(ti===0?"▾":"▸")+"</span>";
+    var grid=document.createElement("div"); grid.className="tiergrid";
+    grid.style.display = ti===0 ? "grid" : "none";
+    tier.keys.forEach(function(k, ki){
+      var t=tile(k, ti===0 && ki===0);
+      grid.appendChild(t);
+    });
+    head.addEventListener("click", function(){
+      var open=grid.style.display!=="none";
+      grid.style.display = open ? "none" : "grid";
+      head.querySelector("span:last-child").textContent = open ? "▸" : "▾";
+    });
+    body.appendChild(head); body.appendChild(grid);
+  });
+})();
+
+// Treatment C: dock button opens a popover with the same tier grid
+var popC=document.getElementById("popC");
+fillTierGrid(document.getElementById("popBodyC"), function(k){ popC.classList.remove("open"); });
+document.getElementById("dockShapeC").addEventListener("click", function(){ popC.classList.toggle("open"); });
+
+// theme
+document.getElementById("themebtn").addEventListener("click", function(){
+  var light=document.body.getAttribute("data-theme")==="light";
+  document.body.setAttribute("data-theme", light?"dark":"light");
+  document.getElementById("themebtn").textContent = light?"LIGHT":"DARK";
+});
+})();
+</script>
+</body>
+</html>
