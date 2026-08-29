@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-<title>PIPEGRID — vertical slice (second shape: elbow)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>PIPEGRID — vertical slice</title>
 <style>
   :root{
     --bg:#0b0d10; --panel:#12151b; --panel2:#0e1116; --edge:#2c313d;
@@ -16,27 +16,84 @@
     --ax:#c0392b; --ay:#3f8f52; --az:#2f6ea8; --indbg:rgba(244,246,249,0.72);
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
-  html,body{margin:0; overscroll-behavior:contain;}
+  html,body{margin:0; overscroll-behavior:contain; height:100%;}
   body{background:var(--bg);color:var(--text);
        font-family:ui-monospace,SFMono-Regular,Menlo,monospace;-webkit-text-size-adjust:100%;
-       padding:14px;padding-bottom:60px;}
-  .hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:6px;flex-wrap:wrap;}
-  .hdr .themebtn{margin-left:auto;}
-  .title{font-size:15px;font-weight:700;letter-spacing:2px;}
-  .sub{font-size:9px;letter-spacing:1px;color:var(--dim);}
-  .panel{border:1px solid var(--edge);border-radius:8px;background:var(--panel);padding:12px;margin-bottom:12px;max-width:640px;}
-  .note{font-size:10px;color:var(--dim);line-height:1.6;margin:4px 0 10px;}
-  .note b{color:var(--text);}
-  .rig{position:relative;background:var(--panel2);border:1px solid var(--edge);border-radius:8px;
-       touch-action:none;user-select:none;}
+       display:flex;flex-direction:column;overflow:hidden;
+       padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);}
+
+  /* ===== Treatment C chrome (owner-picked 2026-08-27, see pipegrid-gui-mockups.html) =====
+     Full-bleed 3D/2D stage, floating HUD pills, bottom dock with popovers. Every element
+     the mechanics/rendering code touches keeps its original id - only the surrounding
+     chrome changed here, nothing under render()/runValidation()/save-load/2D-view logic. */
+  .stage{position:relative;flex:1;min-height:0;background:var(--panel2);overflow:hidden;}
+  /* The 3D canvas's viewBox is a fixed 340x340 square (camera math assumes it - CX/CY/
+     SCALE are all tuned against that). Forcing the SVG's CSS box to a non-square
+     shape (e.g. height:100% of a tall stage) makes the browser's real coordinate
+     transform (getScreenCTM, what svgPointFromClient/hit-testing actually uses)
+     apply "meet" letterboxing - the visible content re-centers inside the stretched
+     box, but a naive width/height-ratio tap mapping no longer agrees with it, so
+     taps land nowhere near what they look like they're hitting. Real bug caught
+     during verification, not by eye: let the SVG size to its own natural aspect
+     ratio (width:100%, height:auto) and centre it in the stage instead of forcing
+     a stretch - that keeps CSS box and viewBox in agreement, so there's nothing
+     for the browser to letterbox and no mismatch for hit-testing to fall into. */
+  .rig{position:absolute;inset:0;touch-action:none;user-select:none;
+       display:flex;align-items:center;justify-content:center;}
   .rigsvg{display:block;width:100%;height:auto;}
-  .readout{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;
-            padding:8px 10px;border-top:1px solid var(--edge);font-size:10.5px;}
-  .readout .stat{color:var(--dim);}
-  .btn{font-family:inherit;font-size:9px;letter-spacing:.5px;text-transform:uppercase;
-       padding:5px 8px;border:1px solid var(--edge);border-radius:4px;background:transparent;
-       color:var(--dim);cursor:pointer;}
-  table{border-collapse:collapse;width:100%;font-size:10.5px;margin-top:6px;}
+
+  .hud{position:absolute;top:10px;left:10px;right:10px;display:flex;justify-content:space-between;
+       gap:8px;pointer-events:none;z-index:15;}
+  .hud .stat{font-size:9.5px;letter-spacing:.4px;color:var(--dim);
+       background:var(--indbg);padding:4px 8px;border-radius:7px;pointer-events:auto;}
+  .themebtn{position:absolute;bottom:10px;right:10px;width:30px;height:30px;border-radius:9px;
+       border:1px solid var(--edge);background:var(--indbg);color:var(--text);font-size:13px;
+       display:flex;align-items:center;justify-content:center;z-index:15;}
+
+  .dock{flex:none;display:flex;background:var(--panel);border-top:1px solid var(--edge);
+       padding-bottom:env(safe-area-inset-bottom);}
+  .dockbtn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+       gap:3px;padding:9px 2px;color:var(--dim);font-size:8.5px;letter-spacing:.5px;background:none;
+       border:none;font-family:inherit;}
+  .dockbtn .ic{font-size:18px;line-height:1;}
+  .dockbtn.on{color:var(--acc);}
+
+  .popover{position:absolute;left:8px;right:8px;bottom:8px;
+       background:var(--panel);border:1px solid var(--edge);border-radius:14px;
+       max-height:min(420px, 66vh);overflow-y:auto;z-index:25;box-shadow:0 -8px 24px rgba(0,0,0,0.35);
+       transform:translateY(8px);opacity:0;pointer-events:none;transition:.16s ease;}
+  .popover.open{transform:translateY(0);opacity:1;pointer-events:auto;}
+  .popoverhead{padding:10px 14px;font-size:10px;letter-spacing:1.2px;color:var(--dim);
+       border-bottom:1px solid var(--edge);}
+  .tier{font-size:9px;letter-spacing:1px;color:var(--dim);margin:10px 12px 6px;}
+  .tiergrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:7px;padding:0 12px 12px;}
+  .tile{aspect-ratio:1;border:1px solid var(--edge);border-radius:9px;background:var(--panel2);
+       display:flex;align-items:center;justify-content:center;}
+  .tile.on{border-color:var(--acc);}
+  .tile svg{width:60%;height:60%;}
+  .glyph{stroke:var(--text);stroke-width:6;fill:none;stroke-linecap:round;}
+  .glyph-port{fill:var(--acc);}
+
+  .boardrow{padding:12px 14px;display:flex;flex-direction:column;gap:8px;}
+  .boardrow .note{font-size:9.5px;color:var(--dim);line-height:1.5;margin:0;}
+  .btn{font-family:inherit;font-size:10px;letter-spacing:.5px;text-transform:uppercase;
+       padding:8px 10px;border:1px solid var(--edge);border-radius:6px;background:var(--panel2);
+       color:var(--text);cursor:pointer;}
+  #savedata{width:100%;height:90px;box-sizing:border-box;font-family:inherit;font-size:9.5px;
+       background:var(--panel2);color:var(--text);border:1px solid var(--edge);border-radius:6px;
+       padding:8px;resize:vertical;}
+  #savestat{font-size:9.5px;color:var(--dim);}
+
+  /* ===== 2D reference view, filling the same stage the 3D rig occupies ===== */
+  .rig2d{position:absolute;inset:0;display:none;flex-direction:column;background:var(--bg);}
+  .rig2d .layerbar{flex:none;display:flex;align-items:center;gap:8px;padding:8px 10px;
+       border-bottom:1px solid var(--edge);font-size:9.5px;color:var(--dim);overflow-x:auto;}
+  .rig2d .panes{flex:1;display:flex;gap:1px;min-height:0;background:var(--edge);}
+  .rig2d .pane{flex:1;position:relative;background:var(--panel2);min-width:0;}
+  .rig2d .pane svg{position:absolute;inset:0;width:100%;height:100%;}
+  .rig2d .panelabel{position:absolute;top:6px;left:8px;font-size:8px;letter-spacing:1px;color:var(--dim);z-index:5;}
+
+  table{border-collapse:collapse;width:100%;font-size:10.5px;}
   th,td{text-align:left;padding:3px 6px;border-bottom:1px solid var(--edge);}
   .badge{display:inline-block;font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;}
   .badge.pass{background:#4caf6b;color:#06170c;}
@@ -44,79 +101,56 @@
 </style>
 </head>
 <body>
-<div class="hdr">
-  <div class="title">PIPEGRID — VERTICAL SLICE</div>
-  <div class="sub">proving the connect/gizmo loop generalizes past one hard-coded shape, before scaling to the full catalogue</div>
-  <button class="btn themebtn" id="themebtn">LIGHT</button>
-</div>
 
-<div class="panel">
-  <div class="note"><b>Tap any ring</b> on the seed corner to place a new corner-split connected to
-  it, same as step 2. The three coloured rings that appear on the <b>new</b> part are the gizmo,
-  ported straight from <code>pipegrid-pose-gizmo-mockups.html</code>: drag a ring to turn the part —
-  it follows your finger's angle, an amber dashed ghost shows where it'll land, and it snaps to the
-  nearest quarter turn on release. Drag a diamond handle to shift the part a whole cell. This is the
-  control that reaches the other 3 valid poses step 2 couldn't. <b>Drag empty space</b> to orbit.
-  <b>Tap an open port while the gizmo is up and it just dismisses</b> — that tap doesn't also place a
-  part — then tap it again normally to keep the chain going. To bring a part's gizmo back,
-  <b>tap anywhere along its drawn pipe</b>, or tap one of its ports that's already connected —
-  either reselects it directly, no dismiss step needed first. <b>Pick CORNER or ELBOW</b> above to
-  choose what the next tap-to-connect placement is — this is the step proving the connection/pose
-  logic generalizes past a single hard-coded shape, on the way to the full catalogue.</div>
-  <div class="note"><b>Axis convention note:</b> the existing camera rig was built Y-up (Y is
-  vertical, X/Z are the ground plane). Everything built this session — the pose system, the gizmo,
-  the 2D sheet — is Z-up (U/D are literally ±Z). Adapted the camera here to Z-up rather than the
-  other way around, since the pose system is the more deeply validated of the two. Flagging this as
-  a real decision, not a silent change.</div>
+<div class="stage">
   <div class="rig" id="rig">
-    <div class="readout">
-      <span class="stat">Next part:</span>
-      <span id="shapePicker"></span>
-    </div>
-    <div class="readout">
+    <div class="hud">
       <span class="stat" id="stat">az 35° · el 25° · zoom 100%</span>
-      <span>
-        <button class="btn" id="undobtn">Undo placement</button>
-        <button class="btn" id="resetbtn">Reset view</button>
-      </span>
+      <span class="stat" id="gizmostat">no part selected</span>
     </div>
-    <div class="readout"><span class="stat" id="gizmostat">no part selected</span></div>
-    <div class="readout">
-      <span class="stat">Save file (no legacy format - fresh schema, no old boards exist to migrate):</span>
-      <span>
-        <button class="btn" id="savebtn">Save to box below</button>
-        <button class="btn" id="loadbtn">Load from box below</button>
-      </span>
+  </div>
+  <button class="themebtn" id="themebtn" title="Toggle theme">☾</button>
+
+  <div class="rig2d" id="rig2d">
+    <div class="layerbar">
+      <span>LAYER</span>
+      <span id="layerPicker"></span>
+      <span id="layerstat"></span>
     </div>
-    <div class="readout" style="display:block;">
-      <textarea id="savedata" spellcheck="false" style="width:100%;height:70px;box-sizing:border-box;
-        font-family:inherit;font-size:9px;background:var(--panel2);color:var(--text);
-        border:1px solid var(--edge);border-radius:4px;padding:6px;resize:vertical;"
+    <div class="panes">
+      <div class="pane"><span class="panelabel">PLAN</span><svg id="planSvg" class="rigsvg" viewBox="0 0 300 300"></svg></div>
+      <div class="pane"><span class="panelabel">ISO</span><svg id="isoSvg" class="rigsvg" viewBox="0 0 300 300"></svg></div>
+    </div>
+  </div>
+
+  <div class="popover" id="popShapes">
+    <div class="popoverhead">NEXT SHAPE</div>
+    <div id="shapePicker"></div>
+  </div>
+
+  <div class="popover" id="popBoard">
+    <div class="popoverhead">BOARD</div>
+    <div class="boardrow">
+      <div class="note">No legacy format — fresh schema, no old boards to migrate. Save writes JSON
+      below; paste JSON in and Load restores it.</div>
+      <button class="btn" id="savebtn">Save to box below</button>
+      <button class="btn" id="loadbtn">Load from box below</button>
+      <textarea id="savedata" spellcheck="false"
         placeholder="Save writes JSON here. Paste JSON here and Load to restore it."></textarea>
-      <span class="stat" id="savestat"></span>
+      <span id="savestat"></span>
     </div>
   </div>
 </div>
 
-<div class="panel">
-  <div class="plabel" style="font-size:11px;font-weight:700;letter-spacing:1.5px;margin-bottom:6px;">2D REFERENCE VIEW</div>
-  <div class="note">Reads the exact same <code>parts</code> array as the 3D view above - no separate
-  state, no export/import step. Plan view drops the U/D axis (looking straight down); iso view uses
-  the settled 20&deg;/50&deg; angle from <code>pipegrid-2d-reference-sheet-mockups.html</code>. Both
-  show one Z-layer at a time - pick which layer with the selector.</div>
-  <div class="readout">
-    <span class="stat">Layer:</span>
-    <span id="layerPicker"></span>
-    <span class="stat" id="layerstat"></span>
-  </div>
-  <div style="display:flex;gap:10px;flex-wrap:wrap;">
-    <div class="rig" style="flex:1;min-width:220px;"><svg id="planSvg" class="rigsvg" viewBox="0 0 300 300"></svg></div>
-    <div class="rig" style="flex:1;min-width:220px;"><svg id="isoSvg" class="rigsvg" viewBox="0 0 300 300"></svg></div>
-  </div>
+<div class="dock">
+  <button class="dockbtn on" id="dockShapes"><span class="ic">◧</span>SHAPES</button>
+  <button class="dockbtn" id="undobtn"><span class="ic">↶</span>UNDO</button>
+  <button class="dockbtn" id="resetbtn"><span class="ic">⟲</span>VIEW</button>
+  <button class="dockbtn" id="dockBoard"><span class="ic">⤓</span>BOARD</button>
+  <button class="dockbtn" id="dock2D"><span class="ic">▦</span>2D</button>
 </div>
 
-<div class="panel">
-  <div class="plabel" style="font-size:11px;font-weight:700;letter-spacing:1.5px;margin-bottom:6px;">VALIDATION</div>
+<div style="display:none;">
   <table id="checks"><tbody></tbody></table>
 </div>
 
@@ -1239,28 +1273,121 @@ function selectShape(key){
     document.getElementById("shapeBtn_"+k).classList.toggle("on", k===key);
   });
 }
+// Treatment C's real fix for the 39-shape wall of text buttons (see
+// pipegrid-gui-mockups.html): group by port count - derived from each shape's own
+// spec via P(), not a hand-maintained list that could drift from the registry - and
+// draw one simple glyph per CONNECTIVITY FAMILY rather than 39 bespoke icons. Owner
+// signed off on the layout, flagged the glyphs themselves as rough - fine to improve
+// later without touching this grouping/generation logic.
+function glyphFamilyFor(key){
+  if(key==="cap") return "cap";
+  if(key==="straight") return "straight";
+  if(key==="elbow") return "elbow";
+  if(key==="tsplit"||key==="tsplitb"||key==="tmerge"||key==="tmergeb") return "t";
+  if(key.indexOf("corner")===0) return "corner";
+  if(key.indexOf("x")===0) return "cross";
+  if(key.indexOf("cthru")===0) return "cthru";
+  if(key.indexOf("five")===0) return "five";
+  if(key.indexOf("six")===0) return "six";
+  return "elbow";
+}
+function glyphPaths(family){
+  var C=50, paths=[];
+  function line(x1,y1,x2,y2){ paths.push("M "+x1+" "+y1+" L "+x2+" "+y2); }
+  if(family==="cap"){ line(C,80,C,50); return {paths:paths, ports:[[C,50]]}; }
+  if(family==="straight"){ line(C,85,C,15); return {paths:paths, ports:[[C,15],[C,85]]}; }
+  if(family==="elbow"){ paths.push("M "+C+" 85 L "+C+" 50 L 85 50"); return {paths:paths, ports:[[C,85],[85,50]]}; }
+  if(family==="t"){ line(15,C,85,C); line(C,C,C,15); return {paths:paths, ports:[[15,C],[85,C],[C,15]]}; }
+  if(family==="corner"){ paths.push("M 15 85 L "+C+" 85 L "+C+" 50 L 85 50");
+    return {paths:paths, ports:[[15,85],[85,50],[C,15]]}; }
+  if(family==="cross"){ line(15,C,85,C); line(C,15,C,85); return {paths:paths, ports:[[15,C],[85,C],[C,15],[C,85]]}; }
+  if(family==="cthru"){ line(15,C,85,C); line(C,C,C,15); line(C+20,C-20,C+34,C-34);
+    return {paths:paths, ports:[[15,C],[85,C],[C,15]]}; }
+  if(family==="five"){ [0,72,144,216,288].forEach(function(deg){
+      var r=deg*Math.PI/180; line(C,C,C+32*Math.cos(r),C+32*Math.sin(r));
+    }); return {paths:paths, ports:[]}; }
+  if(family==="six"){ [0,60,120,180,240,300].forEach(function(deg){
+      var r=deg*Math.PI/180; line(C,C,C+32*Math.cos(r),C+32*Math.sin(r));
+    }); return {paths:paths, ports:[]}; }
+  return {paths:[], ports:[]};
+}
+function glyphSvg(family){
+  var g=glyphPaths(family);
+  var svg=svgNS("svg"); svg.setAttribute("viewBox","0 0 100 100");
+  g.paths.forEach(function(d){ var p=svgNS("path"); p.setAttribute("d",d); p.setAttribute("class","glyph"); svg.appendChild(p); });
+  g.ports.forEach(function(pt){ var c=svgNS("circle"); c.setAttribute("cx",pt[0]); c.setAttribute("cy",pt[1]);
+    c.setAttribute("r",7); c.setAttribute("class","glyph-port"); svg.appendChild(c); });
+  return svg;
+}
 (function(){
   var picker=document.getElementById("shapePicker");
+  var byTier={};
   Object.keys(SHAPES).forEach(function(k){
-    var b=document.createElement("button");
-    b.className="btn"+(k===selectedShapeKey?" on":"");
-    b.id="shapeBtn_"+k;
-    b.textContent=k.toUpperCase();
-    b.addEventListener("click", function(){ selectShape(k); });
-    picker.appendChild(b);
+    var n=P(SHAPES[k].spec).length;
+    (byTier[n]=byTier[n]||[]).push(k);
+  });
+  Object.keys(byTier).map(Number).sort(function(a,b){return a-b;}).forEach(function(n){
+    var h=document.createElement("div"); h.className="tier"; h.textContent=n+" PORT"; picker.appendChild(h);
+    var grid=document.createElement("div"); grid.className="tiergrid"; picker.appendChild(grid);
+    byTier[n].forEach(function(k){
+      var b=document.createElement("button");
+      b.className="tile"+(k===selectedShapeKey?" on":"");
+      b.id="shapeBtn_"+k;
+      b.title=SHAPES[k].label;
+      b.appendChild(glyphSvg(glyphFamilyFor(k)));
+      b.addEventListener("click", function(){ selectShape(k); setViewMode("3d"); setPopover(null); });
+      grid.appendChild(b);
+    });
   });
 })();
+
+/* ================= Treatment C chrome: view-mode + popover state =================
+   viewMode picks which full-bleed layer is visible (#rig's 3D scene, or #rig2d's
+   plan/iso panels) - purely a display toggle, `render()` already keeps #rig2d's
+   content current every time it runs, same as before this pass. activePopover
+   tracks which of the two popovers (if any) is open; opening one always closes
+   the other, matching a single-sheet-at-a-time native-app feel. */
+var viewMode="3d", activePopover=null;
+function setViewMode(m){
+  viewMode=m;
+  document.getElementById("rig").style.display = m==="3d" ? "" : "none";
+  document.getElementById("rig2d").style.display = m==="2d" ? "flex" : "none";
+  document.getElementById("dockShapes").classList.toggle("on", m==="3d" && activePopover==null);
+  document.getElementById("dock2D").classList.toggle("on", m==="2d");
+  if(m==="2d"){ render(); }
+}
+function setPopover(name){
+  activePopover=name;
+  document.getElementById("popShapes").classList.toggle("open", name==="shapes");
+  document.getElementById("popBoard").classList.toggle("open", name==="board");
+  document.getElementById("dockShapes").classList.toggle("on", name==="shapes" || (viewMode==="3d" && name==null));
+  document.getElementById("dockBoard").classList.toggle("on", name==="board");
+}
+document.getElementById("dockShapes").addEventListener("click", function(){
+  setViewMode("3d");
+  setPopover(activePopover==="shapes" ? null : "shapes");
+});
+document.getElementById("dockBoard").addEventListener("click", function(){
+  setPopover(activePopover==="board" ? null : "board");
+});
+document.getElementById("dock2D").addEventListener("click", function(){
+  setPopover(null);
+  setViewMode(viewMode==="2d" ? "3d" : "2d");
+});
+document.getElementById("undobtn").addEventListener("click", function(){ setViewMode("3d"); setPopover(null); });
+document.getElementById("resetbtn").addEventListener("click", function(){ setViewMode("3d"); setPopover(null); });
 
 document.getElementById("themebtn").addEventListener("click", function(){
   var isLight=document.body.getAttribute("data-theme")==="light";
   document.body.setAttribute("data-theme", isLight?"":"light");
-  this.textContent=isLight?"LIGHT":"DARK";
+  this.textContent=isLight?"☾":"☀";
   render();
 });
 
 render();
 window.__pgSlice={get parts(){return parts;}, get gizmoPartIdx(){return gizmoPartIdx;}, get mode(){return mode;},
-  get connectDrag(){return connectDrag;}, serializeBoard:serializeBoard, loadBoard:loadBoard};
+  get connectDrag(){return connectDrag;}, get visiblePorts(){return visiblePorts;}, get CAPTURE_R(){return CAPTURE_R;},
+  svgPointFromClient:svgPointFromClient, serializeBoard:serializeBoard, loadBoard:loadBoard};
 
 /* ================= validation ================= */
 function badge(ok){ return '<span class="badge '+(ok?"pass":"fail")+'">'+(ok?"PASS":"FAIL")+'</span>'; }
