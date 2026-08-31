@@ -46,9 +46,10 @@
        gap:8px;pointer-events:none;z-index:15;}
   .hud .stat{font-size:9.5px;letter-spacing:.4px;color:var(--dim);
        background:var(--indbg);padding:4px 8px;border-radius:7px;pointer-events:auto;}
-  .themebtn{position:absolute;bottom:10px;right:10px;width:30px;height:30px;border-radius:9px;
+  .viewbtns{position:absolute;bottom:10px;right:10px;display:flex;gap:6px;z-index:15;}
+  .minibtn{width:32px;height:32px;border-radius:9px;
        border:1px solid var(--edge);background:var(--indbg);color:var(--text);font-size:13px;
-       display:flex;align-items:center;justify-content:center;z-index:15;}
+       display:flex;align-items:center;justify-content:center;font-family:inherit;}
 
   .dock{flex:none;display:flex;background:var(--panel);border-top:1px solid var(--edge);
        padding-bottom:env(safe-area-inset-bottom);}
@@ -57,6 +58,7 @@
        border:none;font-family:inherit;}
   .dockbtn .ic{font-size:18px;line-height:1;}
   .dockbtn.on{color:var(--acc);}
+  .dockbtn:disabled{opacity:0.3;}
 
   .popover{position:absolute;left:8px;right:8px;bottom:8px;
        background:var(--panel);border:1px solid var(--edge);border-radius:14px;
@@ -109,7 +111,10 @@
       <span class="stat" id="gizmostat">no part selected</span>
     </div>
   </div>
-  <button class="themebtn" id="themebtn" title="Toggle theme">☾</button>
+  <div class="viewbtns">
+    <button class="minibtn" id="resetbtn" title="Reset view">⟲</button>
+    <button class="minibtn" id="themebtn" title="Toggle theme">☾</button>
+  </div>
 
   <div class="rig2d" id="rig2d">
     <div class="layerbar">
@@ -131,13 +136,10 @@
   <div class="popover" id="popBoard">
     <div class="popoverhead">BOARD</div>
     <div class="boardrow">
-      <div class="note">No legacy format — fresh schema, no old boards to migrate. Save writes JSON
-      below; paste JSON in and Load restores it.</div>
-      <button class="btn" id="savebtn">Save to box below</button>
-      <button class="btn" id="loadbtn">Load from box below</button>
-      <textarea id="savedata" spellcheck="false"
-        placeholder="Save writes JSON here. Paste JSON here and Load to restore it."></textarea>
-      <span id="savestat"></span>
+      <button class="btn" id="exportbtn">Export to file</button>
+      <button class="btn" id="importbtn">Import from file</button>
+      <input type="file" id="importfile" accept="application/json,.json" style="display:none;" />
+      <span id="savestat">Autosaves as you build.</span>
     </div>
   </div>
 </div>
@@ -145,7 +147,7 @@
 <div class="dock">
   <button class="dockbtn on" id="dockShapes"><span class="ic">◧</span>SHAPES</button>
   <button class="dockbtn" id="undobtn"><span class="ic">↶</span>UNDO</button>
-  <button class="dockbtn" id="resetbtn"><span class="ic">⟲</span>VIEW</button>
+  <button class="dockbtn" id="redobtn"><span class="ic">↷</span>REDO</button>
   <button class="dockbtn" id="dockBoard"><span class="ic">⤓</span>BOARD</button>
   <button class="dockbtn" id="dock2D"><span class="ic">▦</span>2D</button>
 </div>
@@ -972,7 +974,8 @@ function serializeBoard(){
     })
   };
 }
-function loadBoard(data){
+function loadBoard(data, opts){
+  opts=opts||{};
   if(!data || data.schema!==SAVE_SCHEMA) throw new Error("unrecognized save schema: "+(data&&data.schema));
   if(!Array.isArray(data.parts) || data.parts.length===0) throw new Error("save data has no parts");
   var newParts=data.parts.map(function(rec,idx){
@@ -992,10 +995,81 @@ function loadBoard(data){
   });
   parts=newParts;
   gizmoPartIdx=null; gizmoDrag=null; lastPlacement=null; mode="none"; pts.clear();
-  if(data.camera){
+  // Undo/redo pass restoreCamera:false - stepping back through history shouldn't
+  // yank the camera to wherever it happened to be sitting when that step was taken;
+  // you'd lose your place in the scene every time you undid a rotation. Loading a
+  // saved FILE does restore it, since reopening a board should look like you left it.
+  if(data.camera && opts.restoreCamera!==false){
     cam.az=data.camera.az; cam.el=data.camera.el; cam.scale=data.camera.scale;
     cam.panX=data.camera.panX; cam.panY=data.camera.panY;
   }
+}
+
+/* ---------- undo/redo + persistence: snapshot-history and localStorage patterns
+   ported from the old app (index.html's mutate/undo/redo/saveLocal/exportFile),
+   which is the one thing it does that the slice genuinely needed. The old pop-only
+   undo here could ONLY remove the last-placed part - it couldn't undo a gizmo
+   rotation or a gizmo move at all, since those mutate a part in place rather than
+   growing the array. Snapshotting the whole board sidesteps that entirely: every
+   mutation is undoable by construction, no per-action bookkeeping. */
+var history=[], future=[], HISTORY_MAX=60;
+var LS_KEY="pipegrid.slice.v1";
+function snapshot(){ return JSON.stringify(serializeBoard()); }
+function autosave(){
+  // try/catch: localStorage throws in some embedded/preview contexts (a known trap
+  // recorded in PIPEGRID-STATE.md). Failing to persist must never break the app.
+  try{ localStorage.setItem(LS_KEY, snapshot()); }catch(e){}
+}
+function pushHistory(pre){
+  if(pre===snapshot()) return;     // nothing actually changed - don't burn an undo step
+  history.push(pre);
+  if(history.length>HISTORY_MAX) history.shift();
+  future.length=0;                 // a new branch invalidates any redo chain
+  autosave();
+  syncHistoryButtons();
+}
+function syncHistoryButtons(){
+  document.getElementById("undobtn").disabled = history.length===0;
+  document.getElementById("redobtn").disabled = future.length===0;
+}
+function stepHistory(fromStack, toStack){
+  if(!fromStack.length) return;
+  toStack.push(snapshot());
+  loadBoard(JSON.parse(fromStack.pop()), {restoreCamera:false});
+  autosave(); syncHistoryButtons();
+  render(); runValidation();
+}
+function doUndo(){ stepHistory(history, future); }
+function doRedo(){ stepHistory(future, history); }
+
+function exportBoardFile(){
+  var d=new Date(), pad=function(n){return String(n).padStart(2,"0");};
+  var name="pipegrid-"+d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+
+           "-"+pad(d.getHours())+pad(d.getMinutes())+".json";
+  var blob=new Blob([JSON.stringify(serializeBoard(),null,1)],{type:"application/json"});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement("a");
+  a.href=url; a.download=name;
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 400);
+  return name;
+}
+function importBoardFile(file){
+  var statEl=document.getElementById("savestat");
+  var rd=new FileReader();
+  rd.onload=function(){
+    var pre=snapshot();
+    try{
+      loadBoard(JSON.parse(rd.result));   // a file load DOES restore its camera
+      pushHistory(pre);                   // one undoable step, same as the old app
+      render(); runValidation();
+      statEl.textContent=parts.length+" part(s) loaded from "+file.name;
+    }catch(e){
+      statEl.textContent="Import failed: "+e.message;
+    }
+  };
+  rd.onerror=function(){ statEl.textContent="Could not read that file."; };
+  rd.readAsText(file);
 }
 
 /* ---------- orbit / pan / zoom, ported gesture-for-gesture from the combined-test rig ---------- */
@@ -1069,12 +1143,15 @@ svg.addEventListener("pointerdown", function(e){
     if(arrowHit && (!ringHit || arrowHit.dist<ringHit.dist)){
       var gp0=parts[gizmoPartIdx];
       mode="gizmoMove";
-      gizmoDrag={type:"move", axis:arrowHit.axis, start:p, base:[gp0.cell.x,gp0.cell.y,gp0.cell.z]};
+      // `pre` snapshots the board BEFORE the drag starts, so the whole drag commits
+      // as ONE undo step on release - a move mutates cell live on every pointermove,
+      // so snapshotting at release-time would capture the already-moved state.
+      gizmoDrag={type:"move", axis:arrowHit.axis, start:p, base:[gp0.cell.x,gp0.cell.y,gp0.cell.z], pre:snapshot()};
     } else if(ringHit){
       var cellArr0=gizmoCellArr(parts[gizmoPartIdx]);
       var a0=ringAngleAt(ringHit.axis,cellArr0,p);
       mode="gizmoRot";
-      gizmoDrag={type:"rot", axis:ringHit.axis, basePose:ROTS[parts[gizmoPartIdx].poseIdx], prev:a0.angle, live:0};
+      gizmoDrag={type:"rot", axis:ringHit.axis, basePose:ROTS[parts[gizmoPartIdx].poseIdx], prev:a0.angle, live:0, pre:snapshot()};
     } else {
       // Ports sit AT the tips of a part's channel paths, so a port-tap and a body-tap
       // can be nearly coincident right at the tip - a pure distance comparison let the
@@ -1221,20 +1298,29 @@ function up(e){
       var n=((snapQuarter(gizmoDrag.live)%4)+4)%4, M=gizmoDrag.basePose;
       for(var i=0;i<n;i++) M=matMul(gizmoDrag.axis.M,M);
       var newIdx=ROTS.findIndex(function(R){ return matKey(R)===matKey(M); });
+      var preRot=gizmoDrag.pre;
       parts[gizmoPartIdx].poseIdx = newIdx;
       mode="none"; gizmoDrag=null;
+      pushHistory(preRot);          // no-op if the drag landed back on the same pose
       render(); runValidation();
     }
     return;
   }
   if(mode==="gizmoMove"){
-    if(pts.size===0){ mode="none"; gizmoDrag=null; render(); runValidation(); }
+    if(pts.size===0){
+      var preMove=gizmoDrag.pre;
+      mode="none"; gizmoDrag=null;
+      pushHistory(preMove);         // the cell already moved live during the drag
+      render(); runValidation();
+    }
     return;
   }
   if(mode==="connect"){
     if(pts.size===0){
+      var preConnect=snapshot();
       commitConnection(pendingPort, connectDrag.prep, connectDrag.prep.poseSeq[connectDrag.liveIdx]);
       mode="none"; pendingPort=null; connectDrag=null;
+      pushHistory(preConnect);
       render();
       runValidation();
     }
@@ -1246,26 +1332,18 @@ svg.addEventListener("pointercancel", up);
 document.getElementById("resetbtn").addEventListener("click", function(){
   cam.az=DEFAULT_CAM.az; cam.el=DEFAULT_CAM.el; cam.scale=1; cam.panX=0; cam.panY=0; render();
 });
-document.getElementById("undobtn").addEventListener("click", function(){
-  if(parts.length>1){
-    if(gizmoPartIdx===parts.length-1) gizmoPartIdx=null;
-    parts.pop(); lastPlacement=null; render(); runValidation();
-  }
+document.getElementById("undobtn").addEventListener("click", doUndo);
+document.getElementById("redobtn").addEventListener("click", doRedo);
+document.getElementById("exportbtn").addEventListener("click", function(){
+  var name=exportBoardFile();
+  document.getElementById("savestat").textContent="Exported "+name;
 });
-document.getElementById("savebtn").addEventListener("click", function(){
-  document.getElementById("savedata").value=JSON.stringify(serializeBoard(), null, 1);
-  document.getElementById("savestat").textContent=parts.length+" part(s) saved";
+document.getElementById("importbtn").addEventListener("click", function(){
+  document.getElementById("importfile").click();
 });
-document.getElementById("loadbtn").addEventListener("click", function(){
-  var statEl=document.getElementById("savestat");
-  try{
-    var data=JSON.parse(document.getElementById("savedata").value);
-    loadBoard(data);
-    render(); runValidation();
-    statEl.textContent=parts.length+" part(s) loaded";
-  }catch(e){
-    statEl.textContent="Load failed: "+e.message;
-  }
+document.getElementById("importfile").addEventListener("change", function(){
+  if(this.files && this.files[0]) importBoardFile(this.files[0]);
+  this.value="";   // let the same file be picked again later
 });
 function selectShape(key){
   selectedShapeKey=key;
@@ -1375,6 +1453,7 @@ document.getElementById("dock2D").addEventListener("click", function(){
   setViewMode(viewMode==="2d" ? "3d" : "2d");
 });
 document.getElementById("undobtn").addEventListener("click", function(){ setViewMode("3d"); setPopover(null); });
+document.getElementById("redobtn").addEventListener("click", function(){ setViewMode("3d"); setPopover(null); });
 document.getElementById("resetbtn").addEventListener("click", function(){ setViewMode("3d"); setPopover(null); });
 
 document.getElementById("themebtn").addEventListener("click", function(){
@@ -1384,10 +1463,23 @@ document.getElementById("themebtn").addEventListener("click", function(){
   render();
 });
 
+// Boot: pick up whatever was last autosaved, so closing the tab and coming back
+// doesn't lose the board. A corrupt/absent entry just falls through to the seed
+// part - never blocks startup, never throws past this point.
+(function(){
+  var raw=null;
+  try{ raw=localStorage.getItem(LS_KEY); }catch(e){}
+  if(!raw) return;
+  try{ loadBoard(JSON.parse(raw)); }
+  catch(e){ /* stale or hand-edited entry - keep the seed board */ }
+})();
+syncHistoryButtons();
 render();
 window.__pgSlice={get parts(){return parts;}, get gizmoPartIdx(){return gizmoPartIdx;}, get mode(){return mode;},
   get connectDrag(){return connectDrag;}, get visiblePorts(){return visiblePorts;}, get CAPTURE_R(){return CAPTURE_R;},
-  svgPointFromClient:svgPointFromClient, serializeBoard:serializeBoard, loadBoard:loadBoard};
+  get history(){return history;}, get future(){return future;},
+  svgPointFromClient:svgPointFromClient, serializeBoard:serializeBoard, loadBoard:loadBoard,
+  doUndo:doUndo, doRedo:doRedo, snapshot:snapshot, LS_KEY:LS_KEY};
 
 /* ================= validation ================= */
 function badge(ok){ return '<span class="badge '+(ok?"pass":"fail")+'">'+(ok?"PASS":"FAIL")+'</span>'; }
