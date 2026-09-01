@@ -37,10 +37,16 @@
   .rigsvg{display:block;width:100%;height:auto;}
   #rig>svg.rigsvg{width:100%;height:100%;}
 
-  .hud{position:absolute;top:10px;left:10px;right:10px;display:flex;justify-content:space-between;
-       gap:8px;pointer-events:none;z-index:15;}
+  /* Both readouts stack top-LEFT and the right side stays clear, because the axis
+     indicator is drawn into the scene's top-right corner and has to stay readable to
+     be useful - the gizmo status text used to run straight over it. padding-right
+     reserves the indicator's footprint (centred at VBW-40, radius 35, and viewBox
+     units are CSS px 1:1, so ~86px clears it with margin at any viewport size). */
+  .hud{position:absolute;top:10px;left:10px;right:10px;display:flex;flex-direction:column;
+       align-items:flex-start;gap:6px;pointer-events:none;z-index:15;padding-right:86px;}
   .hud .stat{font-size:9.5px;letter-spacing:.4px;color:var(--dim);
-       background:var(--indbg);padding:4px 8px;border-radius:7px;pointer-events:auto;}
+       background:var(--indbg);padding:4px 8px;border-radius:7px;pointer-events:auto;
+       max-width:100%;}
   .viewbtns{position:absolute;bottom:10px;right:10px;display:flex;gap:6px;z-index:15;}
   .minibtn{width:32px;height:32px;border-radius:9px;
        border:1px solid var(--edge);background:var(--indbg);color:var(--text);font-size:13px;
@@ -445,6 +451,20 @@ var sceneG=svgNS("g"); svg.appendChild(sceneG);
      zoomed-out setting still read as zoomed IN. Deriving SCALE so the whole grid fits
      makes 100% honestly mean "everything visible", and lets the floor go properly wide. */
 var FIT_MARGIN=1.12;   // a little air around the grid at 100%
+
+/* Scene line weights live in WORLD units and convert at draw time. They used to be
+   fixed viewBox units (channel stroke 5, port radius 5, wireframe 1), which held a
+   constant proportion ONLY because SCALE was hard-coded at 110. Once SCALE started
+   varying with the viewport those weights stopped tracking the geometry they belong
+   to: on a short/wide stage SCALE lands near 86, so a 5-unit stroke became 5/86 of a
+   world unit instead of the intended 5/110 - about 28% heavier, which is exactly the
+   "channels look thicker and ports bigger relative to the grid" the owner spotted.
+   Ratios below are the ORIGINAL design values divided by that original SCALE=110, so
+   appearance is unchanged at the old scale and now holds at any viewport size.
+   Deliberately NOT applied to the gizmo rings/arrows/handles: those are controls, not
+   drawing, and a consistent on-screen weight is what keeps them reliably touchable. */
+var W_CHANNEL=5/110, W_PORT=5/110, W_WIRE=1/110;
+function wpx(worldUnits){ return worldUnits*SCALE*cam.scale; }
 // Measure the grid's REAL projected extent rather than assuming its on-screen
 // footprint equals its width in cells. At the default camera the grid projects as a
 // diamond roughly 1.4x wider than the raw cell count implies, so a naive
@@ -562,7 +582,9 @@ function render(){
         var ln=svgNS("line");
         ln.setAttribute("x1",sa.sx); ln.setAttribute("y1",sa.sy);
         ln.setAttribute("x2",sb.sx); ln.setAttribute("y2",sb.sy);
-        ln.setAttribute("stroke","var(--wire)"); ln.setAttribute("stroke-width","1"); ln.setAttribute("opacity","0.12");
+        ln.setAttribute("stroke","var(--wire)");
+        ln.setAttribute("stroke-width", Math.max(0.4, wpx(W_WIRE)).toFixed(2));
+        ln.setAttribute("opacity","0.12");
         sceneG.appendChild(ln);
       });
     } else if(it.kind==="chan"){
@@ -570,7 +592,7 @@ function render(){
       var path=svgNS("path");
       path.setAttribute("d","M "+pts2.map(function(p){return p.sx.toFixed(1)+" "+p.sy.toFixed(1);}).join(" L "));
       path.setAttribute("fill","none"); path.setAttribute("stroke","var(--text)");
-      path.setAttribute("stroke-width", (5*cam.scale).toFixed(2)); path.setAttribute("stroke-linecap","round");
+      path.setAttribute("stroke-width", wpx(W_CHANNEL).toFixed(2)); path.setAttribute("stroke-linecap","round");
       // Owner's fix for the sharp spike artifact at acute viewing angles: an elbow arc's
       // screen-space projection can fold back on itself when viewed near edge-on (its
       // 3D tangent points mostly toward/away from the camera), so consecutive points in
@@ -589,10 +611,13 @@ function render(){
       sceneG.appendChild(path);
     } else {
       var sp=proj(it.view);
+      var pr=wpx(W_PORT);
       var c=svgNS("circle");
-      c.setAttribute("cx",sp.sx); c.setAttribute("cy",sp.sy); c.setAttribute("r",(5*cam.scale).toFixed(2));
+      c.setAttribute("cx",sp.sx); c.setAttribute("cy",sp.sy); c.setAttribute("r",pr.toFixed(2));
       c.setAttribute("fill", it.role==="in" ? "var(--acc)" : "var(--out)");
-      c.setAttribute("stroke","var(--panel2)"); c.setAttribute("stroke-width","1.5");
+      c.setAttribute("stroke","var(--panel2)");
+      // 0.3 of the radius reproduces the original 1.5-against-5 ring at any scale
+      c.setAttribute("stroke-width", Math.max(0.4, pr*0.3).toFixed(2));
       sceneG.appendChild(c);
     }
   });
@@ -639,7 +664,9 @@ function render(){
         .map(function(p){ var w=matApply(ghostPose,p); return pc([w[0]+tc.x,w[1]+tc.y,w[2]+tc.z]); });
       var path=svgNS("path");
       path.setAttribute("d","M "+p3.map(function(p){return p.sx.toFixed(1)+" "+p.sy.toFixed(1);}).join(" L "));
-      path.setAttribute("fill","none"); path.setAttribute("stroke","var(--acc)"); path.setAttribute("stroke-width","2");
+      path.setAttribute("fill","none"); path.setAttribute("stroke","var(--acc)");
+      // ghosts depict a PART, so they track channel weight (0.4x, matching the original 2-against-5)
+      path.setAttribute("stroke-width", Math.max(0.6, wpx(W_CHANNEL)*0.4).toFixed(2));
       path.setAttribute("stroke-linecap","round"); path.setAttribute("stroke-linejoin","round");
       path.setAttribute("stroke-dasharray","4 5"); path.setAttribute("opacity","0.75");
       sceneG.appendChild(path);
@@ -657,7 +684,9 @@ function render(){
           .map(function(p){ var w=matApply(Msnap,p); return pc([w[0]+cellArr[0],w[1]+cellArr[1],w[2]+cellArr[2]]); });
         var path=svgNS("path");
         path.setAttribute("d","M "+p3.map(function(p){return p.sx.toFixed(1)+" "+p.sy.toFixed(1);}).join(" L "));
-        path.setAttribute("fill","none"); path.setAttribute("stroke","var(--acc)"); path.setAttribute("stroke-width","2");
+        path.setAttribute("fill","none"); path.setAttribute("stroke","var(--acc)");
+      // ghosts depict a PART, so they track channel weight (0.4x, matching the original 2-against-5)
+      path.setAttribute("stroke-width", Math.max(0.6, wpx(W_CHANNEL)*0.4).toFixed(2));
         path.setAttribute("stroke-linecap","round"); path.setAttribute("stroke-linejoin","round");
         path.setAttribute("stroke-dasharray","4 5"); path.setAttribute("opacity","0.75");
         sceneG.appendChild(path);
