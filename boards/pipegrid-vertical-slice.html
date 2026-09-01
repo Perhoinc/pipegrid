@@ -27,20 +27,15 @@
      the mechanics/rendering code touches keeps its original id - only the surrounding
      chrome changed here, nothing under render()/runValidation()/save-load/2D-view logic. */
   .stage{position:relative;flex:1;min-height:0;background:var(--panel2);overflow:hidden;}
-  /* The 3D canvas's viewBox is a fixed 340x340 square (camera math assumes it - CX/CY/
-     SCALE are all tuned against that). Forcing the SVG's CSS box to a non-square
-     shape (e.g. height:100% of a tall stage) makes the browser's real coordinate
-     transform (getScreenCTM, what svgPointFromClient/hit-testing actually uses)
-     apply "meet" letterboxing - the visible content re-centers inside the stretched
-     box, but a naive width/height-ratio tap mapping no longer agrees with it, so
-     taps land nowhere near what they look like they're hitting. Real bug caught
-     during verification, not by eye: let the SVG size to its own natural aspect
-     ratio (width:100%, height:auto) and centre it in the stage instead of forcing
-     a stretch - that keeps CSS box and viewBox in agreement, so there's nothing
-     for the browser to letterbox and no mismatch for hit-testing to fall into. */
-  .rig{position:absolute;inset:0;touch-action:none;user-select:none;
-       display:flex;align-items:center;justify-content:center;}
+  /* The 3D canvas fills the stage edge to edge. Its viewBox is re-measured to the
+     stage's real pixel box on load/resize (see fitStage), so viewBox units are CSS
+     pixels 1:1 and the aspect ratios always agree - which means preserveAspectRatio
+     never letterboxes, and there's no gap between what you see and where taps land.
+     A FIXED square viewBox was the earlier approach and it's what put the scene in a
+     letterboxed square floating above the dock instead of filling the screen. */
+  .rig{position:absolute;inset:0;touch-action:none;user-select:none;}
   .rigsvg{display:block;width:100%;height:auto;}
+  #rig>svg.rigsvg{width:100%;height:100%;}
 
   .hud{position:absolute;top:10px;left:10px;right:10px;display:flex;justify-content:space-between;
        gap:8px;pointer-events:none;z-index:15;}
@@ -423,17 +418,67 @@ function rotPt(x,y,z,az,el){
   var y2=y1*ce-z1*se, z2=y1*se+z1*ce;
   return {x:x1, y:y2, z:z2};
 }
-var VB=340, CX=170, CY=178, SCALE=110;
+// All four are re-derived from the stage's real size by fitStage() below; these are
+// only sane pre-measurement defaults so anything running before first layout works.
+var VBW=340, VBH=340, CX=170, CY=178, SCALE=110;
 var cam={az:35*Math.PI/180, el:25*Math.PI/180, scale:1, panX:0, panY:0};
 var DEFAULT_CAM={az:cam.az, el:cam.el};
+var ZOOM_MIN=0.35, ZOOM_MAX=4;
 function proj(p){ return {sx:CX+p.x*SCALE*cam.scale+cam.panX, sy:CY-p.z*SCALE*cam.scale+cam.panY}; }
 // screen Y now reads off p.z (the up/down axis under Z-up), not p.y as in the original Y-up rig.
 
 function svgNS(tag){ return document.createElementNS("http://www.w3.org/2000/svg",tag); }
 var rigEl=document.getElementById("rig");
-var svg=svgNS("svg"); svg.setAttribute("viewBox","0 0 "+VB+" "+VB); svg.setAttribute("class","rigsvg");
+var svg=svgNS("svg"); svg.setAttribute("viewBox","0 0 "+VBW+" "+VBH); svg.setAttribute("class","rigsvg");
 rigEl.insertBefore(svg, rigEl.firstChild);
 var sceneG=svgNS("g"); svg.appendChild(sceneG);
+
+/* Match the viewBox to the stage's actual pixel box, and re-derive the camera's
+   centre and base scale from it. Two things this fixes:
+   - The scene used to sit in a letterboxed square floating above the dock, because a
+     fixed 340x340 viewBox inside a tall stage gets "meet"-fitted to the narrower axis.
+     Measuring the real box means the aspect ratios always agree, so it fills the space.
+   - Zoom percentages now mean something. SCALE was a fixed 110 px/unit against a 340
+     viewBox, which put the 5-cell grid's ~550 units inside a 340-unit box: at "100%"
+     the grid was already cropped well past the edges, and 60% (the old floor) was
+     merely the first level where it roughly fit - which is exactly why the most
+     zoomed-out setting still read as zoomed IN. Deriving SCALE so the whole grid fits
+     makes 100% honestly mean "everything visible", and lets the floor go properly wide. */
+var FIT_MARGIN=1.12;   // a little air around the grid at 100%
+// Measure the grid's REAL projected extent rather than assuming its on-screen
+// footprint equals its width in cells. At the default camera the grid projects as a
+// diamond roughly 1.4x wider than the raw cell count implies, so a naive
+// "min(w,h)/cellCount" divisor let it overflow the sides in portrait. Measured at the
+// DEFAULT angle, not the live one, so "100%" stays a stable property of the viewport
+// instead of silently re-scaling every time you orbit.
+function gridFitScale(){
+  var h=GRIDN+0.5, xs=[], zs=[];
+  [-h,h].forEach(function(x){ [-h,h].forEach(function(y){ [-0.5,0.5].forEach(function(z){
+    var v=rotPt(x,y,z,DEFAULT_CAM.az,DEFAULT_CAM.el);
+    xs.push(v.x); zs.push(v.z);
+  });});});
+  var w=Math.max.apply(null,xs)-Math.min.apply(null,xs);
+  var t=Math.max.apply(null,zs)-Math.min.apply(null,zs);
+  return Math.min(VBW/(w*FIT_MARGIN), VBH/(t*FIT_MARGIN));
+}
+// Returns true only when something actually CHANGED, so it's cheap to call every
+// frame. render() calls it first thing, which makes the fit self-healing: whatever
+// resizes the stage - rotation, split view, the URL bar collapsing, or the page
+// booting while hidden and measuring zero - the next interaction corrects it without
+// depending on a resize event firing. Worth doing because ResizeObserver turned out
+// not to fire at all in some embedded browsers even with a live reference held.
+function fitStage(){
+  var r=rigEl.getBoundingClientRect();
+  if(!(r.width>0 && r.height>0)) return false;   // hidden/pre-layout: leave it alone
+  var w=Math.max(80, Math.round(r.width)), h=Math.max(80, Math.round(r.height));
+  if(w===VBW && h===VBH) return false;
+  VBW=w; VBH=h;
+  svg.setAttribute("viewBox","0 0 "+VBW+" "+VBH);
+  CX=VBW/2; CY=VBH/2;
+  SCALE=gridFitScale();
+  AXIS_IND_CX=VBW-40;
+  return true;
+}
 
 function edgesOf(cx,cy,cz,h){
   var c=[[cx-h,cy-h,cz-h],[cx+h,cy-h,cz-h],[cx+h,cy+h,cz-h],[cx-h,cy+h,cz-h],
@@ -457,6 +502,7 @@ var lastPortWorld=null;   // per-part-index -> {dir: worldPos}, populated by ren
 var visiblePorts=[];      // rebuilt every render: hit-test targets for the connect gesture
 
 function render(){
+  fitStage();   // self-heals the viewBox if the stage changed size since last frame
   while(sceneG.firstChild) sceneG.removeChild(sceneG.firstChild);
   var items=[];
   visiblePorts=[];
@@ -846,7 +892,7 @@ function drawIsoView(layerParts){
 // last so it always sits on top of the scene. Uses ONLY the camera's rotation (never
 // world position or cam.scale), coloured to match the gizmo's own axis colours so the
 // two reinforce each other rather than introducing a second colour vocabulary.
-var AXIS_IND_R=24, AXIS_IND_CX=VB-32, AXIS_IND_CY=32;
+var AXIS_IND_R=24, AXIS_IND_CX=VBW-40, AXIS_IND_CY=40;   // CX re-derived by fitStage()
 function drawAxisIndicator(){
   var dirs=[{v:[0,1,0],col:"var(--ay)",label:"N"},
             {v:[1,0,0],col:"var(--ax)",label:"E"},
@@ -1209,7 +1255,7 @@ svg.addEventListener("pointermove", function(e){
   pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
   if(mode==="pinch" && pts.size>=2){
     var d1=pairDist(), mid1=midpoint();
-    var newScale=Math.max(0.6, Math.min(4, pinchBase.scale0*(d1/pinchBase.d0)));
+    var newScale=Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, pinchBase.scale0*(d1/pinchBase.d0)));
     var ratio=newScale/pinchBase.scale0;
     cam.panX = mid1.x - CX - ratio*(pinchBase.mid0.x - CX - pinchBase.panX0);
     cam.panY = mid1.y - CY - ratio*(pinchBase.mid0.y - CY - pinchBase.panY0);
@@ -1474,7 +1520,25 @@ document.getElementById("themebtn").addEventListener("click", function(){
   catch(e){ /* stale or hand-edited entry - keep the seed board */ }
 })();
 syncHistoryButtons();
+fitStage();
 render();
+// Eager re-fit on rotate/resize so the view corrects immediately rather than waiting
+// for the next interaction. These are an OPTIMISATION, not the guarantee - render()'s
+// own fitStage() call is what actually makes the fit reliable. Verified here that the
+// window-resize listener fires and refits correctly while the ResizeObserver never
+// fired at all (even holding a live reference, which is itself required - an
+// unreferenced observer can be garbage-collected), so don't trust the observer alone.
+// fitStage() no-ops while the box measures zero, so this is safe during layout churn.
+var stageObserver=null;
+(function(){
+  var refit=function(){ if(fitStage()) render(); };
+  if(window.ResizeObserver){
+    stageObserver=new ResizeObserver(refit);
+    stageObserver.observe(rigEl);
+  }
+  window.addEventListener("resize", refit);
+  window.addEventListener("orientationchange", function(){ setTimeout(refit, 150); });
+})();
 window.__pgSlice={get parts(){return parts;}, get gizmoPartIdx(){return gizmoPartIdx;}, get mode(){return mode;},
   get connectDrag(){return connectDrag;}, get visiblePorts(){return visiblePorts;}, get CAPTURE_R(){return CAPTURE_R;},
   get history(){return history;}, get future(){return future;},
