@@ -1117,6 +1117,22 @@ function stepHistory(fromStack, toStack){
 function doUndo(){ stepHistory(history, future); }
 function doRedo(){ stepHistory(future, history); }
 
+// Deletes whichever part currently has the gizmo, if any. No-ops with nothing
+// selected, and refuses to remove the last remaining part - same guard the old
+// pop-only undo used, since loadBoard() itself requires at least one part (the
+// save schema has nowhere to represent an empty board). Safe to splice from the
+// middle of the array: nothing else holds onto a part's index across renders -
+// gizmoPartIdx and lastPlacement are the only persistent ones, and both get
+// cleared here regardless of which part was removed.
+function deletePart(){
+  if(gizmoPartIdx==null || parts.length<=1) return;
+  var pre=snapshot();
+  parts.splice(gizmoPartIdx,1);
+  gizmoPartIdx=null; gizmoDrag=null; lastPlacement=null; mode="none";
+  pushHistory(pre);
+  render(); runValidation();
+}
+
 function exportBoardFile(){
   var d=new Date(), pad=function(n){return String(n).padStart(2,"0");};
   var name="pipegrid-"+d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+
@@ -1149,6 +1165,7 @@ function importBoardFile(file){
 
 /* ---------- orbit / pan / zoom, ported gesture-for-gesture from the combined-test rig ---------- */
 var pts=new Map(), mode="none", orbitLast=null, pinchBase=null;
+var orbitHadGizmo=false, orbitMoveDist=0;   // tap-vs-drag distinction, see pointerdown
 function svgPointFromClient(clientX,clientY){
   var pt=svg.createSVGPoint(); pt.x=clientX; pt.y=clientY;
   var m=svg.getScreenCTM().inverse();
@@ -1265,10 +1282,15 @@ svg.addEventListener("pointerdown", function(e){
         var bodyHit=hitPartBody(p);
         if(bodyHit){
           gizmoPartIdx=bodyHit.partIdx; gizmoDrag=null; mode="none"; render();
-        } else if(gizmoPartIdx!=null){
-          gizmoPartIdx=null; render();
         } else {
+          // Owner's ask: orbiting shouldn't cost you the current selection. Empty
+          // space always starts an orbit now, whether or not a gizmo is showing;
+          // whether it ALSO dismisses the gizmo is decided at release, based on
+          // whether the gesture actually moved (see up()'s mode==="orbit" branch).
+          // A real drag orbits and keeps the selection; a stationary tap still
+          // dismisses it, exactly the original "tap elsewhere to dismiss" behaviour.
           mode="orbit"; orbitLast={x:e.clientX,y:e.clientY};
+          orbitHadGizmo=(gizmoPartIdx!=null); orbitMoveDist=0;
         }
       }
     }
@@ -1294,6 +1316,7 @@ svg.addEventListener("pointermove", function(e){
   if(mode==="orbit"){
     var dx=e.clientX-orbitLast.x, dy=e.clientY-orbitLast.y;
     orbitLast={x:e.clientX,y:e.clientY};
+    orbitMoveDist+=Math.hypot(dx,dy);
     // Flipped per owner feedback: swiping right should turn the view right (content
     // slides left under your finger, the standard "grab the camera" orbit feel), not
     // left. Traced it: proj() reads screen-X straight off p.x, which az alone controls
@@ -1367,7 +1390,17 @@ svg.addEventListener("pointermove", function(e){
 function up(e){
   pts.delete(e.pointerId);
   if(mode==="pinch"){ if(pts.size<2){ mode="none"; pinchBase=null; } return; }
-  if(mode==="orbit"){ if(pts.size===0) mode="none"; return; }
+  if(mode==="orbit"){
+    if(pts.size===0){
+      mode="none";
+      // Tap tolerance well under CAPTURE_R (a hit-test radius, different purpose) -
+      // this is purely "did the finger actually travel" to tell a real orbit drag
+      // apart from a stationary tap meant to dismiss the gizmo.
+      if(orbitHadGizmo && orbitMoveDist<8){ gizmoPartIdx=null; render(); }
+      orbitHadGizmo=false;
+    }
+    return;
+  }
   if(mode==="gizmoRot"){
     if(pts.size===0){
       var n=((snapQuarter(gizmoDrag.live)%4)+4)%4, M=gizmoDrag.basePose;
@@ -1536,6 +1569,23 @@ document.getElementById("themebtn").addEventListener("click", function(){
   document.body.setAttribute("data-theme", isLight?"":"light");
   this.textContent=isLight?"☾":"☀";
   render();
+});
+
+// Delete the selected part. Backspace was the owner's ask; Delete does the same
+// thing since the two are conventionally interchangeable for "remove this" and
+// binding it costs nothing extra. Guarded to only act (and only preventDefault)
+// when there's actually a selection AND focus isn't in a text field - Backspace
+// outside a text field is a known browser "navigate back" trigger in some
+// configurations, but this app has no persistent text input to protect against
+// hijacking (import's file picker doesn't take keyboard focus), so the guard is
+// defensive/future-proofing rather than covering a real input today.
+window.addEventListener("keydown", function(e){
+  if(e.key!=="Backspace" && e.key!=="Delete") return;
+  var el=document.activeElement, tag=el&&el.tagName;
+  if(tag==="INPUT" || tag==="TEXTAREA" || (el&&el.isContentEditable)) return;
+  if(gizmoPartIdx==null) return;
+  e.preventDefault();
+  deletePart();
 });
 
 // Boot: pick up whatever was last autosaved, so closing the tab and coming back
