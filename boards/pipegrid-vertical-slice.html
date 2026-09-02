@@ -1437,6 +1437,29 @@ function up(e){
 }
 svg.addEventListener("pointerup", up);
 svg.addEventListener("pointercancel", up);
+
+/* Wheel/trackpad zoom - zoom was pinch-only, i.e. unreachable with a mouse and
+   keyboard, which is how the owner actually drives this over Remote Control.
+   Anchors on the CURSOR (the world point under the pointer stays under it), the
+   same behaviour pinch already has around its midpoint, so zooming feels like it
+   targets what you're looking at rather than always the middle of the screen.
+   passive:false because we preventDefault to stop the page scrolling underneath. */
+svg.addEventListener("wheel", function(e){
+  e.preventDefault();
+  // deltaMode normalisation: trackpads report pixels, plenty of mice report lines
+  // or pages, and untreated that makes one device crawl while the other leaps.
+  var dy=e.deltaY*(e.deltaMode===1 ? 16 : e.deltaMode===2 ? 400 : 1);
+  var oldScale=cam.scale;
+  // exponential, so every notch is the same PROPORTION of the current zoom - a
+  // linear step would feel fine zoomed in and glacial zoomed out.
+  var newScale=Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, oldScale*Math.exp(-dy*0.0015)));
+  if(newScale===oldScale) return;
+  var pt=svgPointFromClient(e.clientX,e.clientY), ratio=newScale/oldScale;
+  cam.panX=(pt.x-CX)-ratio*(pt.x-CX-cam.panX);
+  cam.panY=(pt.y-CY)-ratio*(pt.y-CY-cam.panY);
+  cam.scale=newScale;
+  render();
+}, {passive:false});
 document.getElementById("resetbtn").addEventListener("click", function(){
   cam.az=DEFAULT_CAM.az; cam.el=DEFAULT_CAM.el; cam.scale=1; cam.panX=0; cam.panY=0; render();
 });
