@@ -56,10 +56,17 @@
        letter-spacing:.3px;}
   .layerbar button.on{border-color:var(--acc);color:var(--acc);}
 
-  .gridrow{display:flex;align-items:center;gap:8px;font-size:10px;color:var(--dim);}
-  .gridrow .lbl{flex:1;}
-  .gridrow .num{min-width:22px;text-align:center;color:var(--text);font-size:11px;}
-  .gridrow button{width:30px;height:30px;border-radius:7px;border:1px solid var(--edge);
+  /* One block per axis: the count on top, then the two ends side by side, because the
+     end is the thing being chosen - "a layer on top" and "a layer below" are different
+     actions, not a single count going up. */
+  .gridaxis{display:flex;flex-direction:column;gap:5px;}
+  .gridhead{display:flex;align-items:center;font-size:10px;color:var(--dim);}
+  .gridhead .lbl{flex:1;letter-spacing:.6px;}
+  .gridhead .num{color:var(--text);font-size:11px;}
+  .gridends{display:flex;gap:8px;}
+  .gridends .end{flex:1;display:flex;align-items:center;gap:5px;}
+  .gridends .endlbl{flex:1;font-size:8px;letter-spacing:.9px;color:var(--dim);}
+  .gridends button{width:30px;height:30px;border-radius:7px;border:1px solid var(--edge);
        background:var(--panel2);color:var(--text);font-family:inherit;font-size:14px;}
   .gridnote{font-size:9.5px;color:var(--dim);line-height:1.5;}
 
@@ -67,6 +74,7 @@
   .minibtn{width:32px;height:32px;border-radius:9px;
        border:1px solid var(--edge);background:var(--indbg);color:var(--text);font-size:13px;
        display:flex;align-items:center;justify-content:center;font-family:inherit;}
+  .minibtn.on{border-color:var(--acc);color:var(--acc);}
 
   .dock{flex:none;display:flex;background:var(--panel);border-top:1px solid var(--edge);
        padding-bottom:env(safe-area-inset-bottom);}
@@ -130,6 +138,7 @@
   </div>
   <div class="layerbar" id="layerbar"></div>
   <div class="viewbtns">
+    <button class="minibtn" id="wirebtn" title="Show the whole stack's grid">▤</button>
     <button class="minibtn" id="resetbtn" title="Reset view">⟲</button>
     <button class="minibtn" id="themebtn" title="Toggle theme">☾</button>
   </div>
@@ -154,13 +163,34 @@
   <div class="popover" id="popBoard">
     <div class="popoverhead">BOARD</div>
     <div class="boardrow">
-      <div class="gridrow"><span class="lbl">COLUMNS (E–W)</span>
-        <button data-grid="cols" data-d="-1">−</button><span class="num" id="numCols">5</span><button data-grid="cols" data-d="1">+</button></div>
-      <div class="gridrow"><span class="lbl">ROWS (N–S)</span>
-        <button data-grid="rows" data-d="-1">−</button><span class="num" id="numRows">5</span><button data-grid="rows" data-d="1">+</button></div>
-      <div class="gridrow"><span class="lbl">LAYERS (U–D)</span>
-        <button data-grid="layers" data-d="-1">−</button><span class="num" id="numLayers">3</span><button data-grid="layers" data-d="1">+</button></div>
-      <div class="gridnote" id="gridnote">Shrinking is refused if parts would fall outside.</div>
+      <div class="gridaxis">
+        <div class="gridhead"><span class="lbl">COLUMNS</span><span class="num" id="numCols">5</span></div>
+        <div class="gridends">
+          <span class="end"><span class="endlbl">WEST</span>
+            <button data-axis="x" data-side="lo" data-d="-1">−</button><button data-axis="x" data-side="lo" data-d="1">+</button></span>
+          <span class="end"><span class="endlbl">EAST</span>
+            <button data-axis="x" data-side="hi" data-d="-1">−</button><button data-axis="x" data-side="hi" data-d="1">+</button></span>
+        </div>
+      </div>
+      <div class="gridaxis">
+        <div class="gridhead"><span class="lbl">ROWS</span><span class="num" id="numRows">5</span></div>
+        <div class="gridends">
+          <span class="end"><span class="endlbl">SOUTH</span>
+            <button data-axis="y" data-side="lo" data-d="-1">−</button><button data-axis="y" data-side="lo" data-d="1">+</button></span>
+          <span class="end"><span class="endlbl">NORTH</span>
+            <button data-axis="y" data-side="hi" data-d="-1">−</button><button data-axis="y" data-side="hi" data-d="1">+</button></span>
+        </div>
+      </div>
+      <div class="gridaxis">
+        <div class="gridhead"><span class="lbl">LAYERS</span><span class="num" id="numLayers">3</span></div>
+        <div class="gridends">
+          <span class="end"><span class="endlbl">BELOW</span>
+            <button data-axis="z" data-side="lo" data-d="-1">−</button><button data-axis="z" data-side="lo" data-d="1">+</button></span>
+          <span class="end"><span class="endlbl">ON TOP</span>
+            <button data-axis="z" data-side="hi" data-d="-1">−</button><button data-axis="z" data-side="hi" data-d="1">+</button></span>
+        </div>
+      </div>
+      <div class="gridnote" id="gridnote">Each end grows or shrinks on its own. Removing an end is refused while parts sit there.</div>
       <button class="btn" id="exportbtn">Export to file</button>
       <button class="btn" id="importbtn">Import from file</button>
       <input type="file" id="importfile" accept="application/json,.json" style="display:none;" />
@@ -498,9 +528,9 @@ function wpx(worldUnits){ return worldUnits*SCALE*cam.scale; }
 function gridFitScale(){
   // Corners of the real configured box, so a wider/taller grid zooms out to suit
   // instead of overflowing - each axis can now differ.
-  var xlo=gridLo(GRID.cols)-0.5,   xhi=gridHi(GRID.cols)+0.5;
-  var ylo=gridLo(GRID.rows)-0.5,   yhi=gridHi(GRID.rows)+0.5;
-  var zlo=gridLo(GRID.layers)-0.5, zhi=gridHi(GRID.layers)+0.5;
+  var xlo=GRID.x.lo-0.5, xhi=GRID.x.hi+0.5;
+  var ylo=GRID.y.lo-0.5, yhi=GRID.y.hi+0.5;
+  var zlo=GRID.z.lo-0.5, zhi=GRID.z.hi+0.5;
   var xs=[], zs=[];
   [xlo,xhi].forEach(function(x){ [ylo,yhi].forEach(function(y){ [zlo,zhi].forEach(function(z){
     var v=rotPt(x,y,z,DEFAULT_CAM.az,DEFAULT_CAM.el);
@@ -542,76 +572,100 @@ function edgesOf(cx,cy,cz,h){
    z=0, placement didn't bound z AT ALL (you could build upward forever into empty
    space with no grid under you), while the gizmo's move handle clamped all three
    axes. Placing and moving now agree, because both go through inGrid().
-   Counts are centred on the origin so the seed part stays at (0,0,0) and every
-   existing save keeps loading unchanged - odd counts come out symmetric (5 -> -2..2,
-   matching the old GRIDN=2 exactly), even counts lean one cell negative. */
-var GRID={cols:5, rows:5, layers:3};   // cols=X (E/W), rows=Y (N/S), layers=Z (U/D)
+   Stored as explicit per-axis BOUNDS rather than counts, because the owner asked to add
+   and remove at a CHOSEN END - "layers on top or below", and the same for rows and
+   columns. A count alone can't express that: growing a count has to guess which side to
+   extend, and the old centring rule (lo = -floor(n/2)) silently re-centred the entire
+   grid underneath the parts every time a count changed parity. Moving one bound moves
+   only the edge you asked for, so placed parts always keep the coordinates they had. */
+var GRID={x:{lo:-2,hi:2}, y:{lo:-2,hi:2}, z:{lo:-1,hi:1}};   // x=cols E/W, y=rows N/S, z=layers U/D
 var GRID_MIN=1, GRID_MAX=12;
+var AXIS_KEYS=["x","y","z"];
+var AXIS_NOUN={x:"column", y:"row", z:"layer"};
+// Which compass end each bound is, in the app's own N/S/E/W/U/D vocabulary.
+var END_LABEL={x:{lo:"west", hi:"east"}, y:{lo:"south", hi:"north"}, z:{lo:"bottom", hi:"top"}};
 var activeLayer=0;                     // shared by the 3D view and the 2D reference view
 var OFF_LAYER_OPACITY="0.28";          // parts on other layers: context, not clutter
-function gridLo(n){ return -Math.floor(n/2); }
-function gridHi(n){ return gridLo(n)+n-1; }
+var showAllWire=false;                 // wireframe: active layer only, or the whole stack
+function axisCount(a){ return GRID[a].hi-GRID[a].lo+1; }
 function layerList(){
-  var out=[]; for(var z=gridHi(GRID.layers); z>=gridLo(GRID.layers); z--) out.push(z);
+  var out=[]; for(var z=GRID.z.hi; z>=GRID.z.lo; z--) out.push(z);
   return out;                          // top-to-bottom, reads naturally in a vertical bar
 }
 function inGrid(x,y,z){
-  return x>=gridLo(GRID.cols)   && x<=gridHi(GRID.cols)
-      && y>=gridLo(GRID.rows)   && y<=gridHi(GRID.rows)
-      && z>=gridLo(GRID.layers) && z<=gridHi(GRID.layers);
+  return x>=GRID.x.lo && x<=GRID.x.hi
+      && y>=GRID.y.lo && y<=GRID.y.hi
+      && z>=GRID.z.lo && z<=GRID.z.hi;
 }
-// Smallest counts that still contain every placed part - used to refuse a shrink
-// that would strand parts outside the grid, and to grow the grid on load rather
-// than rejecting a board that was built larger.
-function occupiedExtent(){
-  var need={cols:1, rows:1, layers:1};
+// Tightest bounds containing every placed part - used to refuse a shrink that would
+// strand parts outside the grid, and to grow the grid on load rather than rejecting a
+// board that was built larger. Null on an empty board: nothing to contain.
+function occupiedBounds(){
+  if(!parts.length) return null;
+  var b={x:{lo:Infinity,hi:-Infinity}, y:{lo:Infinity,hi:-Infinity}, z:{lo:Infinity,hi:-Infinity}};
   parts.forEach(function(p){
-    need.cols  =Math.max(need.cols,   2*Math.abs(p.cell.x)+ (p.cell.x<0?0:1));
-    need.rows  =Math.max(need.rows,   2*Math.abs(p.cell.y)+ (p.cell.y<0?0:1));
-    need.layers=Math.max(need.layers, 2*Math.abs(p.cell.z)+ (p.cell.z<0?0:1));
+    AXIS_KEYS.forEach(function(a){
+      if(p.cell[a]<b[a].lo) b[a].lo=p.cell[a];
+      if(p.cell[a]>b[a].hi) b[a].hi=p.cell[a];
+    });
   });
-  return need;
+  return b;
 }
 function clampActiveLayer(){
-  activeLayer=Math.max(gridLo(GRID.layers), Math.min(gridHi(GRID.layers), activeLayer));
+  activeLayer=Math.max(GRID.z.lo, Math.min(GRID.z.hi, activeLayer));
 }
 function setActiveLayer(z){
   activeLayer=z; clampActiveLayer();
   gizmoPartIdx=null; gizmoDrag=null;   // a selection on the layer you just left is confusing
+  selectedCell=null;                   // ...and so is a target cell sitting on it
   render();
 }
 // Grows the grid to contain everything on the board. Called after any load so a
 // board built on a larger grid always opens intact rather than being rejected -
 // the grid adapts to the board, never the other way round.
 function growGridToFit(){
-  var need=occupiedExtent();
-  GRID.cols  =Math.min(GRID_MAX, Math.max(GRID.cols,   need.cols));
-  GRID.rows  =Math.min(GRID_MAX, Math.max(GRID.rows,   need.rows));
-  GRID.layers=Math.min(GRID_MAX, Math.max(GRID.layers, need.layers));
+  var b=occupiedBounds();
+  if(b) AXIS_KEYS.forEach(function(a){
+    GRID[a].lo=Math.min(GRID[a].lo, b[a].lo);
+    GRID[a].hi=Math.max(GRID[a].hi, b[a].hi);
+  });
   clampActiveLayer();
 }
-// Shrinking is refused rather than silently deleting parts - losing work to a
-// stepper tap would be far worse than the inconvenience of deleting first.
-function setGridDim(key, n){
-  n=Math.max(GRID_MIN, Math.min(GRID_MAX, n));
-  if(n===GRID[key]) return null;
-  var need=occupiedExtent();
-  if(n<need[key]) return "Can't shrink "+key+" to "+n+" - parts would fall outside. Delete them first.";
-  GRID[key]=n; clampActiveLayer();
+// Moves ONE edge of ONE axis by a single cell: `side` is which edge ("lo"/"hi"), `d` is
+// +1 to push that edge outward or -1 to pull it in. The two ends grow in opposite
+// world directions, which is the whole point - "+ on top" and "+ below" both add a
+// layer, they just add it at different ends. Shrinking is refused rather than silently
+// deleting parts: losing work to a stray tap would be far worse than having to delete
+// the parts yourself first.
+function nudgeGrid(axis, side, d){
+  var next = side==="hi" ? GRID[axis][side]+d : GRID[axis][side]-d;
+  var lo = side==="lo" ? next : GRID[axis].lo;
+  var hi = side==="hi" ? next : GRID[axis].hi;
+  var count=hi-lo+1;
+  if(count<GRID_MIN) return "The grid needs at least one "+AXIS_NOUN[axis]+".";
+  if(count>GRID_MAX) return "Maximum is "+GRID_MAX+" "+AXIS_NOUN[axis]+"s.";
+  var b=occupiedBounds();
+  if(b && (b[axis].lo<lo || b[axis].hi>hi))
+    return "Can't remove the "+END_LABEL[axis][side]+" "+AXIS_NOUN[axis]+" - parts are sitting there. Delete them first.";
+  GRID[axis][side]=next;
+  clampActiveLayer();
+  if(selectedCell && !inGrid(selectedCell.x,selectedCell.y,selectedCell.z)) selectedCell=null;
   autosave(); render(); runValidation();
   return null;
 }
 function isOccupied(x,y,z){ return parts.some(function(p){ return p.cell.x===x&&p.cell.y===y&&p.cell.z===z; }); }
-// Only the ACTIVE layer's empty cells get a wireframe. Drawing every layer's cells
-// at once turns a multi-layer grid into visual noise; parts on other layers still
-// render (dimmed), which is enough spatial context.
-function emptyCellList(){
+// Wireframe cells. The active layer always draws. The rest of the stack draws only when
+// the owner turns it on: every layer at once is a lot of lines, but without it there's
+// no read at all on how tall the stack is or where its edges sit.
+function wireCellList(){
   var list=[];
-  for(var gx=gridLo(GRID.cols); gx<=gridHi(GRID.cols); gx++)
-    for(var gy=gridLo(GRID.rows); gy<=gridHi(GRID.rows); gy++){
-      if(isOccupied(gx,gy,activeLayer)) continue;
-      list.push({x:gx,y:gy,z:activeLayer});
-    }
+  (showAllWire ? layerList() : [activeLayer]).forEach(function(z){
+    for(var gx=GRID.x.lo; gx<=GRID.x.hi; gx++)
+      for(var gy=GRID.y.lo; gy<=GRID.y.hi; gy++){
+        if(isOccupied(gx,gy,z)) continue;
+        list.push({x:gx, y:gy, z:z});
+      }
+  });
   return list;
 }
 
@@ -625,13 +679,20 @@ function render(){
   visiblePorts=[];
   lastPortWorld=parts.map(function(){ return {}; });
 
-  emptyCellList().forEach(function(cu, idx){
+  wireCellList().forEach(function(cu, idx){
     var depth=rotPt(cu.x,cu.y,cu.z,cam.az,cam.el).y;
     // empty cells use their own negative index range so they never collide with real
     // part indices in the cellIdx tiebreak below - they don't need cross-cell grouping
     // (a wireframe has no sub-components to interleave), just a stable draw key.
-    items.push({depth:depth, cellDepth:depth, cellIdx:-1-idx, kind:"wire", cu:cu});
+    items.push({depth:depth, cellDepth:depth, cellIdx:-1-idx, kind:"wire", cu:cu,
+      onActive: cu.z===activeLayer});
   });
+  // The cell you've picked to build into, drawn last-ish in its own right so it reads as
+  // a target rather than as part of the wireframe it sits in.
+  if(selectedCell){
+    var sd=rotPt(selectedCell.x,selectedCell.y,selectedCell.z,cam.az,cam.el).y;
+    items.push({depth:sd, cellDepth:sd, cellIdx:-0.5, kind:"selcell", cu:selectedCell});
+  }
 
   // Depth-sort at the PART level first, fine per-point depth only breaks ties within
   // the same part - the same fix the 2D reference sheet needed once more than one
@@ -684,7 +745,23 @@ function render(){
         ln.setAttribute("x2",sb.sx); ln.setAttribute("y2",sb.sy);
         ln.setAttribute("stroke","var(--wire)");
         ln.setAttribute("stroke-width", Math.max(0.4, wpx(W_WIRE)).toFixed(2));
-        ln.setAttribute("opacity","0.12");
+        // The whole-stack wireframe has to stay clearly BEHIND the active layer's, or
+        // turning it on would cost you the sense of which layer you're building on -
+        // the thing the highlight exists to give you.
+        ln.setAttribute("opacity", it.onActive ? "0.12" : "0.06");
+        sceneG.appendChild(ln);
+      });
+    } else if(it.kind==="selcell"){
+      edgesOf(it.cu.x,it.cu.y,it.cu.z,0.47).forEach(function(seg){
+        var pa=rotPt(seg[0][0],seg[0][1],seg[0][2],cam.az,cam.el);
+        var pb=rotPt(seg[1][0],seg[1][1],seg[1][2],cam.az,cam.el);
+        var sa=proj(pa), sb=proj(pb);
+        var ln=svgNS("line");
+        ln.setAttribute("x1",sa.sx); ln.setAttribute("y1",sa.sy);
+        ln.setAttribute("x2",sb.sx); ln.setAttribute("y2",sb.sy);
+        ln.setAttribute("stroke","var(--acc)");
+        ln.setAttribute("stroke-width", Math.max(1, wpx(W_WIRE)*2.2).toFixed(2));
+        ln.setAttribute("opacity","0.9");
         sceneG.appendChild(ln);
       });
     } else if(it.kind==="chan"){
@@ -845,6 +922,11 @@ function render(){
   } else if(mode==="connect" && connectDrag){
     document.getElementById("gizmostat").textContent =
       "placing · pose "+(connectDrag.liveIdx+1)+" of 4 valid for this connection · release to commit";
+  } else if(selectedCell){
+    // The one place the free-placement flow can stall is between picking a cell and
+    // realising a shape is what comes next, so the readout says so outright.
+    document.getElementById("gizmostat").textContent =
+      "cell "+selectedCell.x+", "+selectedCell.y+" on Z"+selectedCell.z+" · pick a shape to place it here";
   } else {
     document.getElementById("gizmostat").textContent = "no part selected";
   }
@@ -861,7 +943,7 @@ function render(){
 
 function renderLayerBar(){
   var bar=document.getElementById("layerbar");
-  if(GRID.layers<=1){ bar.innerHTML=""; bar.style.display="none"; return; }
+  if(axisCount("z")<=1){ bar.innerHTML=""; bar.style.display="none"; return; }
   bar.style.display="flex";
   bar.innerHTML="";
   layerList().forEach(function(z){
@@ -874,9 +956,9 @@ function renderLayerBar(){
   });
 }
 function syncGridNumbers(){
-  document.getElementById("numCols").textContent=GRID.cols;
-  document.getElementById("numRows").textContent=GRID.rows;
-  document.getElementById("numLayers").textContent=GRID.layers;
+  document.getElementById("numCols").textContent=axisCount("x");
+  document.getElementById("numRows").textContent=axisCount("y");
+  document.getElementById("numLayers").textContent=axisCount("z");
 }
 
 /* ================= 2D reference view: same parts array, two more projections =================
@@ -922,13 +1004,13 @@ function drawPlanView(layerParts){
   var svg=document.getElementById("planSvg");
   while(svg.firstChild) svg.removeChild(svg.firstChild);
   // Plan is X across / Y up, so its viewBox follows cols x rows independently now.
-  var VBPW=REF_CELL*GRID.cols, VBPH=REF_CELL*GRID.rows;
+  var VBPW=REF_CELL*axisCount("x"), VBPH=REF_CELL*axisCount("y");
   svg.setAttribute("viewBox","0 0 "+VBPW+" "+VBPH);
-  var ox=-(gridLo(GRID.cols)-0.5)*REF_CELL, oy=(gridHi(GRID.rows)+0.5)*REF_CELL;
+  var ox=-(GRID.x.lo-0.5)*REF_CELL, oy=(GRID.y.hi+0.5)*REF_CELL;
   function ctr(cell){ return {x:ox+cell.x*REF_CELL, y:oy-cell.y*REF_CELL}; }
   // grid
-  for(var gx=gridLo(GRID.cols); gx<=gridHi(GRID.cols); gx++)
-  for(var gy=gridLo(GRID.rows); gy<=gridHi(GRID.rows); gy++){
+  for(var gx=GRID.x.lo; gx<=GRID.x.hi; gx++)
+  for(var gy=GRID.y.lo; gy<=GRID.y.hi; gy++){
     var c=ctr({x:gx,y:gy});
     var r=svgNS("rect");
     r.setAttribute("x",c.x-REF_CELL/2); r.setAttribute("y",c.y-REF_CELL/2);
@@ -1079,6 +1161,45 @@ function drawAxisIndicator(){
 var CAPTURE_R=16;
 var pendingPort=null, lastPlacement=null;  // lastPlacement read by validation
 
+/* ---------- free placement: layer -> cell -> shape ------------------------------------
+   The original flow could only grow a board outward from a port that was already on it,
+   which meant an empty grid needed a seed part before you could build at all, and two
+   separate runs of pipe could never be started independently. This is the owner's stated
+   alternative: choose the layer, tap the empty cell you want, then pick the shape. */
+var selectedCell=null;   // an empty cell on the active layer, chosen as the next build target
+// Screen point -> which cell of the ACTIVE layer's plane it lands in. rotPt() is linear
+// and proj() is affine in its result, so at a fixed z the whole world->screen map is
+// affine: build the 2x2 that takes one cell step in x and one in y to their screen
+// offsets, and invert it. Worth solving exactly rather than reaching for the obvious
+// "nearest projected cell centre" - that partitions the screen into hexagons, while the
+// cells themselves project to sheared squares, so it picks the wrong neighbour near a
+// corner. Cheap either way; only one of them is right.
+function cellAtPoint(pt){
+  var z=activeLayer;
+  var o =proj(rotPt(0,0,z,cam.az,cam.el));
+  var ex=proj(rotPt(1,0,z,cam.az,cam.el));
+  var ey=proj(rotPt(0,1,z,cam.az,cam.el));
+  var a=ex.sx-o.sx, b=ey.sx-o.sx, c=ex.sy-o.sy, d=ey.sy-o.sy;
+  var det=a*d-b*c;
+  if(!det) return null;                    // layer seen exactly edge-on: no plane to point at
+  var px=pt.x-o.sx, py=pt.y-o.sy;
+  var gx=Math.round(( d*px - b*py)/det);
+  var gy=Math.round((-c*px + a*py)/det);
+  if(!inGrid(gx,gy,z)) return null;
+  return {x:gx, y:gy, z:z};
+}
+// Unlike a connection-driven placement there's no existing port to satisfy here, so
+// there's no pose to infer: the part lands in its home orientation and the gizmo - which
+// appears immediately, exactly as it does after a connection - is how you turn it.
+function placeAtCell(cell, shapeKey){
+  var newPorts=P(SHAPES[shapeKey].spec);
+  parts.push({shape:SHAPES[shapeKey].label, shapeKey:shapeKey, ports:newPorts,
+    streams:streamsFor(newPorts), cell:{x:cell.x, y:cell.y, z:cell.z}, poseIdx:0});
+  lastPlacement=null;      // nothing was connected, so there's no connection to validate
+  gizmoPartIdx=parts.length-1;
+  return gizmoPartIdx;
+}
+
 function nearestPortWithin(x,y,r){
   var best=null, bd=Infinity;
   visiblePorts.forEach(function(v){ var d=Math.hypot(x-v.sx,y-v.sy); if(d<bd){bd=d;best=v;} });
@@ -1165,7 +1286,9 @@ function serializeBoard(){
     camera: {az:cam.az, el:cam.el, scale:cam.scale, panX:cam.panX, panY:cam.panY},
     // Additive since schema 1 shipped: older saves simply have no `grid`, and
     // loadBoard defaults + grows to fit, so they still open correctly.
-    grid: {cols:GRID.cols, rows:GRID.rows, layers:GRID.layers},
+    grid: {x:{lo:GRID.x.lo, hi:GRID.x.hi},
+           y:{lo:GRID.y.lo, hi:GRID.y.hi},
+           z:{lo:GRID.z.lo, hi:GRID.z.hi}},
     activeLayer: activeLayer,
     parts: parts.map(function(p){
       return {shape:p.shapeKey, cell:{x:p.cell.x, y:p.cell.y, z:p.cell.z}, poseIdx:p.poseIdx};
@@ -1193,6 +1316,7 @@ function loadBoard(data, opts){
   });
   parts=newParts;
   gizmoPartIdx=null; gizmoDrag=null; lastPlacement=null; mode="none"; pts.clear();
+  selectedCell=null;   // a target cell from the previous board means nothing on this one
   // Undo/redo pass restoreCamera:false - stepping back through history shouldn't
   // yank the camera to wherever it happened to be sitting when that step was taken;
   // you'd lose your place in the scene every time you undid a rotation. Loading a
@@ -1202,9 +1326,25 @@ function loadBoard(data, opts){
     cam.panX=data.camera.panX; cam.panY=data.camera.panY;
   }
   if(data.grid){
-    GRID.cols  =Math.max(GRID_MIN, Math.min(GRID_MAX, data.grid.cols  ||GRID.cols));
-    GRID.rows  =Math.max(GRID_MIN, Math.min(GRID_MAX, data.grid.rows  ||GRID.rows));
-    GRID.layers=Math.max(GRID_MIN, Math.min(GRID_MAX, data.grid.layers||GRID.layers));
+    if(data.grid.x && data.grid.y && data.grid.z){
+      AXIS_KEYS.forEach(function(a){
+        var lo=data.grid[a].lo, hi=data.grid[a].hi;
+        if(typeof lo==="number" && typeof hi==="number" && hi>=lo)
+          GRID[a]={lo:lo, hi:Math.min(hi, lo+GRID_MAX-1)};
+      });
+    } else if(typeof data.grid.cols==="number"){
+      // Boards written while the grid was stored as centred COUNTS - the first shipped
+      // version of it, before the two ends became independently adjustable. Rebuilding
+      // the bounds that count implied (lo = -floor(n/2)) makes those boards open exactly
+      // as they were saved instead of silently landing on a different footprint.
+      var fromCount=function(n){
+        n=Math.max(GRID_MIN, Math.min(GRID_MAX, n));
+        var lo=-Math.floor(n/2); return {lo:lo, hi:lo+n-1};
+      };
+      GRID.x=fromCount(data.grid.cols);
+      if(typeof data.grid.rows==="number")   GRID.y=fromCount(data.grid.rows);
+      if(typeof data.grid.layers==="number") GRID.z=fromCount(data.grid.layers);
+    }
   }
   if(typeof data.activeLayer==="number") activeLayer=data.activeLayer;
   // Always last: a board saved before `grid` existed, or hand-edited, still has to
@@ -1383,6 +1523,26 @@ svg.addEventListener("pointerdown", function(e){
       // instead of a placement. Fixed by giving any port inside its own capture radius
       // absolute priority; the body hit-test only gets a say when no port claims the tap.
       var portHit=nearestPortWithin(p.x,p.y,CAPTURE_R);
+      var bodyHit=portHit ? null : hitPartBody(p);
+      // In an isometric view every layer projects to the same screen area, just offset,
+      // so a part sitting on a DIFFERENT layer routinely lands on top of an empty cell of
+      // the one you're working on - measured 12.4px between a layer-0 port and the centre
+      // of a layer-(-1) cell, inside the 16px capture radius, which silently turned a
+      // "pick this cell" tap into a connect gesture on a part elsewhere in the stack.
+      // The layer you've chosen wins that tie: it's the whole meaning of choosing one.
+      // Deliberately narrow - it only applies when the claimant is off-layer AND the tap
+      // lands on a genuinely empty cell, so parts on the active layer keep absolute
+      // priority, single-layer boards are untouched, and an off-layer part is still
+      // tappable everywhere it isn't covering an empty cell you could build in.
+      var claimIdx = portHit ? portHit.partIdx : (bodyHit ? bodyHit.partIdx : null);
+      if(claimIdx!=null && parts[claimIdx].cell.z!==activeLayer){
+        var underCell=cellAtPoint(p);
+        if(underCell && !isOccupied(underCell.x,underCell.y,underCell.z)){ portHit=null; bodyHit=null; }
+      }
+      // Touching an existing part - either flow - means you're no longer aiming at the
+      // empty cell you'd picked, so the target clears rather than lingering as a stale
+      // highlight that would place the NEXT shape somewhere you'd stopped looking at.
+      if(portHit || bodyHit) selectedCell=null;
       if(portHit){
         if(portCanConnect(portHit)){
           // Placing IS a side effect, so if a different part's gizmo is up, this tap
@@ -1411,7 +1571,6 @@ svg.addEventListener("pointerdown", function(e){
           gizmoPartIdx=portHit.partIdx; gizmoDrag=null; mode="none"; render();
         }
       } else {
-        var bodyHit=hitPartBody(p);
         if(bodyHit){
           gizmoPartIdx=bodyHit.partIdx; gizmoDrag=null; mode="none"; render();
         } else {
@@ -1491,8 +1650,8 @@ svg.addEventListener("pointermove", function(e){
     var along=(dx2*ux+dy2*uy)/m;
     var steps=Math.round(along/40);
     // Clamp per-axis against that axis's own extent - the three can differ now.
-    var lo=[gridLo(GRID.cols), gridLo(GRID.rows), gridLo(GRID.layers)][axIdx];
-    var hi=[gridHi(GRID.cols), gridHi(GRID.rows), gridHi(GRID.layers)][axIdx];
+    var lo=[GRID.x.lo, GRID.y.lo, GRID.z.lo][axIdx];
+    var hi=[GRID.x.hi, GRID.y.hi, GRID.z.hi][axIdx];
     var next=gizmoDrag.base.slice(); next[axIdx]=Math.max(lo, Math.min(hi, gizmoDrag.base[axIdx]+steps));
     var wouldMove = next[0]!==parts[gizmoPartIdx].cell.x || next[1]!==parts[gizmoPartIdx].cell.y || next[2]!==parts[gizmoPartIdx].cell.z;
     if(wouldMove && !isOccupied(next[0],next[1],next[2])){
@@ -1530,8 +1689,18 @@ function up(e){
       mode="none";
       // Tap tolerance well under CAPTURE_R (a hit-test radius, different purpose) -
       // this is purely "did the finger actually travel" to tell a real orbit drag
-      // apart from a stationary tap meant to dismiss the gizmo.
-      if(orbitHadGizmo && orbitMoveDist<8){ gizmoPartIdx=null; render(); }
+      // apart from a stationary tap on empty space.
+      if(orbitMoveDist<8){
+        // A stationary tap still dismisses the gizmo, exactly as before. What's new is
+        // that the same tap also picks the empty cell underneath it as the next build
+        // target - the second step of the owner's layer -> cell -> shape flow. Tapping
+        // an occupied cell or off the grid clears the target instead, so there's always
+        // a way to back out without having to place something.
+        if(orbitHadGizmo) gizmoPartIdx=null;
+        var tapCell=cellAtPoint(svgPointFromClient(e.clientX,e.clientY));
+        selectedCell=(tapCell && !isOccupied(tapCell.x,tapCell.y,tapCell.z)) ? tapCell : null;
+        render();
+      }
       orbitHadGizmo=false;
     }
     return;
@@ -1604,12 +1773,12 @@ document.getElementById("exportbtn").addEventListener("click", function(){
   var name=exportBoardFile();
   document.getElementById("savestat").textContent="Exported "+name;
 });
-[].slice.call(document.querySelectorAll(".gridrow button")).forEach(function(b){
+[].slice.call(document.querySelectorAll(".gridends button")).forEach(function(b){
   b.addEventListener("click", function(){
-    var key=b.getAttribute("data-grid"), d=parseInt(b.getAttribute("data-d"),10);
-    var err=setGridDim(key, GRID[key]+d);
+    var err=nudgeGrid(b.getAttribute("data-axis"), b.getAttribute("data-side"),
+                      parseInt(b.getAttribute("data-d"),10));
     document.getElementById("gridnote").textContent =
-      err || "Grid is "+GRID.cols+" × "+GRID.rows+" × "+GRID.layers+" (cols × rows × layers).";
+      err || "Grid is "+axisCount("x")+" × "+axisCount("y")+" × "+axisCount("z")+" (columns × rows × layers).";
   });
 });
 document.getElementById("importbtn").addEventListener("click", function(){
@@ -1624,6 +1793,28 @@ function selectShape(key){
   Object.keys(SHAPES).forEach(function(k){
     document.getElementById("shapeBtn_"+k).classList.toggle("on", k===key);
   });
+}
+// One tile tap, two meanings, decided by whether a cell is currently targeted: with a
+// target it's the last step of the free-placement flow and the part goes down right now;
+// without one it just arms the shape that the next port tap will place, which is what
+// this picker has always done.
+function chooseShape(key){
+  selectShape(key);
+  var placed=false;
+  if(selectedCell && inGrid(selectedCell.x,selectedCell.y,selectedCell.z)
+     && !isOccupied(selectedCell.x,selectedCell.y,selectedCell.z)){
+    var pre=snapshot();
+    placeAtCell(selectedCell, key);
+    selectedCell=null;
+    pushHistory(pre);
+    placed=true;
+  }
+  setViewMode("3d"); setPopover(null);
+  // render() BEFORE runValidation(), the order every other placement path uses: render
+  // is what rebuilds lastPortWorld, and validation reads it for every part including the
+  // one just added. Validating first throws on the new part's missing port entry.
+  render();
+  if(placed) runValidation();
 }
 // Treatment C's real fix for the 39-shape wall of text buttons (see
 // pipegrid-gui-mockups.html): group by port count - derived from each shape's own
@@ -1687,7 +1878,7 @@ function glyphSvg(family){
       b.id="shapeBtn_"+k;
       b.title=SHAPES[k].label;
       b.appendChild(glyphSvg(glyphFamilyFor(k)));
-      b.addEventListener("click", function(){ selectShape(k); setViewMode("3d"); setPopover(null); });
+      b.addEventListener("click", function(){ chooseShape(k); });
       grid.appendChild(b);
     });
   });
@@ -1730,6 +1921,12 @@ document.getElementById("undobtn").addEventListener("click", function(){ setView
 document.getElementById("redobtn").addEventListener("click", function(){ setViewMode("3d"); setPopover(null); });
 document.getElementById("resetbtn").addEventListener("click", function(){ setViewMode("3d"); setPopover(null); });
 
+document.getElementById("wirebtn").addEventListener("click", function(){
+  showAllWire=!showAllWire;
+  this.classList.toggle("on", showAllWire);
+  setViewMode("3d"); setPopover(null);
+  render();
+});
 document.getElementById("themebtn").addEventListener("click", function(){
   var isLight=document.body.getAttribute("data-theme")==="light";
   document.body.setAttribute("data-theme", isLight?"":"light");
@@ -1789,8 +1986,12 @@ window.__pgSlice={get parts(){return parts;}, get gizmoPartIdx(){return gizmoPar
   get connectDrag(){return connectDrag;}, get visiblePorts(){return visiblePorts;}, get CAPTURE_R(){return CAPTURE_R;},
   get history(){return history;}, get future(){return future;},
   get GRID(){return GRID;}, get activeLayer(){return activeLayer;},
-  gridLo:gridLo, gridHi:gridHi, inGrid:inGrid, setGridDim:setGridDim, setActiveLayer:setActiveLayer,
-  occupiedExtent:occupiedExtent,
+  get selectedCell(){return selectedCell;}, get showAllWire(){return showAllWire;},
+  axisCount:axisCount, inGrid:inGrid, nudgeGrid:nudgeGrid, setActiveLayer:setActiveLayer,
+  occupiedBounds:occupiedBounds, growGridToFit:growGridToFit,
+  cellAtPoint:cellAtPoint, chooseShape:chooseShape, wireCellList:wireCellList,
+  pc:pc,   // world point -> screen point, so cellAtPoint's inverse can be checked against it
+  render:function(){ render(); },
   svgPointFromClient:svgPointFromClient, serializeBoard:serializeBoard, loadBoard:loadBoard,
   doUndo:doUndo, doRedo:doRedo, snapshot:snapshot, LS_KEY:LS_KEY};
 
