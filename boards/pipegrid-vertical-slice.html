@@ -953,7 +953,12 @@ function render(){
 
 function renderLayerBar(){
   var bar=document.getElementById("layerbar");
-  if(axisCount("z")<=1){ bar.innerHTML=""; bar.style.display="none"; return; }
+  // Hidden in 2D mode as well as at a single layer. The bar floats over the stage rather
+  // than living inside #rig, so hiding the 3D rig alone left it sitting directly on top
+  // of the 2D view's OWN layer picker - two live layer selectors overlapping. This is the
+  // single place that decides the bar's visibility; setViewMode calls back here rather
+  // than setting the style itself, since render() runs after it and would overwrite it.
+  if(axisCount("z")<=1 || viewMode==="2d"){ bar.innerHTML=""; bar.style.display="none"; return; }
   bar.style.display="flex";
   bar.innerHTML="";
   layerList().forEach(function(z){
@@ -1952,6 +1957,7 @@ function setViewMode(m){
   viewMode=m;
   document.getElementById("rig").style.display = m==="3d" ? "" : "none";
   document.getElementById("rig2d").style.display = m==="2d" ? "flex" : "none";
+  renderLayerBar();   // owns the bar's visibility, including hiding it in 2D mode
   document.getElementById("dockShapes").classList.toggle("on", m==="3d" && activePopover==null);
   document.getElementById("dock2D").classList.toggle("on", m==="2d");
   if(m==="2d"){ render(); }
