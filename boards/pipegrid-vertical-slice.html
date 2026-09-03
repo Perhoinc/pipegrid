@@ -114,6 +114,14 @@
   .btn{font-family:inherit;font-size:10px;letter-spacing:.5px;text-transform:uppercase;
        padding:8px 10px;border:1px solid var(--edge);border-radius:6px;background:var(--panel2);
        color:var(--text);cursor:pointer;}
+  #jobname{width:100%;box-sizing:border-box;font-family:inherit;font-size:11px;
+       background:var(--panel2);color:var(--text);border:1px solid var(--edge);border-radius:6px;padding:8px;}
+  /* Cut list in the 3D view: same rows the sheet prints, as plain HTML. */
+  .cutrow{display:flex;align-items:baseline;gap:8px;font-size:10.5px;padding:3px 0;
+       border-bottom:1px solid var(--edge);}
+  .cutrow .nm{flex:1;color:var(--text);}
+  .cutrow .qt{color:var(--acc);font-weight:700;}
+  .cuttotal{font-size:9.5px;color:var(--dim);padding-top:8px;}
   #savedata{width:100%;height:90px;box-sizing:border-box;font-family:inherit;font-size:9.5px;
        background:var(--panel2);color:var(--text);border:1px solid var(--edge);border-radius:6px;
        padding:8px;resize:vertical;}
@@ -121,12 +129,36 @@
 
   /* ===== 2D reference view, filling the same stage the 3D rig occupies ===== */
   .rig2d{position:absolute;inset:0;display:none;flex-direction:column;background:var(--bg);}
-  .rig2d .layerbar{flex:none;display:flex;align-items:center;gap:8px;padding:8px 10px;
-       border-bottom:1px solid var(--edge);font-size:9.5px;color:var(--dim);overflow-x:auto;}
-  .rig2d .panes{flex:1;display:flex;gap:1px;min-height:0;background:var(--edge);}
-  .rig2d .pane{flex:1;position:relative;background:var(--panel2);min-width:0;}
-  .rig2d .pane svg{position:absolute;inset:0;width:100%;height:100%;}
-  .rig2d .panelabel{position:absolute;top:6px;left:8px;font-size:8px;letter-spacing:1px;color:var(--dim);z-index:5;}
+  /* Resets position/transform/direction explicitly: this shares the .layerbar class with
+     the 3D view's bar, which is a FLOATING vertical strip (absolute, centred by transform).
+     Without undoing all of that, the 2D toolbar inherited it and sat as a column floating
+     over the sheet instead of as a bar across the top. */
+  .rig2d .layerbar{position:static;transform:none;flex:none;flex-direction:row;
+       display:flex;align-items:center;gap:8px;padding:8px 10px;
+       border-bottom:1px solid var(--edge);font-size:9.5px;color:var(--dim);
+       background:var(--panel);flex-wrap:wrap;}
+  .rig2d .sheetacts{margin-left:auto;display:flex;gap:6px;flex:none;}
+  /* The sheet is a DRAWING, not a screen view: it keeps its own ink-on-paper palette in
+     both themes and sits on a neutral desk surround, so what you see is what prints.
+     Scrolls rather than squashing - a drawing that reflows isn't a drawing. */
+  .rig2d .sheetwrap{flex:1;min-height:0;overflow:auto;background:#3a3a38;padding:12px;
+       display:flex;align-items:center;justify-content:center;}
+  /* aspect-ratio alongside BOTH max constraints is what makes the whole sheet visible at
+     once: with width alone the page runs off the bottom of a short stage and has to be
+     scrolled, which is no way to read a drawing. The ratio lets the browser shrink the
+     width when height is the binding limit, so the paper never ends up wider than the
+     drawing printed on it. */
+  #sheetSvg{display:block;background:#f7f4ec;aspect-ratio:1000/760;
+       width:min(100%,1000px);height:auto;max-height:100%;
+       box-shadow:0 2px 14px rgba(0,0,0,0.4);}
+  /* Print: hide the app chrome by visibility (not display) so the sheet's own layout is
+     never re-flowed by its ancestors collapsing, then lift the sheet to the page origin. */
+  @media print{
+    body *{visibility:hidden;}
+    #sheetwrap, #sheetwrap *{visibility:visible;}
+    #sheetwrap{position:fixed;left:0;top:0;width:100%;padding:0;background:#fff;overflow:visible;}
+    #sheetSvg{width:100%;max-width:none;box-shadow:none;}
+  }
 
   table{border-collapse:collapse;width:100%;font-size:10.5px;}
   th,td{text-align:left;padding:3px 6px;border-bottom:1px solid var(--edge);}
@@ -156,11 +188,19 @@
       <span>LAYER</span>
       <span id="layerPicker"></span>
       <span id="layerstat"></span>
+      <span class="sheetacts">
+        <button class="btn" id="pngbtn">Export PNG</button>
+        <button class="btn" id="printbtn">Print / PDF</button>
+      </span>
     </div>
-    <div class="panes">
-      <div class="pane"><span class="panelabel">PLAN</span><svg id="planSvg" class="rigsvg" viewBox="0 0 300 300"></svg></div>
-      <div class="pane"><span class="panelabel">ISO</span><svg id="isoSvg" class="rigsvg" viewBox="0 0 300 300"></svg></div>
+    <div class="sheetwrap" id="sheetwrap">
+      <svg id="sheetSvg" viewBox="0 0 1000 760"></svg>
     </div>
+  </div>
+
+  <div class="popover" id="popCut">
+    <div class="popoverhead">CUT LIST — WHOLE BOARD</div>
+    <div class="boardrow"><div id="cutlist"></div></div>
   </div>
 
   <div class="popover" id="popShapes">
@@ -171,6 +211,8 @@
   <div class="popover" id="popBoard">
     <div class="popoverhead">BOARD</div>
     <div class="boardrow">
+      <div class="gridhead"><span class="lbl">JOB NAME</span></div>
+      <input type="text" id="jobname" placeholder="e.g. Harbour piece, north wing" />
       <div class="gridaxis">
         <div class="gridhead"><span class="lbl">COLUMNS</span><span class="num" id="numCols">5</span></div>
         <div class="gridends">
@@ -212,6 +254,7 @@
   <button class="dockbtn" id="undobtn"><span class="ic">↶</span>UNDO</button>
   <button class="dockbtn" id="redobtn"><span class="ic">↷</span>REDO</button>
   <button class="dockbtn danger" id="deletebtn" disabled><span class="ic">✕</span>DELETE</button>
+  <button class="dockbtn" id="dockCut"><span class="ic">☰</span>CUT LIST</button>
   <button class="dockbtn" id="dockBoard"><span class="ic">⤓</span>BOARD</button>
   <button class="dockbtn" id="dock2D"><span class="ic">▦</span>2D</button>
 </div>
@@ -990,9 +1033,24 @@ function syncGridNumbers(){
    so switching layers in either place agrees with the other. The picker now spans the
    configured layer range instead of only occupied z values, since empty layers are
    legitimate places to work once the grid defines them. */
-var REF_CELL=64;      // plan-view cell size, px
-var ISO_CELL=2.0, ISO_S=34;   // iso-view cell size (world units) and its pixel scale
+/* The sheet reproduces pipegrid-2d-reference-sheet-mockups.html, which the owner already
+   signed off on - title block with stack position, plan and isometric panels side by side,
+   cut list along the bottom, the whole thing exportable. That board could not be reused
+   directly: its nine parts were hand-typed with row/column positions and pre-rotated demo
+   geometry, and it has no pose system at all, so every drawing routine here is rebuilt
+   against the real parts array and the 24-rotation poses. What carried over unchanged are
+   the settled DECISIONS - the iso angle, plan dropping U/D, the cell-first depth sort -
+   plus the sheet's proportions and ink-on-paper palette. */
+var SHEET_W=1000, SHEET_H=760, SHEET_MARGIN=22, SHEET_TB_H=76, SHEET_GAP=14;
+// Fixed ink-on-paper palette, deliberately NOT the app's theme variables: this is a
+// drawing meant to be printed, so it has to look the same in dark mode as it does on
+// paper. Everything else in the app follows the theme; this panel is the exception.
+var INK="#232a35", DIMC="#7a8494", LINE="#8a95a6", ACC_INK="#c2620f",
+    PAPER="#f7f4ec", PANELBG="#fbfaf5";
+var ISO_CELL=2.0;
 var REF_AZ_DEG=50, REF_EL_DEG=20;   // settled angle from pipegrid-2d-reference-sheet-mockups.html - do not change without asking
+var jobName="";                     // shown in the title block, edited in the Board popover
+var showPlanThumbs=true;            // per-cell iso overlays drawn into the plan squares
 
 function refIsoProject(p){
   var az=REF_AZ_DEG*Math.PI/180, el=REF_EL_DEG*Math.PI/180;
@@ -1001,6 +1059,16 @@ function refIsoProject(p){
   var ce=Math.cos(el), se=Math.sin(el);
   var y2=y*ce-z*se, z2=y*se+z*ce;
   return {vx:x, vy:y2, vz:z2};
+}
+// Small builders so the drawing code below reads like the mockup's did, rather than
+// being buried under setAttribute calls.
+function sEl(tag,a){ var e=svgNS(tag); for(var k in a) e.setAttribute(k,a[k]); return e; }
+function sTxt(x,y,s,opt){
+  opt=opt||{};
+  var t=sEl("text",{x:x, y:y, "font-family":"ui-monospace,SFMono-Regular,Menlo,monospace",
+    "font-size":opt.size||11, fill:opt.fill||INK, "font-weight":opt.weight||400,
+    "text-anchor":opt.anchor||"start", "letter-spacing":opt.ls||"0"});
+  t.textContent=s; return t;
 }
 
 function renderReferenceView(){
@@ -1015,36 +1083,91 @@ function renderReferenceView(){
   });
   var layerParts=parts.filter(function(p){ return p.cell.z===activeLayer; });
   document.getElementById("layerstat").textContent=layerParts.length+" part(s) on this layer";
-
-  drawPlanView(layerParts);
-  drawIsoView(layerParts);
+  drawSheet(layerParts);
+  renderCutListPanel();
 }
 
-function drawPlanView(layerParts){
-  var svg=document.getElementById("planSvg");
+function drawSheet(layerParts){
+  var svg=document.getElementById("sheetSvg");
   while(svg.firstChild) svg.removeChild(svg.firstChild);
-  // Plan is X across / Y up, so its viewBox follows cols x rows independently now.
-  var VBPW=REF_CELL*axisCount("x"), VBPH=REF_CELL*axisCount("y");
-  svg.setAttribute("viewBox","0 0 "+VBPW+" "+VBPH);
-  var ox=-(GRID.x.lo-0.5)*REF_CELL, oy=(GRID.y.hi+0.5)*REF_CELL;
-  function ctr(cell){ return {x:ox+cell.x*REF_CELL, y:oy-cell.y*REF_CELL}; }
-  // grid
+  svg.setAttribute("viewBox","0 0 "+SHEET_W+" "+SHEET_H);
+  svg.appendChild(sEl("rect",{x:0,y:0,width:SHEET_W,height:SHEET_H,fill:PAPER}));
+  svg.appendChild(sEl("rect",{x:SHEET_MARGIN,y:SHEET_MARGIN,
+    width:SHEET_W-2*SHEET_MARGIN, height:SHEET_H-2*SHEET_MARGIN,
+    fill:"none", stroke:INK, "stroke-width":1.5}));
+
+  drawTitleBlock(svg, SHEET_MARGIN, SHEET_MARGIN, SHEET_W-2*SHEET_MARGIN, SHEET_TB_H);
+  var mainY=SHEET_MARGIN+SHEET_TB_H+SHEET_GAP, mainH=430;
+  var half=(SHEET_W-2*SHEET_MARGIN-SHEET_GAP)/2;
+  drawPlanPanel(svg, SHEET_MARGIN, mainY, half, mainH, "PLAN — VIEW FROM ABOVE", layerParts);
+  drawIsoPanel(svg, SHEET_MARGIN+half+SHEET_GAP, mainY, half, mainH, "ISOMETRIC", layerParts);
+  var cutY=mainY+mainH+SHEET_GAP;
+  drawSheetCutList(svg, SHEET_MARGIN, cutY, SHEET_W-2*SHEET_MARGIN, SHEET_H-SHEET_MARGIN-cutY, layerParts);
+}
+
+/* ---------- title block ---------- */
+function drawStackDiagram(svg,x,y,w,h){
+  // Real board data, where the mockup had `var total=5, current=2` hardcoded - it was
+  // listed on that board as a known piece of demo data waiting for the real thing.
+  var zs=layerList();                       // top-to-bottom, same order the layer bar reads
+  var barH=(h-6)/zs.length, barW=w*0.4;
+  zs.forEach(function(z,i){
+    var by=y+i*barH, isCur=(z===activeLayer), bh=Math.max(1.5, barH-3);
+    svg.appendChild(sEl("rect",{x:x,y:by,width:barW,height:bh,
+      fill:isCur?ACC_INK:"none", stroke:isCur?ACC_INK:LINE,
+      "stroke-width":isCur?0:1, opacity:isCur?0.25:1}));
+    svg.appendChild(sEl("rect",{x:x,y:by,width:barW,height:bh,
+      fill:"none", stroke:isCur?ACC_INK:LINE, "stroke-width":isCur?1.6:1}));
+    // At the 12-layer maximum the bars get too thin to letter; the highlight still reads.
+    if(barH>=9) svg.appendChild(sTxt(x+barW+6, by+barH-6, "Z"+z,
+      {size:8.5, fill:isCur?ACC_INK:DIMC, weight:isCur?700:400}));
+  });
+}
+function drawTitleBlock(svg,x,y,w,h){
+  svg.appendChild(sEl("rect",{x:x,y:y,width:w,height:h,fill:PANELBG,stroke:INK,"stroke-width":1}));
+  svg.appendChild(sEl("line",{x1:x+w*0.62,y1:y,x2:x+w*0.62,y2:y+h,stroke:LINE,"stroke-width":1}));
+  var lx=x+14;
+  svg.appendChild(sTxt(lx,y+22,"PIPEGRID",{size:13,weight:700,ls:"2px"}));
+  svg.appendChild(sTxt(lx,y+40,"JOB  "+(jobName||"— unnamed —"),{size:10.5,fill:jobName?INK:DIMC}));
+  var zs=layerList(), fromBottom=zs.length-zs.indexOf(activeLayer);
+  svg.appendChild(sTxt(lx,y+56,
+    "LAYER Z"+activeLayer+"   ("+fromBottom+" of "+zs.length+" from the bottom)",
+    {size:10.5,fill:INK,weight:700}));
+  var d=new Date();
+  var iso=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+  svg.appendChild(sTxt(lx,y+70,"DATE  "+iso,{size:9,fill:DIMC}));
+  svg.appendChild(sTxt(x+w*0.62+14,y+16,"STACK POSITION",{size:8,fill:DIMC,ls:"1px"}));
+  drawStackDiagram(svg, x+w*0.62+14, y+22, w*0.36-28, h-30);
+}
+function panelFrame(svg,x,y,w,h,label){
+  svg.appendChild(sEl("rect",{x:x,y:y,width:w,height:h,fill:PANELBG,stroke:INK,"stroke-width":1}));
+  svg.appendChild(sTxt(x+8,y+15,label,{size:9,fill:DIMC,ls:"1px",weight:700}));
+}
+
+/* ---------- plan panel: view from above, one layer ---------- */
+function drawPlanPanel(svg,x,y,w,h,label,layerParts){
+  panelFrame(svg,x,y,w,h,label);
+  var cols=axisCount("x"), rows=axisCount("y");
+  var innerY=y+22, innerH=h-30;
+  // The mockup's grid was always square (GRIDN x GRIDN); a configurable board is not, so
+  // the cell size is whichever axis runs out of room first and the grid centres in the panel.
+  var cs=Math.min((w-24)/cols, innerH/rows);
+  var ox=x+(w-cs*cols)/2, oy=innerY+(innerH-cs*rows)/2;
+  function ctr(cx,cy){ return {x:ox+(cx-GRID.x.lo)*cs+cs/2, y:oy+(GRID.y.hi-cy)*cs+cs/2}; }
+  // Mark weights were tuned against the mockup's own cell size (~133px); expressed as
+  // ratios of it so a 12-wide board doesn't end up drawn with 12-wide-board-sized pipes.
+  var chanW=cs*0.030, portR=cs*0.026;
+
   for(var gx=GRID.x.lo; gx<=GRID.x.hi; gx++)
   for(var gy=GRID.y.lo; gy<=GRID.y.hi; gy++){
-    var c=ctr({x:gx,y:gy});
-    var r=svgNS("rect");
-    r.setAttribute("x",c.x-REF_CELL/2); r.setAttribute("y",c.y-REF_CELL/2);
-    r.setAttribute("width",REF_CELL); r.setAttribute("height",REF_CELL);
-    r.setAttribute("fill","none"); r.setAttribute("stroke","var(--wire)"); r.setAttribute("stroke-width","0.75"); r.setAttribute("opacity","0.4");
-    svg.appendChild(r);
+    var c0=ctr(gx,gy);
+    svg.appendChild(sEl("rect",{x:c0.x-cs/2, y:c0.y-cs/2, width:cs, height:cs,
+      fill:"none", stroke:LINE, "stroke-width":0.75, opacity:0.55}));
   }
   layerParts.forEach(function(part){
-    var c=ctr(part.cell);
+    var c=ctr(part.cell.x, part.cell.y);
     var pose=ROTS[part.poseIdx];
-    function planPt(p){
-      var w=matApply(pose,p);
-      return {x:c.x+w[0]*(REF_CELL/2), y:c.y-w[1]*(REF_CELL/2)};
-    }
+    function planPt(p){ var wv=matApply(pose,p); return {x:c.x+wv[0]*(cs/2), y:c.y-wv[1]*(cs/2)}; }
     // p.dir is the shape's CANONICAL/home-orientation direction, not where the port
     // actually faces after this part's pose - that's DMAPS[poseIdx][p.dir], the same
     // lookup the 3D renderer already uses. Checking p.dir directly here was a real bug:
@@ -1052,89 +1175,230 @@ function drawPlanView(layerParts){
     // U/D, never a part that got rotated so some OTHER port now points up/down.
     var up=part.ports.filter(function(p){return DMAPS[part.poseIdx][p.dir]==="U";})[0];
     var dn=part.ports.filter(function(p){return DMAPS[part.poseIdx][p.dir]==="D";})[0];
-    if(dn){
-      var dc=svgNS("circle");
-      dc.setAttribute("cx",c.x); dc.setAttribute("cy",c.y); dc.setAttribute("r",REF_CELL*0.16);
-      dc.setAttribute("fill","none"); dc.setAttribute("stroke","var(--wire)"); dc.setAttribute("stroke-width","2"); dc.setAttribute("opacity","0.6");
-      svg.appendChild(dc);
-    }
+    if(dn) svg.appendChild(sEl("circle",{cx:c.x, cy:c.y, r:cs*0.16,
+      fill:"none", stroke:LINE, "stroke-width":2, opacity:0.6}));
     part.streams.forEach(function(s){
-      var p3=(s.type==="straight"?straight3(s.from,s.to):elbow3(s.from,s.to,16));
-      var pts=p3.map(planPt);
+      var pts=(s.type==="straight"?straight3(s.from,s.to):elbow3(s.from,s.to,16)).map(planPt);
       var span=Math.max.apply(null,pts.map(function(p){return Math.hypot(p.x-c.x,p.y-c.y);}));
-      if(span<3) return;
-      var path=svgNS("path");
-      path.setAttribute("d","M "+pts.map(function(p){return p.x.toFixed(1)+" "+p.y.toFixed(1);}).join(" L "));
-      path.setAttribute("fill","none"); path.setAttribute("stroke","var(--text)"); path.setAttribute("stroke-width","4");
-      path.setAttribute("stroke-linecap","round"); path.setAttribute("stroke-linejoin","round");
-      svg.appendChild(path);
+      if(span<3) return;   // a stream seen exactly end-on is a dot, not a line - skip it
+      svg.appendChild(sEl("path",{d:"M "+pts.map(function(p){return p.x.toFixed(1)+" "+p.y.toFixed(1);}).join(" L "),
+        fill:"none", stroke:INK, "stroke-width":chanW.toFixed(2),
+        "stroke-linecap":"round", "stroke-linejoin":"round"}));
     });
     part.ports.forEach(function(p){
-      var worldDir=DMAPS[part.poseIdx][p.dir];
-      if(worldDir==="U"||worldDir==="D") return;
+      var wd=DMAPS[part.poseIdx][p.dir];
+      if(wd==="U"||wd==="D") return;      // vertical ports get the ring marks below instead
       var v=DIRVEC[p.dir], q=planPt([v[0]*PR,v[1]*PR,v[2]*PR]);
-      var pc2=svgNS("circle");
-      pc2.setAttribute("cx",q.x.toFixed(1)); pc2.setAttribute("cy",q.y.toFixed(1)); pc2.setAttribute("r","3.4");
-      pc2.setAttribute("fill", p.role==="in"?"var(--acc)":"var(--panel)"); pc2.setAttribute("stroke","var(--text)"); pc2.setAttribute("stroke-width","1.6");
-      svg.appendChild(pc2);
+      svg.appendChild(sEl("circle",{cx:q.x.toFixed(1), cy:q.y.toFixed(1), r:portR.toFixed(2),
+        fill:p.role==="in"?ACC_INK:PANELBG, stroke:INK, "stroke-width":1.6}));
     });
     if(up){
-      var uc=svgNS("circle");
-      uc.setAttribute("cx",c.x); uc.setAttribute("cy",c.y); uc.setAttribute("r",REF_CELL*0.11);
-      uc.setAttribute("fill","var(--panel)"); uc.setAttribute("stroke",up.role==="in"?"var(--acc)":"var(--text)"); uc.setAttribute("stroke-width","1.8");
-      svg.appendChild(uc);
-      var ud=svgNS("circle");
-      ud.setAttribute("cx",c.x); ud.setAttribute("cy",c.y); ud.setAttribute("r","2");
-      ud.setAttribute("fill",up.role==="in"?"var(--acc)":"var(--text)");
-      svg.appendChild(ud);
+      svg.appendChild(sEl("circle",{cx:c.x, cy:c.y, r:cs*0.11, fill:PANELBG,
+        stroke:up.role==="in"?ACC_INK:INK, "stroke-width":1.8}));
+      svg.appendChild(sEl("circle",{cx:c.x, cy:c.y, r:2, fill:up.role==="in"?ACC_INK:INK}));
+    }
+    if(showPlanThumbs) drawCellThumbnail(svg, part, c.x-cs/2, c.y-cs/2, cs);
+  });
+}
+
+// Per-cell iso overlay drawn into the plan square itself - treatment B's thumbnails,
+// which the owner kept as a toggle DISTINCT from the whole-layer iso panel. Same settled
+// angle as that panel so the two never disagree about which way a part faces.
+function drawCellThumbnail(svg, part, ox, oy, cs){
+  var size=cs*0.34, tx=ox+cs-size/2-4, ty=oy+cs-size/2-4, sc=size*0.42;
+  svg.appendChild(sEl("rect",{x:tx-size/2, y:ty-size/2, width:size, height:size, rx:2,
+    fill:PANELBG, stroke:LINE, "stroke-width":0.75, opacity:0.92}));
+  var pose=ROTS[part.poseIdx], draw=[];
+  part.streams.forEach(function(st){
+    var vw=(st.type==="straight"?straight3(st.from,st.to):elbow3(st.from,st.to,10))
+      .map(function(p){
+        var wv=matApply(pose,p), v=refIsoProject(wv);
+        return {x:tx+v.vx*sc, y:ty-v.vz*sc-v.vy*sc*0.32, d:v.vy};
+      });
+    draw.push({d:vw.reduce(function(a,p){return a+p.d;},0)/vw.length, kind:"chan", pts:vw});
+  });
+  part.ports.forEach(function(p){
+    var v=DIRVEC[p.dir], wv=matApply(pose,[v[0]*PR,v[1]*PR,v[2]*PR]), q=refIsoProject(wv);
+    draw.push({d:q.vy, kind:"port", x:tx+q.vx*sc, y:ty-q.vz*sc-q.vy*sc*0.32, role:p.role});
+  });
+  draw.sort(function(a,b){ return a.d-b.d; });
+  draw.forEach(function(d){
+    if(d.kind==="chan"){
+      svg.appendChild(sEl("path",{d:"M "+d.pts.map(function(p){return p.x.toFixed(1)+" "+p.y.toFixed(1);}).join(" L "),
+        fill:"none", stroke:INK, "stroke-width":1.3, "stroke-linecap":"round", opacity:0.9}));
+    } else {
+      svg.appendChild(sEl("circle",{cx:d.x.toFixed(1), cy:d.y.toFixed(1), r:1.6,
+        fill:d.role==="in"?ACC_INK:PANELBG, stroke:INK, "stroke-width":0.9}));
     }
   });
 }
 
-function drawIsoView(layerParts){
-  var svg=document.getElementById("isoSvg");
-  while(svg.firstChild) svg.removeChild(svg.firstChild);
-  var VBI=300;
-  svg.setAttribute("viewBox","0 0 "+VBI+" "+VBI);
-  var ctr={x:VBI/2, y:VBI*0.56};
+/* ---------- isometric panel: the whole layer at the settled angle ---------- */
+function drawIsoPanel(svg,x,y,w,h,label,layerParts){
+  panelFrame(svg,x,y,w,h,label);
+  var cols=axisCount("x"), rows=axisCount("y");
+  var innerY=y+22, innerH=h-30;
+  var hx=cols*ISO_CELL/2, hy=rows*ISO_CELL/2, z0=-ISO_CELL/2;
+  // Fit by MEASURING what the projection actually produces, rather than dividing the cell
+  // count by a tuned constant as the mockup did. That constant was fitted to one square
+  // 3x3 board; this projection is much wider than it is tall (the 0.32 foreshortening),
+  // so on any other shape a single divisor either overflows sideways or - what actually
+  // happened here first - leaves most of the panel's height empty. Same approach
+  // gridFitScale() already uses for the 3D camera: project the corners, measure, fit.
+  var HEAD=0.9;   // parts reach ~PR beyond a cell centre; a little air on top of that
+  var exs=[], eys=[];
+  [[-hx,-hy],[-hx,hy],[hx,-hy],[hx,hy]].forEach(function(c){
+    [z0, ISO_CELL/2+HEAD].forEach(function(z){
+      var v=refIsoProject([c[0],c[1],z]);
+      exs.push(v.vx); eys.push(-v.vz - v.vy*0.32);
+    });
+  });
+  var exLo=Math.min.apply(null,exs), exHi=Math.max.apply(null,exs);
+  var eyLo=Math.min.apply(null,eys), eyHi=Math.max.apply(null,eys);
+  var s=Math.min((w-24)/(exHi-exLo), (innerH-10)/(eyHi-eyLo));
+  var ctr={x:x+w/2-((exLo+exHi)/2)*s, y:innerY+innerH/2-((eyLo+eyHi)/2)*s};
   function place(p3){
     var v=refIsoProject(p3);
-    return {x:ctr.x+v.vx*ISO_S, y:ctr.y-v.vz*ISO_S-v.vy*ISO_S*0.32, depth:v.vy};
+    return {x:ctr.x+v.vx*s, y:ctr.y+(-v.vz-v.vy*0.32)*s, depth:v.vy};
   }
-  var items=[];
+  // Floor mesh as one connected grid rather than a scatter of loose tiles, spanning the
+  // real configured board rather than the mockup's fixed 3x3.
+  var i, a, b;
+  for(i=0;i<=cols;i++){
+    a=place([-hx+i*ISO_CELL,-hy,z0]); b=place([-hx+i*ISO_CELL,hy,z0]);
+    svg.appendChild(sEl("line",{x1:a.x.toFixed(1),y1:a.y.toFixed(1),x2:b.x.toFixed(1),y2:b.y.toFixed(1),
+      stroke:LINE,"stroke-width":0.75,opacity:0.5}));
+  }
+  for(i=0;i<=rows;i++){
+    a=place([-hx,-hy+i*ISO_CELL,z0]); b=place([hx,-hy+i*ISO_CELL,z0]);
+    svg.appendChild(sEl("line",{x1:a.x.toFixed(1),y1:a.y.toFixed(1),x2:b.x.toFixed(1),y2:b.y.toFixed(1),
+      stroke:LINE,"stroke-width":0.75,opacity:0.5}));
+  }
+
+  // Depth-sort at the CELL level first; fine per-point depth only breaks ties within one
+  // part. Sorting on fine depth alone falls apart at steep elevation, where every cell
+  // sits at nearly the same distance and segments from different parts interleave.
+  var items=[], chanW=s*0.091, portR=s*0.12;
   layerParts.forEach(function(part,partIdx){
-    var off=[part.cell.x*ISO_CELL, part.cell.y*ISO_CELL, 0];
-    var cellDepth=place(off).depth;
-    var pose=ROTS[part.poseIdx];
+    // Cells are centred on the grid's own middle so the drawing sits in the panel
+    // regardless of where the board's bounds happen to fall.
+    var off=[(part.cell.x-(GRID.x.lo+GRID.x.hi)/2)*ISO_CELL,
+             (part.cell.y-(GRID.y.lo+GRID.y.hi)/2)*ISO_CELL, 0];
+    var cellDepth=place(off).depth, pose=ROTS[part.poseIdx];
     part.streams.forEach(function(st){
-      var p3=(st.type==="straight"?straight3(st.from,st.to):elbow3(st.from,st.to,14))
-        .map(function(p){ var w=matApply(pose,p); return [w[0]+off[0],w[1]+off[1],w[2]+off[2]]; });
-      var pts=p3.map(place);
+      var pts=(st.type==="straight"?straight3(st.from,st.to):elbow3(st.from,st.to,14))
+        .map(function(p){ var wv=matApply(pose,p); return [wv[0]+off[0],wv[1]+off[1],wv[2]+off[2]]; })
+        .map(place);
       items.push({cellDepth:cellDepth, cellIdx:partIdx,
-        depth:pts.reduce(function(a,p){return a+p.depth;},0)/pts.length, kind:"chan", pts:pts});
+        depth:pts.reduce(function(acc,p){return acc+p.depth;},0)/pts.length, kind:"chan", pts:pts});
     });
     part.ports.forEach(function(p){
-      var v=DIRVEC[p.dir];
-      var w=matApply(pose,[v[0]*PR,v[1]*PR,v[2]*PR]);
-      var pt=place([w[0]+off[0],w[1]+off[1],w[2]+off[2]]);
+      var v=DIRVEC[p.dir], wv=matApply(pose,[v[0]*PR,v[1]*PR,v[2]*PR]);
+      var pt=place([wv[0]+off[0],wv[1]+off[1],wv[2]+off[2]]);
       items.push({cellDepth:cellDepth, cellIdx:partIdx, depth:pt.depth, kind:"port", pt:pt, role:p.role});
     });
   });
-  items.sort(function(a,b){ return (a.cellDepth-b.cellDepth)||(a.cellIdx-b.cellIdx)||(a.depth-b.depth); });
+  items.sort(function(p,q){ return (p.cellDepth-q.cellDepth)||(p.cellIdx-q.cellIdx)||(p.depth-q.depth); });
   items.forEach(function(it){
     if(it.kind==="chan"){
-      var path=svgNS("path");
-      path.setAttribute("d","M "+it.pts.map(function(p){return p.x.toFixed(1)+" "+p.y.toFixed(1);}).join(" L "));
-      path.setAttribute("fill","none"); path.setAttribute("stroke","var(--text)"); path.setAttribute("stroke-width","3.2");
-      path.setAttribute("stroke-linecap","round"); path.setAttribute("stroke-linejoin","round");
-      svg.appendChild(path);
+      svg.appendChild(sEl("path",{d:"M "+it.pts.map(function(p){return p.x.toFixed(1)+" "+p.y.toFixed(1);}).join(" L "),
+        fill:"none", stroke:INK, "stroke-width":chanW.toFixed(2),
+        "stroke-linecap":"round", "stroke-linejoin":"round"}));
     } else {
-      var c2=svgNS("circle");
-      c2.setAttribute("cx",it.pt.x.toFixed(1)); c2.setAttribute("cy",it.pt.y.toFixed(1)); c2.setAttribute("r","4.2");
-      c2.setAttribute("fill", it.role==="in"?"var(--acc)":"var(--panel)"); c2.setAttribute("stroke","var(--text)"); c2.setAttribute("stroke-width","1.4");
-      svg.appendChild(c2);
+      svg.appendChild(sEl("circle",{cx:it.pt.x.toFixed(1), cy:it.pt.y.toFixed(1), r:portR.toFixed(2),
+        fill:it.role==="in"?ACC_INK:PANELBG, stroke:INK, "stroke-width":1.4}));
     }
   });
+}
+
+/* ---------- cut list: parts only ----------
+   Orientation deliberately stays out of the list and lives entirely in the iso view -
+   the owner's hard law that a rotated fitting is the same fitting, so poses must never
+   multiply the count. */
+function cutListRows(list){
+  var counts={}, order=[];
+  list.forEach(function(p){
+    var name=(SHAPES[p.shapeKey] && SHAPES[p.shapeKey].label) || p.shape || p.shapeKey;
+    if(!(name in counts)){ counts[name]=0; order.push(name); }
+    counts[name]++;
+  });
+  order.sort();
+  return order.map(function(n){ return {name:n, count:counts[n]}; });
+}
+function drawSheetCutList(svg,x,y,w,h,layerParts){
+  svg.appendChild(sEl("rect",{x:x,y:y,width:w,height:h,fill:PANELBG,stroke:INK,"stroke-width":1}));
+  svg.appendChild(sTxt(x+8,y+15,"CUT LIST — THIS LAYER",{size:9,fill:DIMC,ls:"1px",weight:700}));
+  var rows=cutListRows(layerParts);
+  if(!rows.length){
+    svg.appendChild(sTxt(x+12,y+38,"No parts on this layer.",{size:9.5,fill:DIMC}));
+    return;
+  }
+  var cols=3, rowH=16, colW=(w-24)/cols, perCol=Math.ceil(rows.length/cols);
+  rows.forEach(function(r,i){
+    var cx=x+12+Math.floor(i/perCol)*colW, cy=y+34+(i%perCol)*rowH;
+    if(cy>y+h-14) return;      // never let a long list spill through the panel's own frame
+    svg.appendChild(sTxt(cx,cy,r.name,{size:9.5,fill:INK}));
+    svg.appendChild(sTxt(cx+colW-14,cy,"×"+r.count,{size:9.5,fill:ACC_INK,anchor:"end",weight:700}));
+  });
+  svg.appendChild(sTxt(x+w-12,y+h-8,
+    rows.length+" distinct · "+layerParts.length+" total on this layer",
+    {size:8.5,fill:DIMC,anchor:"end"}));
+}
+// The same rows as plain HTML for the 3D view's popover. Whole board, not the active
+// layer: on the sheet the list belongs to the layer being drawn, but the thing you take
+// to the workshop is everything the piece needs, so the two are deliberately different
+// scopes - and each says which it is in its own heading.
+function renderCutListPanel(){
+  var host=document.getElementById("cutlist");
+  var rows=cutListRows(parts);
+  host.innerHTML="";
+  rows.forEach(function(r){
+    var d=document.createElement("div"); d.className="cutrow";
+    var n=document.createElement("span"); n.className="nm"; n.textContent=r.name;
+    var q=document.createElement("span"); q.className="qt"; q.textContent="×"+r.count;
+    d.appendChild(n); d.appendChild(q); host.appendChild(d);
+  });
+  var t=document.createElement("div"); t.className="cuttotal";
+  t.textContent=rows.length+" distinct part(s) · "+parts.length+" total across "+
+                axisCount("z")+" layer(s).";
+  host.appendChild(t);
+}
+
+/* ---------- export ----------
+   PNG rasterises the sheet through a data-URL image onto a canvas at 2.5x, which is the
+   one route that needs no dependency. PDF has no dependency-free path in a single HTML
+   file, so "Print / PDF" hands off to the browser's own print dialog - on iPad Safari
+   that's Share > Print > pinch the preview > Save to Files, which does produce a real PDF. */
+function exportSheetPNG(){
+  var svg=document.getElementById("sheetSvg");
+  var scale=2.5;
+  var clone=svg.cloneNode(true);
+  clone.setAttribute("xmlns","http://www.w3.org/2000/svg");
+  clone.setAttribute("width",SHEET_W); clone.setAttribute("height",SHEET_H);
+  var url=URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(clone)],
+                                       {type:"image/svg+xml;charset=utf-8"}));
+  var img=new Image();
+  img.onload=function(){
+    var canvas=document.createElement("canvas");
+    canvas.width=SHEET_W*scale; canvas.height=SHEET_H*scale;
+    var ctx=canvas.getContext("2d");
+    ctx.fillStyle=PAPER; ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.drawImage(img,0,0,canvas.width,canvas.height);
+    URL.revokeObjectURL(url);
+    canvas.toBlob(function(png){
+      var a=document.createElement("a");
+      a.href=URL.createObjectURL(png);
+      a.download=((jobName||"pipegrid")+"-Z"+activeLayer).replace(/[^\w-]+/g,"_")+".png";
+      document.body.appendChild(a); a.click();
+      setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(a.href); },400);
+      document.getElementById("layerstat").textContent="PNG exported.";
+    },"image/png");
+  };
+  img.onerror=function(){
+    URL.revokeObjectURL(url);
+    document.getElementById("layerstat").textContent="Export failed - could not rasterise the sheet.";
+  };
+  img.src=url;
 }
 
 // Owner's fix for the "which way is actually up" illusion when orbiting underneath a
@@ -1310,6 +1574,7 @@ function serializeBoard(){
            y:{lo:GRID.y.lo, hi:GRID.y.hi},
            z:{lo:GRID.z.lo, hi:GRID.z.hi}},
     activeLayer: activeLayer,
+    job: jobName,          // printed in the sheet's title block; additive, older saves have none
     parts: parts.map(function(p){
       return {shape:p.shapeKey, cell:{x:p.cell.x, y:p.cell.y, z:p.cell.z}, poseIdx:p.poseIdx};
     })
@@ -1367,6 +1632,11 @@ function loadBoard(data, opts){
     }
   }
   if(typeof data.activeLayer==="number") activeLayer=data.activeLayer;
+  // Always assigned, never conditionally: a board that carries no job name has none, and
+  // leaving the previous board's name in place would print the wrong job on this one's
+  // title block - the kind of error you'd only catch after cutting metal.
+  jobName = (typeof data.job==="string") ? data.job : "";
+  document.getElementById("jobname").value=jobName;
   // Always last: a board saved before `grid` existed, or hand-edited, still has to
   // open with every part reachable rather than half of them stranded off-grid.
   growGridToFit();
@@ -1966,8 +2236,10 @@ function setPopover(name){
   activePopover=name;
   document.getElementById("popShapes").classList.toggle("open", name==="shapes");
   document.getElementById("popBoard").classList.toggle("open", name==="board");
+  document.getElementById("popCut").classList.toggle("open", name==="cut");
   document.getElementById("dockShapes").classList.toggle("on", name==="shapes" || (viewMode==="3d" && name==null));
   document.getElementById("dockBoard").classList.toggle("on", name==="board");
+  document.getElementById("dockCut").classList.toggle("on", name==="cut");
 }
 document.getElementById("dockShapes").addEventListener("click", function(){
   setViewMode("3d");
@@ -1975,6 +2247,16 @@ document.getElementById("dockShapes").addEventListener("click", function(){
 });
 document.getElementById("dockBoard").addEventListener("click", function(){
   setPopover(activePopover==="board" ? null : "board");
+});
+document.getElementById("dockCut").addEventListener("click", function(){
+  renderCutListPanel();   // cheap, and guarantees it's current the moment it opens
+  setPopover(activePopover==="cut" ? null : "cut");
+});
+document.getElementById("pngbtn").addEventListener("click", exportSheetPNG);
+document.getElementById("printbtn").addEventListener("click", function(){ window.print(); });
+document.getElementById("jobname").addEventListener("input", function(){
+  jobName=this.value;
+  autosave(); render();   // the title block reads it, so the sheet redraws with it
 });
 document.getElementById("dock2D").addEventListener("click", function(){
   setPopover(null);
