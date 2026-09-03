@@ -710,15 +710,72 @@ function isOccupied(x,y,z){ return parts.some(function(p){ return p.cell.x===x&&
 // the owner turns it on: every layer at once is a lot of lines, but without it there's
 // no read at all on how tall the stack is or where its edges sit.
 function wireCellList(){
+  // One occupancy lookup built up front instead of isOccupied()'s linear scan per cell:
+  // this runs over every cell of every layer on every frame, so the naive form is
+  // cells x parts comparisons each time.
+  var occ={};
+  parts.forEach(function(p){ occ[p.cell.x+","+p.cell.y+","+p.cell.z]=1; });
   var list=[];
   (showAllWire ? layerList() : [activeLayer]).forEach(function(z){
     for(var gx=GRID.x.lo; gx<=GRID.x.hi; gx++)
       for(var gy=GRID.y.lo; gy<=GRID.y.hi; gy++){
-        if(isOccupied(gx,gy,z)) continue;
+        if(occ[gx+","+gy+","+z]) continue;
         list.push({x:gx, y:gy, z:z});
       }
   });
   return list;
+}
+
+/* The wireframe draws as TWO paths - one per opacity tier - rather than twelve <line>
+   elements per cell. On the owner's 4x4x8 board that was ~1500 nodes created, styled and
+   thrown away on EVERY frame, and a frame happens on every pointermove of an orbit:
+   measured 10.1ms per render against 1.8ms with the wireframe off, i.e. already past the
+   16ms budget for 60fps before the browser lays out or paints anything. The picture is
+   identical - same segments, same stroke, same opacities - it's the same geometry emitted
+   as path data instead of as DOM.
+   One deliberate consequence: the wireframe now draws BEHIND every part, rather than
+   being depth-sorted cell-by-cell among them. A nearer grid line tinting a part at 0.12
+   opacity was barely perceptible anyway, and parts reading solid is if anything the more
+   correct result - but it IS a change, not an oversight. Cell boxes are inset (h=0.47),
+   so neighbours don't share edges and there is nothing to deduplicate here. */
+var WIRE_H=0.47;   // cell boxes are inset, so neighbours don't share edges
+var WIRE_CORNERS=[[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]];
+var WIRE_EDGES=[0,1, 1,2, 2,3, 3,0, 4,5, 5,6, 6,7, 7,4, 0,4, 1,5, 2,6, 3,7];
+var wireSX=new Array(8), wireSY=new Array(8);   // reused every cell, never reallocated
+function drawWireframe(){
+  var d={on:"", off:""};
+  wireCellList().forEach(function(cu){
+    var key=(cu.z===activeLayer) ? "on" : "off";
+    // Project the 8 CORNERS, then join them by index. Going edge-by-edge through edgesOf
+    // projected both endpoints of all 12 edges - 24 projections per cell for 8 distinct
+    // points, every corner done three times - and allocated an 8-corner array plus twelve
+    // pair arrays per cell per frame, all of it immediate garbage.
+    var i, c, v;
+    for(i=0;i<8;i++){
+      c=WIRE_CORNERS[i];
+      v=proj(rotPt(cu.x+c[0]*WIRE_H, cu.y+c[1]*WIRE_H, cu.z+c[2]*WIRE_H, cam.az, cam.el));
+      // Math.round over toFixed: same one-decimal result, without toFixed's formatting
+      // machinery, and this runs 8 times per cell per frame - ~14k calls at the biggest grid.
+      wireSX[i]=Math.round(v.sx*10)/10; wireSY[i]=Math.round(v.sy*10)/10;
+    }
+    for(i=0;i<24;i+=2){
+      var a=WIRE_EDGES[i], b=WIRE_EDGES[i+1];
+      d[key]+="M"+wireSX[a]+" "+wireSY[a]+"L"+wireSX[b]+" "+wireSY[b];
+    }
+  });
+  var w=Math.max(0.4, wpx(W_WIRE)).toFixed(2);
+  // Off-layer first so the active layer's own grid reads over the rest of the stack -
+  // the whole-stack view must never cost you the sense of which layer you're building on.
+  ["off","on"].forEach(function(k){
+    if(!d[k]) return;
+    var p=svgNS("path");
+    p.setAttribute("d", d[k]);
+    p.setAttribute("fill","none");
+    p.setAttribute("stroke","var(--wire)");
+    p.setAttribute("stroke-width", w);
+    p.setAttribute("opacity", k==="on" ? "0.12" : "0.06");
+    sceneG.appendChild(p);
+  });
 }
 
 var lastPortWorld=null;   // per-part-index -> {dir: worldPos}, populated by render(), read by validation
@@ -731,14 +788,7 @@ function render(){
   visiblePorts=[];
   lastPortWorld=parts.map(function(){ return {}; });
 
-  wireCellList().forEach(function(cu, idx){
-    var depth=rotPt(cu.x,cu.y,cu.z,cam.az,cam.el).y;
-    // empty cells use their own negative index range so they never collide with real
-    // part indices in the cellIdx tiebreak below - they don't need cross-cell grouping
-    // (a wireframe has no sub-components to interleave), just a stable draw key.
-    items.push({depth:depth, cellDepth:depth, cellIdx:-1-idx, kind:"wire", cu:cu,
-      onActive: cu.z===activeLayer});
-  });
+  drawWireframe();
   // The cell you've picked to build into, drawn last-ish in its own right so it reads as
   // a target rather than as part of the wireframe it sits in.
   if(selectedCell){
@@ -787,23 +837,7 @@ function render(){
   items.sort(function(a,b){ return (b.cellDepth-a.cellDepth)||(a.cellIdx-b.cellIdx)||(b.depth-a.depth); });
 
   items.forEach(function(it){
-    if(it.kind==="wire"){
-      edgesOf(it.cu.x,it.cu.y,it.cu.z,0.47).forEach(function(seg){
-        var pa=rotPt(seg[0][0],seg[0][1],seg[0][2],cam.az,cam.el);
-        var pb=rotPt(seg[1][0],seg[1][1],seg[1][2],cam.az,cam.el);
-        var sa=proj(pa), sb=proj(pb);
-        var ln=svgNS("line");
-        ln.setAttribute("x1",sa.sx); ln.setAttribute("y1",sa.sy);
-        ln.setAttribute("x2",sb.sx); ln.setAttribute("y2",sb.sy);
-        ln.setAttribute("stroke","var(--wire)");
-        ln.setAttribute("stroke-width", Math.max(0.4, wpx(W_WIRE)).toFixed(2));
-        // The whole-stack wireframe has to stay clearly BEHIND the active layer's, or
-        // turning it on would cost you the sense of which layer you're building on -
-        // the thing the highlight exists to give you.
-        ln.setAttribute("opacity", it.onActive ? "0.12" : "0.06");
-        sceneG.appendChild(ln);
-      });
-    } else if(it.kind==="selcell"){
+    if(it.kind==="selcell"){
       edgesOf(it.cu.x,it.cu.y,it.cu.z,0.47).forEach(function(seg){
         var pa=rotPt(seg[0][0],seg[0][1],seg[0][2],cam.az,cam.el);
         var pb=rotPt(seg[1][0],seg[1][1],seg[1][2],cam.az,cam.el);
