@@ -1438,6 +1438,7 @@ function importBoardFile(file){
 /* ---------- orbit / pan / zoom, ported gesture-for-gesture from the combined-test rig ---------- */
 var pts=new Map(), mode="none", orbitLast=null, pinchBase=null;
 var orbitHadGizmo=false, orbitMoveDist=0;   // tap-vs-drag distinction, see pointerdown
+var panLast=null;                           // middle-button pan, in viewBox units
 function svgPointFromClient(clientX,clientY){
   var pt=svg.createSVGPoint(); pt.x=clientX; pt.y=clientY;
   var m=svg.getScreenCTM().inverse();
@@ -1481,6 +1482,24 @@ function hitGizmoArrow(pt){
 }
 
 svg.addEventListener("pointerdown", function(e){
+  // Middle-button drag pans. Pan existed only as the two-finger half of the pinch
+  // gesture - unreachable with a mouse, the same gap the wheel-zoom pass closed for
+  // zoom. Claimed here at the very top so a middle-press over a part or a port pans
+  // instead of selecting or placing, and preventDefault also suppresses the browser's
+  // own middle-click autoscroll (which would otherwise fight the drag).
+  // Only starts from an idle state: a middle press during an orbit or pinch is ignored
+  // outright rather than overwriting a gesture already in progress, and returning early
+  // keeps its pointer out of `pts` so it can never be mistaken for a second finger.
+  if(e.button===1){
+    e.preventDefault();
+    if(mode==="none"){
+      mode="pan";
+      panLast=svgPointFromClient(e.clientX,e.clientY);
+      svg.style.cursor="grabbing";
+      try{svg.setPointerCapture(e.pointerId);}catch(err){}
+    }
+    return;
+  }
   // Self-heal a stuck gesture state. Traced the owner's report to an exact mechanism:
   // a real touchscreen can drop the up/cancel event for one finger of a two-finger
   // gesture entirely (the OS briefly claiming that finger for its own purposes and
@@ -1590,6 +1609,19 @@ svg.addEventListener("pointerdown", function(e){
   e.preventDefault();
 });
 svg.addEventListener("pointermove", function(e){
+  // Ahead of the pts guard on purpose: the middle-button pointer is deliberately never
+  // added to `pts`, so it would be filtered out there. Panning by the delta measured in
+  // viewBox space (the units cam.panX/panY are already in) makes the scene track the
+  // cursor exactly 1:1 at any zoom, matching how pinch-pan follows its midpoint.
+  if(mode==="pan"){
+    e.preventDefault();
+    var pp=svgPointFromClient(e.clientX,e.clientY);
+    cam.panX += pp.x-panLast.x;
+    cam.panY += pp.y-panLast.y;
+    panLast=pp;
+    render();
+    return;
+  }
   if(!pts.has(e.pointerId)) return;
   e.preventDefault(); // only pointerdown called this before - kept the browser from ever
   // fully committing to its own native gesture (page pinch-zoom/scroll) mid-drag, which
@@ -1683,6 +1715,13 @@ svg.addEventListener("pointermove", function(e){
 });
 function up(e){
   pts.delete(e.pointerId);
+  // End the pan only on the middle button's own release (or once no button is left
+  // down at all, which also covers pointercancel) - releasing some other button while
+  // the wheel is still held shouldn't drop you out of the drag mid-stroke.
+  if(mode==="pan"){
+    if(e.button===1 || e.buttons===0){ mode="none"; panLast=null; svg.style.cursor=""; }
+    return;
+  }
   if(mode==="pinch"){ if(pts.size<2){ mode="none"; pinchBase=null; } return; }
   if(mode==="orbit"){
     if(pts.size===0){
@@ -1741,6 +1780,9 @@ function up(e){
 }
 svg.addEventListener("pointerup", up);
 svg.addEventListener("pointercancel", up);
+// The click that completes a middle-button press has its own default action (opening
+// things in a new tab, pasting on X11); suppressed so ending a pan can't trigger it.
+svg.addEventListener("auxclick", function(e){ if(e.button===1) e.preventDefault(); });
 
 /* Wheel/trackpad zoom - zoom was pinch-only, i.e. unreachable with a mouse and
    keyboard, which is how the owner actually drives this over Remote Control.
