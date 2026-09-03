@@ -47,6 +47,22 @@
   .hud .stat{font-size:9.5px;letter-spacing:.4px;color:var(--dim);
        background:var(--indbg);padding:4px 8px;border-radius:7px;pointer-events:auto;
        max-width:100%;}
+  /* Layer bar, left edge, top-to-bottom so it reads like the stack it represents.
+     Hidden entirely at one layer - a selector with a single option is just noise. */
+  .layerbar{position:absolute;left:8px;top:50%;transform:translateY(-50%);
+       display:flex;flex-direction:column;gap:5px;z-index:15;}
+  .layerbar button{width:36px;height:30px;border-radius:8px;border:1px solid var(--edge);
+       background:var(--indbg);color:var(--dim);font-family:inherit;font-size:10px;
+       letter-spacing:.3px;}
+  .layerbar button.on{border-color:var(--acc);color:var(--acc);}
+
+  .gridrow{display:flex;align-items:center;gap:8px;font-size:10px;color:var(--dim);}
+  .gridrow .lbl{flex:1;}
+  .gridrow .num{min-width:22px;text-align:center;color:var(--text);font-size:11px;}
+  .gridrow button{width:30px;height:30px;border-radius:7px;border:1px solid var(--edge);
+       background:var(--panel2);color:var(--text);font-family:inherit;font-size:14px;}
+  .gridnote{font-size:9.5px;color:var(--dim);line-height:1.5;}
+
   .viewbtns{position:absolute;bottom:10px;right:10px;display:flex;gap:6px;z-index:15;}
   .minibtn{width:32px;height:32px;border-radius:9px;
        border:1px solid var(--edge);background:var(--indbg);color:var(--text);font-size:13px;
@@ -112,6 +128,7 @@
       <span class="stat" id="gizmostat">no part selected</span>
     </div>
   </div>
+  <div class="layerbar" id="layerbar"></div>
   <div class="viewbtns">
     <button class="minibtn" id="resetbtn" title="Reset view">⟲</button>
     <button class="minibtn" id="themebtn" title="Toggle theme">☾</button>
@@ -137,6 +154,13 @@
   <div class="popover" id="popBoard">
     <div class="popoverhead">BOARD</div>
     <div class="boardrow">
+      <div class="gridrow"><span class="lbl">COLUMNS (E–W)</span>
+        <button data-grid="cols" data-d="-1">−</button><span class="num" id="numCols">5</span><button data-grid="cols" data-d="1">+</button></div>
+      <div class="gridrow"><span class="lbl">ROWS (N–S)</span>
+        <button data-grid="rows" data-d="-1">−</button><span class="num" id="numRows">5</span><button data-grid="rows" data-d="1">+</button></div>
+      <div class="gridrow"><span class="lbl">LAYERS (U–D)</span>
+        <button data-grid="layers" data-d="-1">−</button><span class="num" id="numLayers">3</span><button data-grid="layers" data-d="1">+</button></div>
+      <div class="gridnote" id="gridnote">Shrinking is refused if parts would fall outside.</div>
       <button class="btn" id="exportbtn">Export to file</button>
       <button class="btn" id="importbtn">Import from file</button>
       <input type="file" id="importfile" accept="application/json,.json" style="display:none;" />
@@ -472,8 +496,13 @@ function wpx(worldUnits){ return worldUnits*SCALE*cam.scale; }
 // DEFAULT angle, not the live one, so "100%" stays a stable property of the viewport
 // instead of silently re-scaling every time you orbit.
 function gridFitScale(){
-  var h=GRIDN+0.5, xs=[], zs=[];
-  [-h,h].forEach(function(x){ [-h,h].forEach(function(y){ [-0.5,0.5].forEach(function(z){
+  // Corners of the real configured box, so a wider/taller grid zooms out to suit
+  // instead of overflowing - each axis can now differ.
+  var xlo=gridLo(GRID.cols)-0.5,   xhi=gridHi(GRID.cols)+0.5;
+  var ylo=gridLo(GRID.rows)-0.5,   yhi=gridHi(GRID.rows)+0.5;
+  var zlo=gridLo(GRID.layers)-0.5, zhi=gridHi(GRID.layers)+0.5;
+  var xs=[], zs=[];
+  [xlo,xhi].forEach(function(x){ [ylo,yhi].forEach(function(y){ [zlo,zhi].forEach(function(z){
     var v=rotPt(x,y,z,DEFAULT_CAM.az,DEFAULT_CAM.el);
     xs.push(v.x); zs.push(v.z);
   });});});
@@ -507,14 +536,82 @@ function edgesOf(cx,cy,cz,h){
   return pairs.map(function(p){ return [c[p[0]],c[p[1]]]; });
 }
 
-var GRIDN=2; // cells from -GRIDN..GRIDN on each ground axis, one floor only for this step
+/* Configurable grid, replacing the old hard-coded `GRIDN=2` whose own comment said
+   "one floor only for this step". That left the grid half-built for layers in a way
+   that actively disagreed with itself: the empty-cell wireframe only ever drew at
+   z=0, placement didn't bound z AT ALL (you could build upward forever into empty
+   space with no grid under you), while the gizmo's move handle clamped all three
+   axes. Placing and moving now agree, because both go through inGrid().
+   Counts are centred on the origin so the seed part stays at (0,0,0) and every
+   existing save keeps loading unchanged - odd counts come out symmetric (5 -> -2..2,
+   matching the old GRIDN=2 exactly), even counts lean one cell negative. */
+var GRID={cols:5, rows:5, layers:3};   // cols=X (E/W), rows=Y (N/S), layers=Z (U/D)
+var GRID_MIN=1, GRID_MAX=12;
+var activeLayer=0;                     // shared by the 3D view and the 2D reference view
+var OFF_LAYER_OPACITY="0.28";          // parts on other layers: context, not clutter
+function gridLo(n){ return -Math.floor(n/2); }
+function gridHi(n){ return gridLo(n)+n-1; }
+function layerList(){
+  var out=[]; for(var z=gridHi(GRID.layers); z>=gridLo(GRID.layers); z--) out.push(z);
+  return out;                          // top-to-bottom, reads naturally in a vertical bar
+}
+function inGrid(x,y,z){
+  return x>=gridLo(GRID.cols)   && x<=gridHi(GRID.cols)
+      && y>=gridLo(GRID.rows)   && y<=gridHi(GRID.rows)
+      && z>=gridLo(GRID.layers) && z<=gridHi(GRID.layers);
+}
+// Smallest counts that still contain every placed part - used to refuse a shrink
+// that would strand parts outside the grid, and to grow the grid on load rather
+// than rejecting a board that was built larger.
+function occupiedExtent(){
+  var need={cols:1, rows:1, layers:1};
+  parts.forEach(function(p){
+    need.cols  =Math.max(need.cols,   2*Math.abs(p.cell.x)+ (p.cell.x<0?0:1));
+    need.rows  =Math.max(need.rows,   2*Math.abs(p.cell.y)+ (p.cell.y<0?0:1));
+    need.layers=Math.max(need.layers, 2*Math.abs(p.cell.z)+ (p.cell.z<0?0:1));
+  });
+  return need;
+}
+function clampActiveLayer(){
+  activeLayer=Math.max(gridLo(GRID.layers), Math.min(gridHi(GRID.layers), activeLayer));
+}
+function setActiveLayer(z){
+  activeLayer=z; clampActiveLayer();
+  gizmoPartIdx=null; gizmoDrag=null;   // a selection on the layer you just left is confusing
+  render();
+}
+// Grows the grid to contain everything on the board. Called after any load so a
+// board built on a larger grid always opens intact rather than being rejected -
+// the grid adapts to the board, never the other way round.
+function growGridToFit(){
+  var need=occupiedExtent();
+  GRID.cols  =Math.min(GRID_MAX, Math.max(GRID.cols,   need.cols));
+  GRID.rows  =Math.min(GRID_MAX, Math.max(GRID.rows,   need.rows));
+  GRID.layers=Math.min(GRID_MAX, Math.max(GRID.layers, need.layers));
+  clampActiveLayer();
+}
+// Shrinking is refused rather than silently deleting parts - losing work to a
+// stepper tap would be far worse than the inconvenience of deleting first.
+function setGridDim(key, n){
+  n=Math.max(GRID_MIN, Math.min(GRID_MAX, n));
+  if(n===GRID[key]) return null;
+  var need=occupiedExtent();
+  if(n<need[key]) return "Can't shrink "+key+" to "+n+" - parts would fall outside. Delete them first.";
+  GRID[key]=n; clampActiveLayer();
+  autosave(); render(); runValidation();
+  return null;
+}
 function isOccupied(x,y,z){ return parts.some(function(p){ return p.cell.x===x&&p.cell.y===y&&p.cell.z===z; }); }
+// Only the ACTIVE layer's empty cells get a wireframe. Drawing every layer's cells
+// at once turns a multi-layer grid into visual noise; parts on other layers still
+// render (dimmed), which is enough spatial context.
 function emptyCellList(){
   var list=[];
-  for(var gx=-GRIDN; gx<=GRIDN; gx++) for(var gy=-GRIDN; gy<=GRIDN; gy++){
-    if(isOccupied(gx,gy,0)) continue;
-    list.push({x:gx,y:gy,z:0});
-  }
+  for(var gx=gridLo(GRID.cols); gx<=gridHi(GRID.cols); gx++)
+    for(var gy=gridLo(GRID.rows); gy<=gridHi(GRID.rows); gy++){
+      if(isOccupied(gx,gy,activeLayer)) continue;
+      list.push({x:gx,y:gy,z:activeLayer});
+    }
   return list;
 }
 
@@ -545,11 +642,14 @@ function render(){
     // otherwise (and for every other part) draw its actual committed pose.
     var pose = (gizmoDrag && gizmoDrag.type==="rot" && partIdx===gizmoPartIdx) ? gizmoLiveMatrix() : ROTS[part.poseIdx];
     var cellDepth=rotPt(part.cell.x,part.cell.y,part.cell.z,cam.az,cam.el).y;
+    // Parts away from the active layer stay fully interactive (owner chose highlight,
+    // not lock) but drop back visually so the layer you're working on reads first.
+    var onActive = part.cell.z===activeLayer;
     part.streams.forEach(function(st){
       var pts3=(st.type==="straight"?straight3(st.from,st.to):elbow3(st.from,st.to,14))
         .map(function(p){ var w=matApply(pose,p); return [w[0]+part.cell.x, w[1]+part.cell.y, w[2]+part.cell.z]; });
       var view=pts3.map(function(p){ return rotPt(p[0],p[1],p[2],cam.az,cam.el); });
-      items.push({cellDepth:cellDepth, cellIdx:partIdx,
+      items.push({cellDepth:cellDepth, cellIdx:partIdx, onActive:onActive,
         depth:view.reduce(function(a,p){return a+p.y;},0)/view.length, kind:"chan", pts:view});
     });
     part.ports.forEach(function(p){
@@ -560,7 +660,7 @@ function render(){
       var view=rotPt(world[0],world[1],world[2],cam.az,cam.el);
       var sp=proj(view);
       var worldDir=DMAPS[part.poseIdx][p.dir];
-      items.push({cellDepth:cellDepth, cellIdx:partIdx, depth:view.y, kind:"port", view:view, role:p.role});
+      items.push({cellDepth:cellDepth, cellIdx:partIdx, onActive:onActive, depth:view.y, kind:"port", view:view, role:p.role});
       visiblePorts.push({partIdx:partIdx, dir:p.dir, role:p.role, worldDir:worldDir, sx:sp.sx, sy:sp.sy});
     });
   });
@@ -607,7 +707,10 @@ function render(){
       // whatever's drawn on top is actually opaque enough to hide what's underneath -
       // an 0.85-opaque channel can never fully cover a fully-opaque port behind it,
       // regardless of whether the draw order itself is correct. Full opacity here is
-      // what makes painter's algorithm actually occlude, not just reorder.
+      // what makes painter's algorithm actually occlude, not just reorder. The
+      // off-layer case is the one exception - there translucency is the POINT, and
+      // those parts are context rather than something meant to occlude cleanly.
+      if(!it.onActive) path.setAttribute("opacity", OFF_LAYER_OPACITY);
       sceneG.appendChild(path);
     } else {
       var sp=proj(it.view);
@@ -618,6 +721,7 @@ function render(){
       c.setAttribute("stroke","var(--panel2)");
       // 0.3 of the radius reproduces the original 1.5-against-5 ring at any scale
       c.setAttribute("stroke-width", Math.max(0.4, pr*0.3).toFixed(2));
+      if(!it.onActive) c.setAttribute("opacity", OFF_LAYER_OPACITY);
       sceneG.appendChild(c);
     }
   });
@@ -751,28 +855,41 @@ function render(){
     "az "+Math.round(cam.az*180/Math.PI)+"° · el "+Math.round(cam.el*180/Math.PI)+"° · zoom "+Math.round(cam.scale*100)+"%";
 
   renderReferenceView();
+  renderLayerBar();
+}
+
+function renderLayerBar(){
+  var bar=document.getElementById("layerbar");
+  if(GRID.layers<=1){ bar.innerHTML=""; bar.style.display="none"; return; }
+  bar.style.display="flex";
+  bar.innerHTML="";
+  layerList().forEach(function(z){
+    var b=document.createElement("button");
+    b.className=(z===activeLayer?"on":"");
+    b.textContent="Z"+z;
+    b.title="Work on layer "+z;
+    b.addEventListener("click", function(){ setActiveLayer(z); });
+    bar.appendChild(b);
+  });
+}
+function syncGridNumbers(){
+  document.getElementById("numCols").textContent=GRID.cols;
+  document.getElementById("numRows").textContent=GRID.rows;
+  document.getElementById("numLayers").textContent=GRID.layers;
 }
 
 /* ================= 2D reference view: same parts array, two more projections =================
    Reads `parts` directly - no export, no separate copy of state. A part's world-oriented
    points come from the exact same matApply(ROTS[part.poseIdx], canonicalPoint) the 3D
    view above already uses; only the FINAL projection differs (drop U/D for plan, rotate
-   by the settled iso angle for iso). Shows one Z-layer at a time, picked from whichever
-   z values are actually occupied - z has no fixed bound (only x/y are grid-limited), so
-   the picker is built from real part positions rather than assuming a fixed range. */
-var currentRefLayer=0;
+   by the settled iso angle for iso). Shows one Z-layer at a time - the SAME activeLayer
+   the 3D view highlights, rather than a second independent notion of "current layer",
+   so switching layers in either place agrees with the other. The picker now spans the
+   configured layer range instead of only occupied z values, since empty layers are
+   legitimate places to work once the grid defines them. */
 var REF_CELL=64;      // plan-view cell size, px
 var ISO_CELL=2.0, ISO_S=34;   // iso-view cell size (world units) and its pixel scale
 var REF_AZ_DEG=50, REF_EL_DEG=20;   // settled angle from pipegrid-2d-reference-sheet-mockups.html - do not change without asking
-
-function occupiedLayers(){
-  var set={};
-  parts.forEach(function(p){ set[p.cell.z]=true; });
-  var list=Object.keys(set).map(Number);
-  list.sort(function(a,b){return a-b;});
-  if(list.indexOf(0)<0) list.push(0), list.sort(function(a,b){return a-b;});
-  return list;
-}
 
 function refIsoProject(p){
   var az=REF_AZ_DEG*Math.PI/180, el=REF_EL_DEG*Math.PI/180;
@@ -784,18 +901,16 @@ function refIsoProject(p){
 }
 
 function renderReferenceView(){
-  var layers=occupiedLayers();
   var picker=document.getElementById("layerPicker");
-  if(layers.indexOf(currentRefLayer)<0) currentRefLayer=layers[0];
   picker.innerHTML="";
-  layers.forEach(function(z){
+  layerList().forEach(function(z){
     var b=document.createElement("button");
-    b.className="btn"+(z===currentRefLayer?" on":"");
+    b.className="btn"+(z===activeLayer?" on":"");
     b.textContent="Z="+z;
-    b.addEventListener("click", function(){ currentRefLayer=z; renderReferenceView(); });
+    b.addEventListener("click", function(){ setActiveLayer(z); });
     picker.appendChild(b);
   });
-  var layerParts=parts.filter(function(p){ return p.cell.z===currentRefLayer; });
+  var layerParts=parts.filter(function(p){ return p.cell.z===activeLayer; });
   document.getElementById("layerstat").textContent=layerParts.length+" part(s) on this layer";
 
   drawPlanView(layerParts);
@@ -805,11 +920,14 @@ function renderReferenceView(){
 function drawPlanView(layerParts){
   var svg=document.getElementById("planSvg");
   while(svg.firstChild) svg.removeChild(svg.firstChild);
-  var VBP=REF_CELL*(2*GRIDN+1);
-  svg.setAttribute("viewBox","0 0 "+VBP+" "+VBP);
-  function ctr(cell){ return {x:VBP/2+cell.x*REF_CELL, y:VBP/2-cell.y*REF_CELL}; }
+  // Plan is X across / Y up, so its viewBox follows cols x rows independently now.
+  var VBPW=REF_CELL*GRID.cols, VBPH=REF_CELL*GRID.rows;
+  svg.setAttribute("viewBox","0 0 "+VBPW+" "+VBPH);
+  var ox=-(gridLo(GRID.cols)-0.5)*REF_CELL, oy=(gridHi(GRID.rows)+0.5)*REF_CELL;
+  function ctr(cell){ return {x:ox+cell.x*REF_CELL, y:oy-cell.y*REF_CELL}; }
   // grid
-  for(var gx=-GRIDN; gx<=GRIDN; gx++) for(var gy=-GRIDN; gy<=GRIDN; gy++){
+  for(var gx=gridLo(GRID.cols); gx<=gridHi(GRID.cols); gx++)
+  for(var gy=gridLo(GRID.rows); gy<=gridHi(GRID.rows); gy++){
     var c=ctr({x:gx,y:gy});
     var r=svgNS("rect");
     r.setAttribute("x",c.x-REF_CELL/2); r.setAttribute("y",c.y-REF_CELL/2);
@@ -975,7 +1093,7 @@ function portCanConnect(fromPort){
     y:existingCell.y+DIRVEC[fromPort.worldDir][1],
     z:existingCell.z+DIRVEC[fromPort.worldDir][2]
   };
-  if(targetCell.x<-GRIDN||targetCell.x>GRIDN||targetCell.y<-GRIDN||targetCell.y>GRIDN) return false;
+  if(!inGrid(targetCell.x,targetCell.y,targetCell.z)) return false;
   if(isOccupied(targetCell.x,targetCell.y,targetCell.z)) return false;
   var result=connectingPose(fromPort.worldDir, fromPort.role, P(SHAPES[selectedShapeKey].spec));
   return !!(result && result.poseIdx>=0);
@@ -1016,7 +1134,7 @@ function prepareConnection(fromPort){
     y:existingCell.y+DIRVEC[fromPort.worldDir][1],
     z:existingCell.z+DIRVEC[fromPort.worldDir][2]
   };
-  if(targetCell.x<-GRIDN||targetCell.x>GRIDN||targetCell.y<-GRIDN||targetCell.y>GRIDN) return null; // off the demo grid
+  if(!inGrid(targetCell.x,targetCell.y,targetCell.z)) return null;   // off the grid
   if(isOccupied(targetCell.x,targetCell.y,targetCell.z)) return null; // already something there
   var newPorts=P(SHAPES[selectedShapeKey].spec);
   var result=connectingPose(fromPort.worldDir, fromPort.role, newPorts);
@@ -1044,6 +1162,10 @@ function serializeBoard(){
   return {
     schema: SAVE_SCHEMA,
     camera: {az:cam.az, el:cam.el, scale:cam.scale, panX:cam.panX, panY:cam.panY},
+    // Additive since schema 1 shipped: older saves simply have no `grid`, and
+    // loadBoard defaults + grows to fit, so they still open correctly.
+    grid: {cols:GRID.cols, rows:GRID.rows, layers:GRID.layers},
+    activeLayer: activeLayer,
     parts: parts.map(function(p){
       return {shape:p.shapeKey, cell:{x:p.cell.x, y:p.cell.y, z:p.cell.z}, poseIdx:p.poseIdx};
     })
@@ -1078,6 +1200,15 @@ function loadBoard(data, opts){
     cam.az=data.camera.az; cam.el=data.camera.el; cam.scale=data.camera.scale;
     cam.panX=data.camera.panX; cam.panY=data.camera.panY;
   }
+  if(data.grid){
+    GRID.cols  =Math.max(GRID_MIN, Math.min(GRID_MAX, data.grid.cols  ||GRID.cols));
+    GRID.rows  =Math.max(GRID_MIN, Math.min(GRID_MAX, data.grid.rows  ||GRID.rows));
+    GRID.layers=Math.max(GRID_MIN, Math.min(GRID_MAX, data.grid.layers||GRID.layers));
+  }
+  if(typeof data.activeLayer==="number") activeLayer=data.activeLayer;
+  // Always last: a board saved before `grid` existed, or hand-edited, still has to
+  // open with every part reachable rather than half of them stranded off-grid.
+  growGridToFit();
 }
 
 /* ---------- undo/redo + persistence: snapshot-history and localStorage patterns
@@ -1358,7 +1489,10 @@ svg.addEventListener("pointermove", function(e){
     var ux=ref.sx-org.sx, uy=ref.sy-org.sy, m=Math.hypot(ux,uy)||1;
     var along=(dx2*ux+dy2*uy)/m;
     var steps=Math.round(along/40);
-    var next=gizmoDrag.base.slice(); next[axIdx]=Math.max(-GRIDN, Math.min(GRIDN, gizmoDrag.base[axIdx]+steps));
+    // Clamp per-axis against that axis's own extent - the three can differ now.
+    var lo=[gridLo(GRID.cols), gridLo(GRID.rows), gridLo(GRID.layers)][axIdx];
+    var hi=[gridHi(GRID.cols), gridHi(GRID.rows), gridHi(GRID.layers)][axIdx];
+    var next=gizmoDrag.base.slice(); next[axIdx]=Math.max(lo, Math.min(hi, gizmoDrag.base[axIdx]+steps));
     var wouldMove = next[0]!==parts[gizmoPartIdx].cell.x || next[1]!==parts[gizmoPartIdx].cell.y || next[2]!==parts[gizmoPartIdx].cell.z;
     if(wouldMove && !isOccupied(next[0],next[1],next[2])){
       parts[gizmoPartIdx].cell={x:next[0], y:next[1], z:next[2]};
@@ -1468,6 +1602,15 @@ document.getElementById("redobtn").addEventListener("click", doRedo);
 document.getElementById("exportbtn").addEventListener("click", function(){
   var name=exportBoardFile();
   document.getElementById("savestat").textContent="Exported "+name;
+});
+[].slice.call(document.querySelectorAll(".gridrow button")).forEach(function(b){
+  b.addEventListener("click", function(){
+    var key=b.getAttribute("data-grid"), d=parseInt(b.getAttribute("data-d"),10);
+    var err=setGridDim(key, GRID[key]+d);
+    document.getElementById("gridnote").textContent =
+      err || "Grid is "+GRID.cols+" × "+GRID.rows+" × "+GRID.layers+" (cols × rows × layers).";
+    syncGridNumbers();
+  });
 });
 document.getElementById("importbtn").addEventListener("click", function(){
   document.getElementById("importfile").click();
@@ -1622,6 +1765,7 @@ window.addEventListener("keydown", function(e){
   catch(e){ /* stale or hand-edited entry - keep the seed board */ }
 })();
 syncHistoryButtons();
+syncGridNumbers();
 fitStage();
 render();
 // Eager re-fit on rotate/resize so the view corrects immediately rather than waiting
@@ -1644,6 +1788,9 @@ var stageObserver=null;
 window.__pgSlice={get parts(){return parts;}, get gizmoPartIdx(){return gizmoPartIdx;}, get mode(){return mode;},
   get connectDrag(){return connectDrag;}, get visiblePorts(){return visiblePorts;}, get CAPTURE_R(){return CAPTURE_R;},
   get history(){return history;}, get future(){return future;},
+  get GRID(){return GRID;}, get activeLayer(){return activeLayer;},
+  gridLo:gridLo, gridHi:gridHi, inGrid:inGrid, setGridDim:setGridDim, setActiveLayer:setActiveLayer,
+  occupiedExtent:occupiedExtent,
   svgPointFromClient:svgPointFromClient, serializeBoard:serializeBoard, loadBoard:loadBoard,
   doUndo:doUndo, doRedo:doRedo, snapshot:snapshot, LS_KEY:LS_KEY};
 
