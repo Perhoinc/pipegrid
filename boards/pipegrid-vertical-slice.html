@@ -856,6 +856,7 @@ function render(){
 
   renderReferenceView();
   renderLayerBar();
+  syncGridNumbers();
 }
 
 function renderLayerBar(){
@@ -1609,7 +1610,6 @@ document.getElementById("exportbtn").addEventListener("click", function(){
     var err=setGridDim(key, GRID[key]+d);
     document.getElementById("gridnote").textContent =
       err || "Grid is "+GRID.cols+" × "+GRID.rows+" × "+GRID.layers+" (cols × rows × layers).";
-    syncGridNumbers();
   });
 });
 document.getElementById("importbtn").addEventListener("click", function(){
