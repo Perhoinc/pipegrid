@@ -9,11 +9,15 @@
     --bg:#0b0d10; --panel:#12151b; --panel2:#0e1116; --edge:#2c313d;
     --text:#c7d3e2; --dim:#5f6775; --acc:#e0a14e; --out:#3a4150; --wire:#8ea6bf;
     --ax:#d8534f; --ay:#5aa469; --az:#4a7fb5; --indbg:rgba(18,21,27,0.65);
+    /* Deliberately not --ax: the axis reds mean "this is the X axis" everywhere else
+       in the scene, and a destructive control borrowing that colour would read as one. */
+    --danger:#e06c60;
   }
   body[data-theme="light"]{
     --bg:#eef1f5; --panel:#ffffff; --panel2:#f4f6f9; --edge:#d3d9e2;
     --text:#232a35; --dim:#7a8494; --acc:#c97a1f; --out:#9aa4b3; --wire:#5b6b80;
     --ax:#c0392b; --ay:#3f8f52; --az:#2f6ea8; --indbg:rgba(244,246,249,0.72);
+    --danger:#b83227;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html,body{margin:0; overscroll-behavior:contain; height:100%;}
@@ -84,6 +88,10 @@
   .dockbtn .ic{font-size:18px;line-height:1;}
   .dockbtn.on{color:var(--acc);}
   .dockbtn:disabled{opacity:0.3;}
+  /* Red only while it can actually fire. Disabled it falls back to the same dimmed
+     grey as UNDO/REDO, so the dock doesn't carry a standing red warning for an action
+     that isn't available - it colours up exactly when a part is selected. */
+  .dockbtn.danger:not(:disabled){color:var(--danger);}
 
   .popover{position:absolute;left:8px;right:8px;bottom:8px;
        background:var(--panel);border:1px solid var(--edge);border-radius:14px;
@@ -203,6 +211,7 @@
   <button class="dockbtn on" id="dockShapes"><span class="ic">◧</span>SHAPES</button>
   <button class="dockbtn" id="undobtn"><span class="ic">↶</span>UNDO</button>
   <button class="dockbtn" id="redobtn"><span class="ic">↷</span>REDO</button>
+  <button class="dockbtn danger" id="deletebtn" disabled><span class="ic">✕</span>DELETE</button>
   <button class="dockbtn" id="dockBoard"><span class="ic">⤓</span>BOARD</button>
   <button class="dockbtn" id="dock2D"><span class="ic">▦</span>2D</button>
 </div>
@@ -939,6 +948,7 @@ function render(){
   renderReferenceView();
   renderLayerBar();
   syncGridNumbers();
+  syncDeleteButton();
 }
 
 function renderLayerBar(){
@@ -954,6 +964,11 @@ function renderLayerBar(){
     b.addEventListener("click", function(){ setActiveLayer(z); });
     bar.appendChild(b);
   });
+}
+// Mirrors deletePart()'s own guards exactly, so the button is never offering something
+// the action would then refuse: nothing selected, or the last part left on the board.
+function syncDeleteButton(){
+  document.getElementById("deletebtn").disabled = (gizmoPartIdx==null || parts.length<=1);
 }
 function syncGridNumbers(){
   document.getElementById("numCols").textContent=axisCount("x");
@@ -1962,6 +1977,14 @@ document.getElementById("dock2D").addEventListener("click", function(){
 document.getElementById("undobtn").addEventListener("click", function(){ setViewMode("3d"); setPopover(null); });
 document.getElementById("redobtn").addEventListener("click", function(){ setViewMode("3d"); setPopover(null); });
 document.getElementById("resetbtn").addEventListener("click", function(){ setViewMode("3d"); setPopover(null); });
+// Delete was keyboard-only (Backspace/Delete), which is no use on the iPad this is built
+// for - the owner found exactly that. Same action, now reachable by thumb. No confirm
+// step: it's a single undo away, and a dialog on every removal would cost far more than
+// the occasional mis-tap it would prevent.
+document.getElementById("deletebtn").addEventListener("click", function(){
+  setViewMode("3d"); setPopover(null);
+  deletePart();
+});
 
 document.getElementById("wirebtn").addEventListener("click", function(){
   showAllWire=!showAllWire;
