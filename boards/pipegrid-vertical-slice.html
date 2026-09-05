@@ -4,6 +4,13 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <title>PIPEGRID — vertical slice</title>
+<!-- Roboto Slab, owner's choice of face for the whole app. This is the only thing the
+     file fetches from anywhere. Worth being clear about the difference from the PDF
+     decision: a font that fails to arrive leaves the app fully working in the fallback
+     stack below, whereas a library that fails to arrive leaves a dead button. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@300;400;500;700&display=swap">
 <style>
   :root{
     --bg:#0b0d10; --panel:#12151b; --panel2:#0e1116; --edge:#2c313d;
@@ -22,7 +29,11 @@
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html,body{margin:0; overscroll-behavior:contain; height:100%;}
   body{background:var(--bg);color:var(--text);
-       font-family:ui-monospace,SFMono-Regular,Menlo,monospace;-webkit-text-size-adjust:100%;
+       font-family:"Roboto Slab",Rockwell,"Courier New",Georgia,serif;
+       /* The readouts and the cut list are full of digits that sit in columns or change
+          live; slab faces default to proportional figures, which makes a camera readout
+          jitter as you orbit. */
+       font-variant-numeric:tabular-nums;-webkit-text-size-adjust:100%;
        display:flex;flex-direction:column;overflow:hidden;
        padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);}
 
@@ -99,7 +110,8 @@
        transform:translateY(8px);opacity:0;pointer-events:none;transition:.16s ease;}
   .popover.open{transform:translateY(0);opacity:1;pointer-events:auto;}
   .popoverhead{padding:10px 14px;font-size:10px;letter-spacing:1.2px;color:var(--dim);
-       border-bottom:1px solid var(--edge);}
+       border-bottom:1px solid var(--edge);
+       display:flex;align-items:center;justify-content:space-between;gap:12px;}
   .tier{font-size:9px;letter-spacing:1px;color:var(--dim);margin:10px 12px 6px;}
   .tiergrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:7px;padding:0 12px 12px;}
   .tile{aspect-ratio:1;border:1px solid var(--edge);border-radius:9px;background:var(--panel2);
@@ -114,6 +126,12 @@
   .btn{font-family:inherit;font-size:10px;letter-spacing:.5px;text-transform:uppercase;
        padding:8px 10px;border:1px solid var(--edge);border-radius:6px;background:var(--panel2);
        color:var(--text);cursor:pointer;}
+  /* In the popover's header rather than among its controls: it leaves the app, so it
+     isn't another thing that acts on this board - and the header is the one row that
+     stays put, where a link at the end of a scrolling popover would sit below the fold. */
+  .roadlink{text-decoration:none;color:var(--acc);letter-spacing:.6px;
+       border-bottom:1px solid transparent;}
+  .roadlink:hover,.roadlink:focus-visible{border-bottom-color:var(--acc);}
   #jobname{width:100%;box-sizing:border-box;font-family:inherit;font-size:11px;
        background:var(--panel2);color:var(--text);border:1px solid var(--edge);border-radius:6px;padding:8px;}
   /* Cut list in the 3D view: same rows the sheet prints, as plain HTML. */
@@ -132,15 +150,31 @@
 
   /* ===== 2D reference view, filling the same stage the 3D rig occupies ===== */
   .rig2d{position:absolute;inset:0;display:none;flex-direction:column;background:var(--bg);}
-  /* Resets position/transform/direction explicitly: this shares the .layerbar class with
-     the 3D view's bar, which is a FLOATING vertical strip (absolute, centred by transform).
-     Without undoing all of that, the 2D toolbar inherited it and sat as a column floating
-     over the sheet instead of as a bar across the top. */
-  .rig2d .layerbar{position:static;transform:none;flex:none;flex-direction:row;
-       display:flex;align-items:center;gap:8px;padding:8px 10px;
-       border-bottom:1px solid var(--edge);font-size:9.5px;color:var(--dim);
-       background:var(--panel);flex-wrap:wrap;}
-  .rig2d .sheetacts{margin-left:auto;display:flex;gap:6px;flex:none;}
+  /* The sheet's own toolbar. Previously this reused .layerbar and .btn, which meant the
+     layer choice and the two export actions were styled identically - three rows of the
+     same pill, none of which said which was a choice and which was a thing that happens.
+     It also inherited the 3D bar's floating vertical positioning and had to fight it. */
+  .rig2d .sheetbar{flex:none;display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+       padding:9px 12px;border-bottom:1px solid var(--edge);background:var(--panel);}
+  .sbLabel{flex:none;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dimmer,var(--dim));}
+  /* Segmented control: choosing a layer is picking one of a set, and one connected group
+     says that where separate pills say "three unrelated buttons". Same labels as the 3D
+     view's layer bar (Z0, Z-1) so the two read as the same control in two places. */
+  .seg{display:flex;flex:0 1 auto;max-width:100%;overflow-x:auto;
+       border:1px solid var(--edge);border-radius:8px;}
+  .seg button{flex:none;font-family:inherit;font-size:11px;letter-spacing:.3px;
+       padding:6px 13px;min-width:46px;border:none;border-left:1px solid var(--edge);
+       background:var(--panel2);color:var(--dim);cursor:pointer;}
+  .seg button:first-child{border-left:none;}
+  .seg button.on{background:var(--acc);color:#1a1206;font-weight:700;}
+  .sbStat{flex:1;min-width:60px;font-size:10.5px;color:var(--dim);
+       overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .sbActs{flex:none;display:flex;gap:8px;margin-left:auto;}
+  .sbBtn{font-family:inherit;font-size:10.5px;letter-spacing:.4px;padding:7px 14px;
+       border-radius:8px;border:1px solid var(--edge);background:var(--panel2);
+       color:var(--text);cursor:pointer;}
+  /* PNG is the one that just works; print is the four-step route. Weight says which. */
+  .sbBtn.primary{background:var(--acc);border-color:var(--acc);color:#1a1206;font-weight:700;}
   /* The sheet is a DRAWING, not a screen view: it keeps its own ink-on-paper palette in
      both themes and sits on a neutral desk surround, so what you see is what prints.
      Scrolls rather than squashing - a drawing that reflows isn't a drawing. */
@@ -187,13 +221,13 @@
   </div>
 
   <div class="rig2d" id="rig2d">
-    <div class="layerbar">
-      <span>LAYER</span>
-      <span id="layerPicker"></span>
-      <span id="layerstat"></span>
-      <span class="sheetacts">
-        <button class="btn" id="pngbtn">Export PNG</button>
-        <button class="btn" id="printbtn">Print / PDF</button>
+    <div class="sheetbar">
+      <span class="sbLabel">Layer</span>
+      <span class="seg" id="layerPicker"></span>
+      <span class="sbStat" id="layerstat"></span>
+      <span class="sbActs">
+        <button class="sbBtn" id="printbtn">Print</button>
+        <button class="sbBtn primary" id="pngbtn">Export PNG</button>
       </span>
     </div>
     <div class="sheetwrap" id="sheetwrap">
@@ -212,7 +246,9 @@
   </div>
 
   <div class="popover" id="popBoard">
-    <div class="popoverhead">BOARD</div>
+    <div class="popoverhead">BOARD
+      <a class="roadlink" href="https://claude.ai/code/artifact/5f84e562-2ab2-480b-9d2d-4d2177d1c820"
+         target="_blank" rel="noopener">Roadmap ↗</a></div>
     <div class="boardrow">
       <div class="gridhead"><span class="lbl">JOB NAME</span></div>
       <input type="text" id="jobname" placeholder="e.g. Harbour piece, north wing" />
@@ -1102,7 +1138,9 @@ function refIsoProject(p){
 function sEl(tag,a){ var e=svgNS(tag); for(var k in a) e.setAttribute(k,a[k]); return e; }
 function sTxt(x,y,s,opt){
   opt=opt||{};
-  var t=sEl("text",{x:x, y:y, "font-family":"ui-monospace,SFMono-Regular,Menlo,monospace",
+  // The sheet is rasterised for PNG export, which resolves fonts at draw time - so this
+  // names the same stack the page uses rather than inheriting, and the fallback matters.
+  var t=sEl("text",{x:x, y:y, "font-family":"'Roboto Slab',Rockwell,Georgia,serif",
     "font-size":opt.size||11, fill:opt.fill||INK, "font-weight":opt.weight||400,
     "text-anchor":opt.anchor||"start", "letter-spacing":opt.ls||"0"});
   t.textContent=s; return t;
@@ -1113,8 +1151,8 @@ function renderReferenceView(){
   picker.innerHTML="";
   layerList().forEach(function(z){
     var b=document.createElement("button");
-    b.className="btn"+(z===activeLayer?" on":"");
-    b.textContent="Z="+z;
+    b.className=(z===activeLayer?"on":"");
+    b.textContent="Z"+z;      // same labels the 3D layer bar uses, so it reads as one control
     b.addEventListener("click", function(){ setActiveLayer(z); });
     picker.appendChild(b);
   });
