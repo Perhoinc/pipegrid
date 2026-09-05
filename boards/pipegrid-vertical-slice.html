@@ -357,8 +357,37 @@ var DMAPS=ROTS.map(function(M){
 
 /* ================= parts: construction rule — ported from the flow/sheet boards ================= */
 var PR=0.42; // part half-size within a cell, in the SAME world units as the camera rig's cube half-size (0.47)
-function straight3(a,b){var u=DIRVEC[a],v=DIRVEC[b];
-  return [[u[0]*PR,u[1]*PR,u[2]*PR],[v[0]*PR,v[1]*PR,v[2]*PR]];}
+/* `reach` is how far past the cell centre this stream's ends sit, per direction. A
+   1-cell part reaches PR both ways, which is every part except a spanning straight;
+   there the forward end runs to the far cell and PR beyond it, so the pipe is drawn as
+   one continuous piece rather than repeated per cell - it IS one piece. */
+function straight3(a,b,reach){
+  var u=DIRVEC[a], v=DIRVEC[b];
+  var ra=(reach&&reach[a])||PR, rb=(reach&&reach[b])||PR;
+  return [[u[0]*ra,u[1]*ra,u[2]*ra],[v[0]*rb,v[1]*rb,v[2]*rb]];
+}
+// How far each of a part's ports sits from its anchor cell, in the part's OWN frame.
+// Only the port a spanning part grows toward moves; everything else stays at PR.
+function reachOf(part){
+  var n=spanOf(part);
+  if(n<=1) return null;
+  var r={};
+  r[part.ports[0].dir]=PR+(n-1);
+  return r;
+}
+// A port's position in the part's own frame, before pose and cell are applied.
+function portLocal(part, p){
+  var r=reachOf(part), d=(r&&r[p.dir])||PR, v=DIRVEC[p.dir];
+  return [v[0]*d, v[1]*d, v[2]*d];
+}
+// The points of one stream in the part's own frame - the single place that decides how a
+// stream is shaped, so the 3D view, hit-testing, the plan, the thumbnails and the iso
+// panel can never disagree about where a pipe runs.
+function streamLocal(part, st, segs){
+  var r=reachOf(part);
+  return st.type==="straight" ? straight3(st.from, st.to, r)
+                              : elbow3(st.from, st.to, segs);
+}
 function elbow3(a,b,n){
   var u=DIRVEC[a],v=DIRVEC[b],o=[];
   for(var i=0;i<=n;i++){var t=(i/n)*(Math.PI/2),s=Math.sin(t),c=Math.cos(t);
@@ -695,9 +724,11 @@ function occupiedBounds(){
   if(!parts.length) return null;
   var b={x:{lo:Infinity,hi:-Infinity}, y:{lo:Infinity,hi:-Infinity}, z:{lo:Infinity,hi:-Infinity}};
   parts.forEach(function(p){
-    AXIS_KEYS.forEach(function(a){
-      if(p.cell[a]<b[a].lo) b[a].lo=p.cell[a];
-      if(p.cell[a]>b[a].hi) b[a].hi=p.cell[a];
+    cellsOf(p).forEach(function(c){
+      AXIS_KEYS.forEach(function(a){
+        if(c[a]<b[a].lo) b[a].lo=c[a];
+        if(c[a]>b[a].hi) b[a].hi=c[a];
+      });
     });
   });
   return b;
@@ -744,7 +775,43 @@ function nudgeGrid(axis, side, d){
   autosave(); render(); runValidation();
   return null;
 }
-function isOccupied(x,y,z){ return parts.some(function(p){ return p.cell.x===x&&p.cell.y===y&&p.cell.z===z; }); }
+/* ---------- multi-cell parts -------------------------------------------------------
+   A cast piece can be one, two or three cells long. That is a property of the object,
+   not of how it is drawn: a 3-cell straight is a single piece out of a single mould, so
+   `span` belongs in the part and in the cut list alongside its port configuration.
+   Only shapes whose geometry stretches meaningfully carry a span - a straight does, an
+   elbow does not, because lengthening an elbow would change which fitting it is. */
+var MAX_SPAN=3;                       // matches the old app's MAXSTRAIGHT: 1, 2 and 3-cell casts
+function canSpan(shapeKey){ return shapeKey==="straight"; }
+function spanOf(part){ return (part && part.span) || 1; }
+// The world direction a spanning part grows in: its FIRST port's direction, put through
+// the part's pose. `cell` is the far end from that port, so the part runs cell -> port.
+function partAxis(part){
+  return DIRVEC[DMAPS[part.poseIdx][part.ports[0].dir]];
+}
+// Every cell a part occupies. The single source of truth for occupancy - anything that
+// asks "is this square taken" or "where does this part live" goes through here, so a
+// spanning part can never be half-tracked.
+function cellsOf(part){
+  var n=spanOf(part);
+  if(n<=1) return [part.cell];
+  var d=partAxis(part), out=[];
+  for(var i=0;i<n;i++) out.push({x:part.cell.x+d[0]*i, y:part.cell.y+d[1]*i, z:part.cell.z+d[2]*i});
+  return out;
+}
+function isOccupied(x,y,z,exceptIdx){
+  return parts.some(function(p,i){
+    if(i===exceptIdx) return false;
+    return cellsOf(p).some(function(c){ return c.x===x&&c.y===y&&c.z===z; });
+  });
+}
+// Does a part at this anchor/pose/span fit - on the grid, and clear of everything else?
+function partFits(cell, poseIdx, ports, span, exceptIdx){
+  var probe={cell:cell, poseIdx:poseIdx, ports:ports, span:span};
+  return cellsOf(probe).every(function(c){
+    return inGrid(c.x,c.y,c.z) && !isOccupied(c.x,c.y,c.z,exceptIdx);
+  });
+}
 // Wireframe cells. The active layer always draws. The rest of the stack draws only when
 // the owner turns it on: every layer at once is a lot of lines, but without it there's
 // no read at all on how tall the stack is or where its edges sit.
@@ -753,7 +820,7 @@ function wireCellList(){
   // this runs over every cell of every layer on every frame, so the naive form is
   // cells x parts comparisons each time.
   var occ={};
-  parts.forEach(function(p){ occ[p.cell.x+","+p.cell.y+","+p.cell.z]=1; });
+  parts.forEach(function(p){ cellsOf(p).forEach(function(c){ occ[c.x+","+c.y+","+c.z]=1; }); });
   var list=[];
   (showAllWire ? layerList() : [activeLayer]).forEach(function(z){
     for(var gx=GRID.x.lo; gx<=GRID.x.hi; gx++)
@@ -848,15 +915,14 @@ function render(){
     // not lock) but drop back visually so the layer you're working on reads first.
     var onActive = part.cell.z===activeLayer;
     part.streams.forEach(function(st){
-      var pts3=(st.type==="straight"?straight3(st.from,st.to):elbow3(st.from,st.to,14))
+      var pts3=streamLocal(part,st,14)
         .map(function(p){ var w=matApply(pose,p); return [w[0]+part.cell.x, w[1]+part.cell.y, w[2]+part.cell.z]; });
       var view=pts3.map(function(p){ return rotPt(p[0],p[1],p[2],cam.az,cam.el); });
       items.push({cellDepth:cellDepth, cellIdx:partIdx, onActive:onActive,
         depth:view.reduce(function(a,p){return a+p.y;},0)/view.length, kind:"chan", pts:view});
     });
     part.ports.forEach(function(p){
-      var v=DIRVEC[p.dir];
-      var w=matApply(pose,[v[0]*PR,v[1]*PR,v[2]*PR]);
+      var w=matApply(pose, portLocal(part,p));
       var world=[w[0]+part.cell.x, w[1]+part.cell.y, w[2]+part.cell.z];
       lastPortWorld[partIdx][p.dir]=world;
       var view=rotPt(world[0],world[1],world[2],cam.az,cam.el);
@@ -965,8 +1031,9 @@ function render(){
   if(mode==="connect" && connectDrag){
     var prep=connectDrag.prep, ghostPose=ROTS[prep.poseSeq[connectDrag.liveIdx]], tc=prep.targetCell;
     var ghostPorts=prep.newPorts, ghostStreams=streamsFor(ghostPorts);
+    var ghostPart={ports:ghostPorts, span:prep.span||1};
     ghostStreams.forEach(function(s){
-      var p3=(s.type==="straight"?straight3(s.from,s.to):elbow3(s.from,s.to,14))
+      var p3=streamLocal(ghostPart,s,14)
         .map(function(p){ var w=matApply(ghostPose,p); return pc([w[0]+tc.x,w[1]+tc.y,w[2]+tc.z]); });
       var path=svgNS("path");
       path.setAttribute("d","M "+p3.map(function(p){return p.sx.toFixed(1)+" "+p.sy.toFixed(1);}).join(" L "));
@@ -984,9 +1051,50 @@ function render(){
     var gp=parts[gizmoPartIdx], cellArr=gizmoCellArr(gp);
     var Msnap=gizmoSnapMatrix();
 
+    // Length handle, on parts that can be cast longer. Drawn as a bar across the axis
+    // rather than another arrowhead: the three move arrows already mean "shift the whole
+    // part", and this means "pull this end out", which is a different verb.
+    if(canSpan(gp.shapeKey)){
+      var liveLen=(mode==="spanDrag"&&spanDrag) ? spanDrag.len : spanOf(gp);
+      var ad=partAxis(gp);
+      // live preview of the run the release will actually produce
+      if(mode==="spanDrag"&&spanDrag){
+        var pcs=divideRun(liveLen), po=0;
+        pcs.forEach(function(k,pi){
+          var a=pc([gp.cell.x+ad[0]*(po-PR+0.02), gp.cell.y+ad[1]*(po-PR+0.02), gp.cell.z+ad[2]*(po-PR+0.02)]);
+          var b=pc([gp.cell.x+ad[0]*(po+k-1+PR-0.02), gp.cell.y+ad[1]*(po+k-1+PR-0.02), gp.cell.z+ad[2]*(po+k-1+PR-0.02)]);
+          var gl=svgNS("path");
+          gl.setAttribute("d","M "+a.sx.toFixed(1)+" "+a.sy.toFixed(1)+" L "+b.sx.toFixed(1)+" "+b.sy.toFixed(1));
+          gl.setAttribute("fill","none"); gl.setAttribute("stroke","var(--acc)");
+          gl.setAttribute("stroke-width", Math.max(1.2, wpx(W_CHANNEL)*0.55).toFixed(2));
+          gl.setAttribute("stroke-linecap","round");
+          // each cast piece drawn separately, so you can see where the run divides
+          gl.setAttribute("opacity", pi===0 ? "0.95" : "0.65");
+          sceneG.appendChild(gl);
+          po+=k;
+        });
+      }
+      var hp=pc([gp.cell.x+ad[0]*((liveLen-1)+SPAN_HANDLE_GAP),
+                 gp.cell.y+ad[1]*((liveLen-1)+SPAN_HANDLE_GAP),
+                 gp.cell.z+ad[2]*((liveLen-1)+SPAN_HANDLE_GAP)]);
+      var hb=pc([gp.cell.x+ad[0]*((liveLen-1)+SPAN_HANDLE_GAP-0.18),
+                 gp.cell.y+ad[1]*((liveLen-1)+SPAN_HANDLE_GAP-0.18),
+                 gp.cell.z+ad[2]*((liveLen-1)+SPAN_HANDLE_GAP-0.18)]);
+      var stem=svgNS("line");
+      stem.setAttribute("x1",hb.sx.toFixed(1)); stem.setAttribute("y1",hb.sy.toFixed(1));
+      stem.setAttribute("x2",hp.sx.toFixed(1)); stem.setAttribute("y2",hp.sy.toFixed(1));
+      stem.setAttribute("stroke","var(--acc)"); stem.setAttribute("stroke-width","2");
+      stem.setAttribute("opacity","0.8"); sceneG.appendChild(stem);
+      var grip=svgNS("circle");
+      grip.setAttribute("cx",hp.sx.toFixed(1)); grip.setAttribute("cy",hp.sy.toFixed(1));
+      grip.setAttribute("r", mode==="spanDrag" ? "8" : "6.5");
+      grip.setAttribute("fill","var(--acc)"); grip.setAttribute("stroke","var(--panel)");
+      grip.setAttribute("stroke-width","1.5"); sceneG.appendChild(grip);
+    }
+
     if(gizmoDrag && gizmoDrag.type==="rot"){
       gp.streams.forEach(function(s){
-        var p3=(s.type==="straight"?straight3(s.from,s.to):elbow3(s.from,s.to,14))
+        var p3=streamLocal(gp,s,14)
           .map(function(p){ var w=matApply(Msnap,p); return pc([w[0]+cellArr[0],w[1]+cellArr[1],w[2]+cellArr[2]]); });
         var path=svgNS("path");
         path.setAttribute("d","M "+p3.map(function(p){return p.sx.toFixed(1)+" "+p.sy.toFixed(1);}).join(" L "));
@@ -1253,7 +1361,7 @@ function drawPlanPanel(svg,x,y,w,h,label,layerParts){
     if(dn) svg.appendChild(sEl("circle",{cx:c.x, cy:c.y, r:cs*0.16,
       fill:"none", stroke:LINE, "stroke-width":2, opacity:0.6}));
     part.streams.forEach(function(s){
-      var pts=(s.type==="straight"?straight3(s.from,s.to):elbow3(s.from,s.to,16)).map(planPt);
+      var pts=streamLocal(part,s,16).map(planPt);
       var span=Math.max.apply(null,pts.map(function(p){return Math.hypot(p.x-c.x,p.y-c.y);}));
       if(span<3) return;   // a stream seen exactly end-on is a dot, not a line - skip it
       svg.appendChild(sEl("path",{d:"M "+pts.map(function(p){return p.x.toFixed(1)+" "+p.y.toFixed(1);}).join(" L "),
@@ -1263,7 +1371,7 @@ function drawPlanPanel(svg,x,y,w,h,label,layerParts){
     part.ports.forEach(function(p){
       var wd=DMAPS[part.poseIdx][p.dir];
       if(wd==="U"||wd==="D") return;      // vertical ports get the ring marks below instead
-      var v=DIRVEC[p.dir], q=planPt([v[0]*PR,v[1]*PR,v[2]*PR]);
+      var q=planPt(portLocal(part,p));
       svg.appendChild(sEl("circle",{cx:q.x.toFixed(1), cy:q.y.toFixed(1), r:portR.toFixed(2),
         fill:p.role==="in"?ACC_INK:PANELBG, stroke:INK, "stroke-width":1.6}));
     });
@@ -1285,7 +1393,7 @@ function drawCellThumbnail(svg, part, ox, oy, cs){
     fill:PANELBG, stroke:LINE, "stroke-width":0.75, opacity:0.92}));
   var pose=ROTS[part.poseIdx], draw=[];
   part.streams.forEach(function(st){
-    var vw=(st.type==="straight"?straight3(st.from,st.to):elbow3(st.from,st.to,10))
+    var vw=streamLocal(part,st,10)
       .map(function(p){
         var wv=matApply(pose,p), v=refIsoProject(wv);
         return {x:tx+v.vx*sc, y:ty-v.vz*sc-v.vy*sc*0.32, d:v.vy};
@@ -1293,7 +1401,7 @@ function drawCellThumbnail(svg, part, ox, oy, cs){
     draw.push({d:vw.reduce(function(a,p){return a+p.d;},0)/vw.length, kind:"chan", pts:vw});
   });
   part.ports.forEach(function(p){
-    var v=DIRVEC[p.dir], wv=matApply(pose,[v[0]*PR,v[1]*PR,v[2]*PR]), q=refIsoProject(wv);
+    var wv=matApply(pose,portLocal(part,p)), q=refIsoProject(wv);
     draw.push({d:q.vy, kind:"port", x:tx+q.vx*sc, y:ty-q.vz*sc-q.vy*sc*0.32, role:p.role});
   });
   draw.sort(function(a,b){ return a.d-b.d; });
@@ -1361,14 +1469,14 @@ function drawIsoPanel(svg,x,y,w,h,label,layerParts){
              (part.cell.y-(GRID.y.lo+GRID.y.hi)/2)*ISO_CELL, 0];
     var cellDepth=place(off).depth, pose=ROTS[part.poseIdx];
     part.streams.forEach(function(st){
-      var pts=(st.type==="straight"?straight3(st.from,st.to):elbow3(st.from,st.to,14))
+      var pts=streamLocal(part,st,14)
         .map(function(p){ var wv=matApply(pose,p); return [wv[0]+off[0],wv[1]+off[1],wv[2]+off[2]]; })
         .map(place);
       items.push({cellDepth:cellDepth, cellIdx:partIdx,
         depth:pts.reduce(function(acc,p){return acc+p.depth;},0)/pts.length, kind:"chan", pts:pts});
     });
     part.ports.forEach(function(p){
-      var v=DIRVEC[p.dir], wv=matApply(pose,[v[0]*PR,v[1]*PR,v[2]*PR]);
+      var wv=matApply(pose,portLocal(part,p));
       var pt=place([wv[0]+off[0],wv[1]+off[1],wv[2]+off[2]]);
       items.push({cellDepth:cellDepth, cellIdx:partIdx, depth:pt.depth, kind:"port", pt:pt, role:p.role});
     });
@@ -1405,12 +1513,14 @@ function portConfig(shapeKey){
 function cutListRows(list){
   var by={}, order=[];
   list.forEach(function(p){
-    var key=p.shapeKey;
+    // Length is part of what identifies the mould, so it keys the row alongside the shape.
+    var k0=p.shapeKey, sp=spanOf(p), key=k0+"@"+sp;
     if(!(key in by)){
       by[key]={key:key,
-        name:(SHAPES[key] && SHAPES[key].label) || p.shape || key,
-        ports:portConfig(key),
-        tier:(SHAPES[key] ? P(SHAPES[key].spec).length : 0),
+        name:((SHAPES[k0] && SHAPES[k0].label) || p.shape || k0) + (sp>1 ? " · "+sp+" cells" : ""),
+        ports:portConfig(k0),
+        tier:(SHAPES[k0] ? P(SHAPES[k0].spec).length : 0),
+        span:sp,
         count:0};
       order.push(key);
     }
@@ -1418,7 +1528,8 @@ function cutListRows(list){
   });
   // Ordered by port count then name, the same tiering the shape picker uses, so the list
   // reads in the order the catalogue itself is organised rather than alphabetically.
-  order.sort(function(a,b){ return (by[a].tier-by[b].tier) || (by[a].name<by[b].name?-1:1); });
+  order.sort(function(a,b){ return (by[a].tier-by[b].tier) || (by[a].span-by[b].span)
+                                   || (by[a].name<by[b].name?-1:1); });
   return order.map(function(k){ return by[k]; });
 }
 function drawSheetCutList(svg,x,y,w,h,layerParts){
@@ -1588,10 +1699,11 @@ function cellAtPoint(pt){
 // Unlike a connection-driven placement there's no existing port to satisfy here, so
 // there's no pose to infer: the part lands in its home orientation and the gizmo - which
 // appears immediately, exactly as it does after a connection - is how you turn it.
-function placeAtCell(cell, shapeKey){
+function placeAtCell(cell, shapeKey, poseIdx, span){
   var newPorts=P(SHAPES[shapeKey].spec);
   parts.push({shape:SHAPES[shapeKey].label, shapeKey:shapeKey, ports:newPorts,
-    streams:streamsFor(newPorts), cell:{x:cell.x, y:cell.y, z:cell.z}, poseIdx:0});
+    streams:streamsFor(newPorts), cell:{x:cell.x, y:cell.y, z:cell.z},
+    poseIdx:poseIdx||0, span:(canSpan(shapeKey)&&span>1)?Math.min(MAX_SPAN,span):1});
   lastPlacement=null;      // nothing was connected, so there's no connection to validate
   gizmoPartIdx=parts.length-1;
   return gizmoPartIdx;
@@ -1612,10 +1724,10 @@ function portCanConnect(fromPort){
     y:existingCell.y+DIRVEC[fromPort.worldDir][1],
     z:existingCell.z+DIRVEC[fromPort.worldDir][2]
   };
-  if(!inGrid(targetCell.x,targetCell.y,targetCell.z)) return false;
-  if(isOccupied(targetCell.x,targetCell.y,targetCell.z)) return false;
-  var result=connectingPose(fromPort.worldDir, fromPort.role, P(SHAPES[selectedShapeKey].spec));
-  return !!(result && result.poseIdx>=0);
+  var newPorts=P(SHAPES[selectedShapeKey].spec);
+  var result=connectingPose(fromPort.worldDir, fromPort.role, newPorts);
+  if(!result || result.poseIdx<0) return false;
+  return partFits(targetCell, result.poseIdx, newPorts, 1);
 }
 function distToSegment(px,py,ax,ay,bx,by){
   var dx=bx-ax, dy=by-ay, len2=dx*dx+dy*dy;
@@ -1632,7 +1744,7 @@ function hitPartBody(pt){
   parts.forEach(function(part, partIdx){
     var pose=ROTS[part.poseIdx];
     part.streams.forEach(function(st){
-      var pts3=(st.type==="straight"?straight3(st.from,st.to):elbow3(st.from,st.to,14))
+      var pts3=streamLocal(part,st,14)
         .map(function(p){ var w=matApply(pose,p); return [w[0]+part.cell.x, w[1]+part.cell.y, w[2]+part.cell.z]; });
       var pts2=pts3.map(function(p){ return proj(rotPt(p[0],p[1],p[2],cam.az,cam.el)); });
       for(var i=0;i<pts2.length-1;i++){
@@ -1653,11 +1765,10 @@ function prepareConnection(fromPort){
     y:existingCell.y+DIRVEC[fromPort.worldDir][1],
     z:existingCell.z+DIRVEC[fromPort.worldDir][2]
   };
-  if(!inGrid(targetCell.x,targetCell.y,targetCell.z)) return null;   // off the grid
-  if(isOccupied(targetCell.x,targetCell.y,targetCell.z)) return null; // already something there
   var newPorts=P(SHAPES[selectedShapeKey].spec);
   var result=connectingPose(fromPort.worldDir, fromPort.role, newPorts);
   if(!result || result.poseIdx<0) return null;
+  if(!partFits(targetCell, result.poseIdx, newPorts, 1)) return null;
   var axis=AXIS_FOR_DIR[fromPort.worldDir];
   var poseSeq=poseSequenceFor(axis, result.poseIdx);
   return {targetCell:targetCell, newPorts:newPorts, connResult:result, axis:axis, poseSeq:poseSeq,
@@ -1689,7 +1800,9 @@ function serializeBoard(){
     activeLayer: activeLayer,
     job: jobName,          // printed in the sheet's title block; additive, older saves have none
     parts: parts.map(function(p){
-      return {shape:p.shapeKey, cell:{x:p.cell.x, y:p.cell.y, z:p.cell.z}, poseIdx:p.poseIdx};
+      var rec={shape:p.shapeKey, cell:{x:p.cell.x, y:p.cell.y, z:p.cell.z}, poseIdx:p.poseIdx};
+      if(spanOf(p)>1) rec.span=spanOf(p);   // additive: a 1-cell part writes nothing new
+      return rec;
     })
   };
 }
@@ -1704,13 +1817,16 @@ function loadBoard(data, opts){
     if(!rec.cell || !Number.isInteger(rec.cell.x) || !Number.isInteger(rec.cell.y) || !Number.isInteger(rec.cell.z)) throw new Error("part "+idx+": invalid cell");
     var ports=P(def.spec);
     return {shape:def.label, shapeKey:rec.shape, ports:ports, streams:streamsFor(ports),
-      cell:{x:rec.cell.x, y:rec.cell.y, z:rec.cell.z}, poseIdx:rec.poseIdx};
+      cell:{x:rec.cell.x, y:rec.cell.y, z:rec.cell.z}, poseIdx:rec.poseIdx,
+      span: (canSpan(rec.shape) && rec.span>1) ? Math.min(MAX_SPAN, Math.round(rec.span)) : 1};
   });
   var occ={};
   newParts.forEach(function(p,idx){
-    var k=p.cell.x+","+p.cell.y+","+p.cell.z;
-    if(occ[k]!==undefined) throw new Error("parts "+occ[k]+" and "+idx+" both occupy cell "+k);
-    occ[k]=idx;
+    cellsOf(p).forEach(function(c){
+      var k=c.x+","+c.y+","+c.z;
+      if(occ[k]!==undefined) throw new Error("parts "+occ[k]+" and "+idx+" both occupy cell "+k);
+      occ[k]=idx;
+    });
   });
   parts=newParts;
   gizmoPartIdx=null; gizmoDrag=null; lastPlacement=null; mode="none"; pts.clear();
@@ -1842,6 +1958,7 @@ function importBoardFile(file){
 var pts=new Map(), mode="none", orbitLast=null, pinchBase=null;
 var orbitHadGizmo=false, orbitMoveDist=0;   // tap-vs-drag distinction, see pointerdown
 var panLast=null;                           // middle-button pan, in viewBox units
+var spanDrag=null;                          // live run length while the length handle is dragged
 function svgPointFromClient(clientX,clientY){
   var pt=svg.createSVGPoint(); pt.x=clientX; pt.y=clientY;
   var m=svg.getScreenCTM().inverse();
@@ -1855,6 +1972,47 @@ function midpoint(){
 function pairDist(){
   var arr=Array.from(pts.values()).map(function(v){return svgPointFromClient(v.x,v.y);});
   return Math.hypot(arr[0].x-arr[1].x, arr[0].y-arr[1].y);
+}
+/* ---------- length handle: drag a straight out into a run ---------------------------
+   A cast piece stops at 3 cells, so "drag to set the length" only works if a longer drag
+   divides itself - which is exactly what the old app did (segmentStraight cut a run into
+   3s from the pressed end and left the remainder at the far end). The two are one gesture,
+   not two features: without the division, dragging would just hit a wall at 3.
+   The handle sits past the run's far end, on the part's own axis, so it reads as "pull
+   this end out" rather than as a fourth move arrow. */
+var SPAN_HANDLE_GAP=0.75;
+function spanHandleWorld(part){
+  var d=partAxis(part), n=spanOf(part);
+  var t=(n-1)+SPAN_HANDLE_GAP;
+  return [part.cell.x+d[0]*t, part.cell.y+d[1]*t, part.cell.z+d[2]*t];
+}
+function hitSpanHandle(pt){
+  if(gizmoPartIdx==null) return null;
+  var part=parts[gizmoPartIdx];
+  if(!canSpan(part.shapeKey)) return null;
+  var p=pc(spanHandleWorld(part));
+  var d=Math.hypot(p.sx-pt.x, p.sy-pt.y);
+  return d<16 ? {dist:d} : null;
+}
+// How long a run can get from this anchor before it leaves the grid or hits something.
+// Not capped at MAX_SPAN - a longer run is legal, it just becomes more than one piece.
+function maxRunFrom(part){
+  var d=partAxis(part), n=0;
+  for(var i=0;i<64;i++){
+    var c={x:part.cell.x+d[0]*i, y:part.cell.y+d[1]*i, z:part.cell.z+d[2]*i};
+    if(!inGrid(c.x,c.y,c.z)) break;
+    if(isOccupied(c.x,c.y,c.z,gizmoPartIdx)) break;
+    n++;
+  }
+  return Math.max(1,n);
+}
+// Greedy 3s with the remainder at the far end, exactly as the old app cut its runs.
+// Greedy is also optimal in piece count here: any run of L cells needs at least
+// ceil(L/3) casts, and taking 3 whenever 3 remain achieves that.
+function divideRun(len){
+  var out=[], rem=len;
+  while(rem>0){ var k=Math.min(MAX_SPAN,rem); out.push(k); rem-=k; }
+  return out;
 }
 function hitGizmoRing(pt){
   if(gizmoPartIdx==null) return null;
@@ -1925,8 +2083,13 @@ svg.addEventListener("pointerdown", function(e){
   try{svg.setPointerCapture(e.pointerId);}catch(err){}
   if(pts.size===1 && mode==="none"){
     var p=svgPointFromClient(e.clientX,e.clientY);
+    var spanHit=hitSpanHandle(p);
     var ringHit=hitGizmoRing(p), arrowHit=hitGizmoArrow(p);
-    if(arrowHit && (!ringHit || arrowHit.dist<ringHit.dist)){
+    if(spanHit){
+      mode="spanDrag";
+      spanDrag={start:p, base:spanOf(parts[gizmoPartIdx]), len:spanOf(parts[gizmoPartIdx]),
+                max:maxRunFrom(parts[gizmoPartIdx]), pre:snapshot()};
+    } else if(arrowHit && (!ringHit || arrowHit.dist<ringHit.dist)){
       var gp0=parts[gizmoPartIdx];
       mode="gizmoMove";
       // `pre` snapshots the board BEFORE the drag starts, so the whole drag commits
@@ -2075,6 +2238,16 @@ svg.addEventListener("pointermove", function(e){
     gizmoDrag.live+=d; gizmoDrag.prev=cur;
     render(); return;
   }
+  if(mode==="spanDrag"){
+    var ptS=svgPointFromClient(e.clientX,e.clientY);
+    var part=parts[gizmoPartIdx], d=partAxis(part);
+    var org=pc([part.cell.x,part.cell.y,part.cell.z]);
+    var one=pc([part.cell.x+d[0],part.cell.y+d[1],part.cell.z+d[2]]);
+    var ux=one.sx-org.sx, uy=one.sy-org.sy, m=Math.hypot(ux,uy)||1;
+    var along=((ptS.x-spanDrag.start.x)*ux+(ptS.y-spanDrag.start.y)*uy)/m;
+    spanDrag.len=Math.max(1, Math.min(spanDrag.max, spanDrag.base+Math.round(along/m*1)));
+    render(); return;
+  }
   if(mode==="gizmoMove"){
     var pt2=svgPointFromClient(e.clientX,e.clientY);
     var dx2=pt2.x-gizmoDrag.start.x, dy2=pt2.y-gizmoDrag.start.y;
@@ -2089,7 +2262,8 @@ svg.addEventListener("pointermove", function(e){
     var hi=[GRID.x.hi, GRID.y.hi, GRID.z.hi][axIdx];
     var next=gizmoDrag.base.slice(); next[axIdx]=Math.max(lo, Math.min(hi, gizmoDrag.base[axIdx]+steps));
     var wouldMove = next[0]!==parts[gizmoPartIdx].cell.x || next[1]!==parts[gizmoPartIdx].cell.y || next[2]!==parts[gizmoPartIdx].cell.z;
-    if(wouldMove && !isOccupied(next[0],next[1],next[2])){
+    if(wouldMove && partFits({x:next[0],y:next[1],z:next[2]}, parts[gizmoPartIdx].poseIdx,
+                             parts[gizmoPartIdx].ports, spanOf(parts[gizmoPartIdx]), gizmoPartIdx)){
       parts[gizmoPartIdx].cell={x:next[0], y:next[1], z:next[2]};
       render();
     }
@@ -2156,6 +2330,23 @@ function up(e){
       parts[gizmoPartIdx].poseIdx = newIdx;
       mode="none"; gizmoDrag=null;
       pushHistory(preRot);          // no-op if the drag landed back on the same pose
+      render(); runValidation();
+    }
+    return;
+  }
+  if(mode==="spanDrag"){
+    if(pts.size===0){
+      var sp=spanDrag, part=parts[gizmoPartIdx], d=partAxis(part);
+      var pieces=divideRun(sp.len), off=0;
+      part.span=pieces[0]; off=pieces[0];
+      for(var i=1;i<pieces.length;i++){
+        parts.push({shape:part.shape, shapeKey:part.shapeKey, ports:part.ports,
+          streams:part.streams, poseIdx:part.poseIdx, span:pieces[i],
+          cell:{x:part.cell.x+d[0]*off, y:part.cell.y+d[1]*off, z:part.cell.z+d[2]*off}});
+        off+=pieces[i];
+      }
+      mode="none"; spanDrag=null;
+      pushHistory(sp.pre);
       render(); runValidation();
     }
     return;
@@ -2456,6 +2647,7 @@ window.__pgSlice={get parts(){return parts;}, get gizmoPartIdx(){return gizmoPar
   axisCount:axisCount, inGrid:inGrid, nudgeGrid:nudgeGrid, setActiveLayer:setActiveLayer,
   occupiedBounds:occupiedBounds, growGridToFit:growGridToFit,
   cellAtPoint:cellAtPoint, chooseShape:chooseShape, wireCellList:wireCellList,
+  cellsOf:cellsOf, spanOf:spanOf, partFits:partFits, canSpan:canSpan, MAX_SPAN:MAX_SPAN,
   pc:pc,   // world point -> screen point, so cellAtPoint's inverse can be checked against it
   render:function(){ render(); },
   svgPointFromClient:svgPointFromClient, serializeBoard:serializeBoard, loadBoard:loadBoard,
@@ -2484,14 +2676,18 @@ function runValidation(){
   });
   rows.push(["Seed part actually rotated by its pose (checked across all ports)", anyPortMoved]);
 
+  // Was "exactly PR from the cell centre", which stopped being true once a part could be
+  // cast longer than one cell: the port a run grows toward sits PR beyond its FAR cell.
+  // Checked against the part own declared reach so it still catches a genuine drift.
   var lengthsOk = parts.every(function(part,pi){
+    var reach=reachOf(part);
     return part.ports.every(function(p){
       var w=lastPortWorld[pi][p.dir];
       var d=Math.hypot(w[0]-part.cell.x, w[1]-part.cell.y, w[2]-part.cell.z);
-      return Math.abs(d-PR) < 1e-9;
+      return Math.abs(d-((reach&&reach[p.dir])||PR)) < 1e-9;
     });
   });
-  rows.push(["Every port on every part sits exactly PR from its own cell centre", lengthsOk]);
+  rows.push(["Every port sits its own reach from its anchor cell (PR, or further on a run)", lengthsOk]);
 
   // General, shape-agnostic version of the old corner-only "no opposite pair" check:
   // whichever canonical port-pairs are opposite in a shape's HOME orientation must
@@ -2501,10 +2697,14 @@ function runValidation(){
   // shape will share that property, which straight/T (added when scaling to the full
   // catalogue) will not.
   var shapeOk = parts.every(function(part,pi){
+    // Measured about the RUN centre, not the anchor cell: a spanning part own ports stay
+    // symmetric about the middle of the run, which is the anchor only when span is 1.
+    var nn=spanOf(part), ax=partAxis(part);
+    var mx=part.cell.x+ax[0]*(nn-1)/2, my=part.cell.y+ax[1]*(nn-1)/2, mz=part.cell.z+ax[2]*(nn-1)/2;
     var pts=part.ports.map(function(p){ return lastPortWorld[pi][p.dir]; });
     for(var i=0;i<pts.length;i++)for(var j=i+1;j<pts.length;j++){
       var a=pts[i],b=pts[j];
-      var sum=[a[0]+b[0]-2*part.cell.x, a[1]+b[1]-2*part.cell.y, a[2]+b[2]-2*part.cell.z];
+      var sum=[a[0]+b[0]-2*mx, a[1]+b[1]-2*my, a[2]+b[2]-2*mz];
       var isOppositeNow = Math.hypot(sum[0],sum[1],sum[2])<1e-6;
       var wasOppositeAtHome = OPP[part.ports[i].dir]===part.ports[j].dir;
       if(isOppositeNow !== wasOppositeAtHome) return false;
