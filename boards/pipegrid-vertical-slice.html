@@ -120,6 +120,9 @@
   .cutrow{display:flex;align-items:baseline;gap:8px;font-size:10.5px;padding:3px 0;
        border-bottom:1px solid var(--edge);}
   .cutrow .nm{flex:1;color:var(--text);}
+  /* The port configuration is what identifies the mould, so it sits with the name rather
+     than being something you look up elsewhere - quieter, but always present. */
+  .cutrow .pc{display:block;font-size:9px;color:var(--dim);letter-spacing:.3px;margin-top:1px;}
   .cutrow .qt{color:var(--acc);font-weight:700;}
   .cuttotal{font-size:9.5px;color:var(--dim);padding-top:8px;}
   #savedata{width:100%;height:90px;box-sizing:border-box;font-family:inherit;font-size:9.5px;
@@ -1349,15 +1352,36 @@ function drawIsoPanel(svg,x,y,w,h,label,layerParts){
    Orientation deliberately stays out of the list and lives entirely in the iso view -
    the owner's hard law that a rotated fitting is the same fitting, so poses must never
    multiply the count. */
+// The port layout in the part's OWN frame, never world directions. The parts are cast
+// stoneware and the inlets/outlets are the physical connectors that align each piece for
+// gluing, so which openings are which IS what identifies the mould - two entries sharing
+// a port layout but differing in roles are genuinely different objects, and the list must
+// keep them apart. Pose still must not appear: a rotated fitting is the same fitting.
+function portConfig(shapeKey){
+  var spec=SHAPES[shapeKey] && SHAPES[shapeKey].spec;
+  if(!spec) return "";
+  var ports=P(spec), ins=[], outs=[];
+  ports.forEach(function(p){ (p.role==="in"?ins:outs).push(p.dir); });
+  return "in "+(ins.join(" ")||"–")+"  ·  out "+(outs.join(" ")||"–");
+}
 function cutListRows(list){
-  var counts={}, order=[];
+  var by={}, order=[];
   list.forEach(function(p){
-    var name=(SHAPES[p.shapeKey] && SHAPES[p.shapeKey].label) || p.shape || p.shapeKey;
-    if(!(name in counts)){ counts[name]=0; order.push(name); }
-    counts[name]++;
+    var key=p.shapeKey;
+    if(!(key in by)){
+      by[key]={key:key,
+        name:(SHAPES[key] && SHAPES[key].label) || p.shape || key,
+        ports:portConfig(key),
+        tier:(SHAPES[key] ? P(SHAPES[key].spec).length : 0),
+        count:0};
+      order.push(key);
+    }
+    by[key].count++;
   });
-  order.sort();
-  return order.map(function(n){ return {name:n, count:counts[n]}; });
+  // Ordered by port count then name, the same tiering the shape picker uses, so the list
+  // reads in the order the catalogue itself is organised rather than alphabetically.
+  order.sort(function(a,b){ return (by[a].tier-by[b].tier) || (by[a].name<by[b].name?-1:1); });
+  return order.map(function(k){ return by[k]; });
 }
 function drawSheetCutList(svg,x,y,w,h,layerParts){
   svg.appendChild(sEl("rect",{x:x,y:y,width:w,height:h,fill:PANELBG,stroke:INK,"stroke-width":1}));
@@ -1367,13 +1391,27 @@ function drawSheetCutList(svg,x,y,w,h,layerParts){
     svg.appendChild(sTxt(x+12,y+38,"No parts on this layer.",{size:9.5,fill:DIMC}));
     return;
   }
-  var cols=3, rowH=16, colW=(w-24)/cols, perCol=Math.ceil(rows.length/cols);
-  rows.forEach(function(r,i){
+  // Two columns rather than three: each row now carries the port configuration as well as
+  // the name, which is what actually identifies the mould to pull.
+  var cols=2, rowH=15, colW=(w-24)/cols;
+  var maxRows=Math.floor((h-34-14)/rowH);          // rows one column can hold
+  var capacity=maxRows*cols;
+  var shown=Math.min(rows.length, rows.length>capacity ? capacity-1 : capacity);
+  var perCol=Math.ceil(Math.min(rows.length,capacity)/cols);
+  rows.slice(0,shown).forEach(function(r,i){
     var cx=x+12+Math.floor(i/perCol)*colW, cy=y+34+(i%perCol)*rowH;
-    if(cy>y+h-14) return;      // never let a long list spill through the panel's own frame
-    svg.appendChild(sTxt(cx,cy,r.name,{size:9.5,fill:INK}));
+    svg.appendChild(sTxt(cx,cy,r.name,{size:9,fill:INK}));
+    svg.appendChild(sTxt(cx+colW*0.56,cy,r.ports,{size:7.5,fill:DIMC}));
     svg.appendChild(sTxt(cx+colW-14,cy,"×"+r.count,{size:9.5,fill:ACC_INK,anchor:"end",weight:700}));
   });
+  // A cut list that silently drops rows is worse than one that admits it - these get
+  // taken to the workshop and parts get made from them.
+  if(rows.length>shown){
+    var i=shown;
+    svg.appendChild(sTxt(x+12+Math.floor(i/perCol)*colW, y+34+(i%perCol)*rowH,
+      "+"+(rows.length-shown)+" more — open CUT LIST in the 3D view for the full list",
+      {size:8.5,fill:ACC_INK,weight:700}));
+  }
   svg.appendChild(sTxt(x+w-12,y+h-8,
     rows.length+" distinct · "+layerParts.length+" total on this layer",
     {size:8.5,fill:DIMC,anchor:"end"}));
@@ -1388,7 +1426,10 @@ function renderCutListPanel(){
   host.innerHTML="";
   rows.forEach(function(r){
     var d=document.createElement("div"); d.className="cutrow";
-    var n=document.createElement("span"); n.className="nm"; n.textContent=r.name;
+    var n=document.createElement("span"); n.className="nm";
+    n.textContent=r.name;
+    var pc=document.createElement("span"); pc.className="pc"; pc.textContent=r.ports;
+    n.appendChild(pc);
     var q=document.createElement("span"); q.className="qt"; q.textContent="×"+r.count;
     d.appendChild(n); d.appendChild(q); host.appendChild(d);
   });
