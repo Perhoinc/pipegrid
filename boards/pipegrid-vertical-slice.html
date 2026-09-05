@@ -375,6 +375,17 @@ function reachOf(part){
   r[part.ports[0].dir]=PR+(n-1);
   return r;
 }
+// Which of a part's cells a given port opens from. Only a spanning part can have its
+// ports on different cells: the one it grows toward sits on the FAR cell, everything else
+// on the anchor. Without this a run's far port worked out its neighbour from the anchor,
+// which for a 2-cell run is the run's own second cell - so the app decided the space was
+// occupied and refused to build off that end. Owner found it.
+function portCell(part, dir){
+  var n=spanOf(part);
+  if(n<=1 || dir!==part.ports[0].dir) return part.cell;
+  var d=partAxis(part);
+  return {x:part.cell.x+d[0]*(n-1), y:part.cell.y+d[1]*(n-1), z:part.cell.z+d[2]*(n-1)};
+}
 // A port's position in the part's own frame, before pose and cell are applied.
 function portLocal(part, p){
   var r=reachOf(part), d=(r&&r[p.dir])||PR, v=DIRVEC[p.dir];
@@ -1074,20 +1085,20 @@ function render(){
           po+=k;
         });
       }
-      var hp=pc([gp.cell.x+ad[0]*((liveLen-1)+SPAN_HANDLE_GAP),
-                 gp.cell.y+ad[1]*((liveLen-1)+SPAN_HANDLE_GAP),
-                 gp.cell.z+ad[2]*((liveLen-1)+SPAN_HANDLE_GAP)]);
-      var hb=pc([gp.cell.x+ad[0]*((liveLen-1)+SPAN_HANDLE_GAP-0.18),
-                 gp.cell.y+ad[1]*((liveLen-1)+SPAN_HANDLE_GAP-0.18),
-                 gp.cell.z+ad[2]*((liveLen-1)+SPAN_HANDLE_GAP-0.18)]);
+      // Same screen position the hit-test uses - one source, so the grip you see and the
+      // grip you can grab can never drift apart. A live drag moves it with the length.
+      var hp=spanHandleScreen({cell:gp.cell, poseIdx:gp.poseIdx, ports:gp.ports, span:liveLen});
+      var tipS=pc([gp.cell.x+ad[0]*((liveLen-1)+PR),
+                   gp.cell.y+ad[1]*((liveLen-1)+PR),
+                   gp.cell.z+ad[2]*((liveLen-1)+PR)]);
       var stem=svgNS("line");
-      stem.setAttribute("x1",hb.sx.toFixed(1)); stem.setAttribute("y1",hb.sy.toFixed(1));
+      stem.setAttribute("x1",tipS.sx.toFixed(1)); stem.setAttribute("y1",tipS.sy.toFixed(1));
       stem.setAttribute("x2",hp.sx.toFixed(1)); stem.setAttribute("y2",hp.sy.toFixed(1));
       stem.setAttribute("stroke","var(--acc)"); stem.setAttribute("stroke-width","2");
       stem.setAttribute("opacity","0.8"); sceneG.appendChild(stem);
       var grip=svgNS("circle");
       grip.setAttribute("cx",hp.sx.toFixed(1)); grip.setAttribute("cy",hp.sy.toFixed(1));
-      grip.setAttribute("r", mode==="spanDrag" ? "8" : "6.5");
+      grip.setAttribute("r", mode==="spanDrag" ? "8.5" : "7");
       grip.setAttribute("fill","var(--acc)"); grip.setAttribute("stroke","var(--panel)");
       grip.setAttribute("stroke-width","1.5"); sceneG.appendChild(grip);
     }
@@ -1718,7 +1729,7 @@ function nearestPortWithin(x,y,r){
 // something" vs "dead end" BEFORE deciding what the tap should do, without actually
 // running placeConnectedPart's side effects.
 function portCanConnect(fromPort){
-  var existingCell=parts[fromPort.partIdx].cell;
+  var existingCell=portCell(parts[fromPort.partIdx], fromPort.dir);
   var targetCell={
     x:existingCell.x+DIRVEC[fromPort.worldDir][0],
     y:existingCell.y+DIRVEC[fromPort.worldDir][1],
@@ -1759,7 +1770,7 @@ function hitPartBody(pt){
 // tap is even placeable, same validity checks as before) and commit (runs at
 // pointerup, once the placement drag has picked which of the 4 poses to land on).
 function prepareConnection(fromPort){
-  var existingCell=parts[fromPort.partIdx].cell;
+  var existingCell=portCell(parts[fromPort.partIdx], fromPort.dir);
   var targetCell={
     x:existingCell.x+DIRVEC[fromPort.worldDir][0],
     y:existingCell.y+DIRVEC[fromPort.worldDir][1],
@@ -1980,19 +1991,32 @@ function pairDist(){
    not two features: without the division, dragging would just hit a wall at 3.
    The handle sits past the run's far end, on the part's own axis, so it reads as "pull
    this end out" rather than as a fourth move arrow. */
-var SPAN_HANDLE_GAP=0.75;
-function spanHandleWorld(part){
-  var d=partAxis(part), n=spanOf(part);
-  var t=(n-1)+SPAN_HANDLE_GAP;
-  return [part.cell.x+d[0]*t, part.cell.y+d[1]*t, part.cell.z+d[2]*t];
+/* The grip is offset from the port in SCREEN space, not world space. A fixed world gap
+   was the first attempt and it put the grip 7px from the port at normal zoom - inside
+   both their capture radii - so pressing the port started a zero-length drag instead of
+   reaching the port, and you could no longer build off that end. Offsetting on screen
+   keeps the two a constant distance apart at every zoom, and follows the rule the rest of
+   this file already uses: things that depict the drawing scale with the world, controls
+   stay put on screen so they stay touchable. */
+var SPAN_HANDLE_PX=34, SPAN_HANDLE_R=13;
+function spanHandleScreen(part){
+  var d=partAxis(part), n=spanOf(part), t=(n-1);
+  var far=pc([part.cell.x+d[0]*t, part.cell.y+d[1]*t, part.cell.z+d[2]*t]);
+  var tip=pc([part.cell.x+d[0]*(t+PR), part.cell.y+d[1]*(t+PR), part.cell.z+d[2]*(t+PR)]);
+  var ux=tip.sx-far.sx, uy=tip.sy-far.sy, m=Math.hypot(ux,uy);
+  // Axis pointing straight at or away from the camera: it projects to nothing, so there
+  // is no direction to push along. Offset up the screen instead - still reachable, and
+  // still clear of the port, which is projected onto the same spot.
+  if(m<0.5) return {sx:tip.sx, sy:tip.sy-SPAN_HANDLE_PX, flat:true};
+  return {sx:tip.sx+ux/m*SPAN_HANDLE_PX, sy:tip.sy+uy/m*SPAN_HANDLE_PX, flat:false};
 }
 function hitSpanHandle(pt){
   if(gizmoPartIdx==null) return null;
   var part=parts[gizmoPartIdx];
   if(!canSpan(part.shapeKey)) return null;
-  var p=pc(spanHandleWorld(part));
+  var p=spanHandleScreen(part);
   var d=Math.hypot(p.sx-pt.x, p.sy-pt.y);
-  return d<16 ? {dist:d} : null;
+  return d<SPAN_HANDLE_R ? {dist:d} : null;
 }
 // How long a run can get from this anchor before it leaves the grid or hits something.
 // Not capped at MAX_SPAN - a longer run is legal, it just becomes more than one piece.
@@ -2084,6 +2108,13 @@ svg.addEventListener("pointerdown", function(e){
   if(pts.size===1 && mode==="none"){
     var p=svgPointFromClient(e.clientX,e.clientY);
     var spanHit=hitSpanHandle(p);
+    // Belt as well as braces: even with the screen offset, a port that is genuinely
+    // nearer than the grip wins the tap. Losing the ability to build off an end is far
+    // worse than having to aim a little better at the grip.
+    if(spanHit){
+      var nearPort=nearestPortWithin(p.x,p.y,CAPTURE_R);
+      if(nearPort && Math.hypot(p.x-nearPort.sx,p.y-nearPort.sy) < spanHit.dist) spanHit=null;
+    }
     var ringHit=hitGizmoRing(p), arrowHit=hitGizmoArrow(p);
     if(spanHit){
       mode="spanDrag";
