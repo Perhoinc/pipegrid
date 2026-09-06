@@ -1066,14 +1066,16 @@ function render(){
     // rather than another arrowhead: the three move arrows already mean "shift the whole
     // part", and this means "pull this end out", which is a different verb.
     if(canSpan(gp.shapeKey)){
-      var liveLen=(mode==="spanDrag"&&spanDrag) ? spanDrag.len : spanOf(gp);
-      var ad=partAxis(gp);
-      // live preview of the run the release will actually produce
-      if(mode==="spanDrag"&&spanDrag){
-        var pcs=divideRun(liveLen), po=0;
-        pcs.forEach(function(k,pi){
-          var a=pc([gp.cell.x+ad[0]*(po-PR+0.02), gp.cell.y+ad[1]*(po-PR+0.02), gp.cell.z+ad[2]*(po-PR+0.02)]);
-          var b=pc([gp.cell.x+ad[0]*(po+k-1+PR-0.02), gp.cell.y+ad[1]*(po+k-1+PR-0.02), gp.cell.z+ad[2]*(po+k-1+PR-0.02)]);
+      var dragging=(mode==="spanDrag"&&spanDrag);
+      var liveLen=dragging ? spanDrag.len : spanOf(gp);
+      // While dragging, the run is previewed where it will actually land - which depends
+      // on which end is being pulled, since the opposite end stays put.
+      var lay=runPieces(gp, dragging?spanDrag.end:0, liveLen);
+      if(dragging){
+        lay.forEach(function(pcpiece,pi){
+          var ax=partAxis(gp), c0=pcpiece.cell, k=pcpiece.span;
+          var a=pc([c0.x-ax[0]*(PR-0.02), c0.y-ax[1]*(PR-0.02), c0.z-ax[2]*(PR-0.02)]);
+          var b=pc([c0.x+ax[0]*(k-1+PR-0.02), c0.y+ax[1]*(k-1+PR-0.02), c0.z+ax[2]*(k-1+PR-0.02)]);
           var gl=svgNS("path");
           gl.setAttribute("d","M "+a.sx.toFixed(1)+" "+a.sy.toFixed(1)+" L "+b.sx.toFixed(1)+" "+b.sy.toFixed(1));
           gl.setAttribute("fill","none"); gl.setAttribute("stroke","var(--acc)");
@@ -1082,25 +1084,39 @@ function render(){
           // each cast piece drawn separately, so you can see where the run divides
           gl.setAttribute("opacity", pi===0 ? "0.95" : "0.65");
           sceneG.appendChild(gl);
-          po+=k;
         });
       }
-      // Same screen position the hit-test uses - one source, so the grip you see and the
-      // grip you can grab can never drift apart. A live drag moves it with the length.
-      var hp=spanHandleScreen({cell:gp.cell, poseIdx:gp.poseIdx, ports:gp.ports, span:liveLen});
-      var tipS=pc([gp.cell.x+ad[0]*((liveLen-1)+PR),
-                   gp.cell.y+ad[1]*((liveLen-1)+PR),
-                   gp.cell.z+ad[2]*((liveLen-1)+PR)]);
-      var stem=svgNS("line");
-      stem.setAttribute("x1",tipS.sx.toFixed(1)); stem.setAttribute("y1",tipS.sy.toFixed(1));
-      stem.setAttribute("x2",hp.sx.toFixed(1)); stem.setAttribute("y2",hp.sy.toFixed(1));
-      stem.setAttribute("stroke","var(--acc)"); stem.setAttribute("stroke-width","2");
-      stem.setAttribute("opacity","0.8"); sceneG.appendChild(stem);
-      var grip=svgNS("circle");
-      grip.setAttribute("cx",hp.sx.toFixed(1)); grip.setAttribute("cy",hp.sy.toFixed(1));
-      grip.setAttribute("r", mode==="spanDrag" ? "8.5" : "7");
-      grip.setAttribute("fill","var(--acc)"); grip.setAttribute("stroke","var(--panel)");
-      grip.setAttribute("stroke-width","1.5"); sceneG.appendChild(grip);
+      // A grip on each end. Both come from the same function that hit-tests them, so the
+      // grip you see and the grip you can grab can never drift apart. During a drag the
+      // grips follow the previewed run rather than the part's committed position.
+      var previewPart = dragging
+        ? {cell:lay[0].cell, poseIdx:gp.poseIdx, ports:gp.ports,
+           span:(function(){var t=0; lay.forEach(function(q){t+=q.span;}); return t;})()}
+        : gp;
+      // ...but a preview part built from lay[0] only spans the whole run when the pieces
+      // are laid forward from it, which is exactly the anchor runPieces returns for end 0.
+      if(dragging && spanDrag.end===1){
+        var last=lay[lay.length-1];
+        previewPart.cell={x:last.cell.x, y:last.cell.y, z:last.cell.z};
+      }
+      [0,1].forEach(function(end){
+        var hp=spanHandleScreen(previewPart, end);
+        var ec=endCell(previewPart, end), eu=endDir(previewPart, end);
+        var tipS=pc([ec.x+eu[0]*PR, ec.y+eu[1]*PR, ec.z+eu[2]*PR]);
+        var stem=svgNS("line");
+        stem.setAttribute("x1",tipS.sx.toFixed(1)); stem.setAttribute("y1",tipS.sy.toFixed(1));
+        stem.setAttribute("x2",hp.sx.toFixed(1)); stem.setAttribute("y2",hp.sy.toFixed(1));
+        stem.setAttribute("stroke","var(--acc)"); stem.setAttribute("stroke-width","2");
+        stem.setAttribute("opacity","0.8"); sceneG.appendChild(stem);
+        var grip=svgNS("circle");
+        grip.setAttribute("cx",hp.sx.toFixed(1)); grip.setAttribute("cy",hp.sy.toFixed(1));
+        var active = dragging && spanDrag.end===end;
+        grip.setAttribute("r", active ? "8.5" : "7");
+        grip.setAttribute("fill","var(--acc)"); grip.setAttribute("stroke","var(--panel)");
+        grip.setAttribute("stroke-width","1.5");
+        grip.setAttribute("opacity", (dragging && !active) ? "0.45" : "1");
+        sceneG.appendChild(grip);
+      });
     }
 
     if(gizmoDrag && gizmoDrag.type==="rot"){
@@ -1999,36 +2015,73 @@ function pairDist(){
    this file already uses: things that depict the drawing scale with the world, controls
    stay put on screen so they stay touchable. */
 var SPAN_HANDLE_PX=34, SPAN_HANDLE_R=13;
-function spanHandleScreen(part){
-  var d=partAxis(part), n=spanOf(part), t=(n-1);
-  var far=pc([part.cell.x+d[0]*t, part.cell.y+d[1]*t, part.cell.z+d[2]*t]);
-  var tip=pc([part.cell.x+d[0]*(t+PR), part.cell.y+d[1]*(t+PR), part.cell.z+d[2]*(t+PR)]);
-  var ux=tip.sx-far.sx, uy=tip.sy-far.sy, m=Math.hypot(ux,uy);
-  // Axis pointing straight at or away from the camera: it projects to nothing, so there
-  // is no direction to push along. Offset up the screen instead - still reachable, and
-  // still clear of the port, which is projected onto the same spot.
-  if(m<0.5) return {sx:tip.sx, sy:tip.sy-SPAN_HANDLE_PX, flat:true};
+/* A grip at BOTH ends. The first version grew only from ports[0], which on a straight is
+   the inlet - so only the amber end could be pulled, and the owner works from outlets as
+   often as inlets. End 0 is the ports[0] direction, end 1 the opposite. Pulling one end
+   leaves the OTHER where it is, which is what "extend this end" has to mean when you are
+   working away from a connection you have already made. */
+function endDir(part, end){
+  var d=partAxis(part);
+  return end===0 ? d : [-d[0],-d[1],-d[2]];
+}
+// The cell at a given end of the run: the far cell is end 0, the anchor is end 1.
+function endCell(part, end){
+  var n=spanOf(part), d=partAxis(part);
+  return end===0 ? {x:part.cell.x+d[0]*(n-1), y:part.cell.y+d[1]*(n-1), z:part.cell.z+d[2]*(n-1)}
+                 : {x:part.cell.x, y:part.cell.y, z:part.cell.z};
+}
+function spanHandleScreen(part, end){
+  var e=endCell(part,end), u=endDir(part,end);
+  var base=pc([e.x,e.y,e.z]);
+  var tip=pc([e.x+u[0]*PR, e.y+u[1]*PR, e.z+u[2]*PR]);
+  var ux=tip.sx-base.sx, uy=tip.sy-base.sy, m=Math.hypot(ux,uy);
+  // Axis pointing straight at or away from the camera projects to nothing, so there is no
+  // direction to push along. Offset up the screen instead - still reachable, still clear
+  // of the port on the same spot. The two ends would land together there, so they go
+  // opposite ways.
+  if(m<0.5) return {sx:tip.sx, sy:tip.sy+(end===0?-1:1)*SPAN_HANDLE_PX, flat:true};
   return {sx:tip.sx+ux/m*SPAN_HANDLE_PX, sy:tip.sy+uy/m*SPAN_HANDLE_PX, flat:false};
 }
 function hitSpanHandle(pt){
   if(gizmoPartIdx==null) return null;
   var part=parts[gizmoPartIdx];
   if(!canSpan(part.shapeKey)) return null;
-  var p=spanHandleScreen(part);
-  var d=Math.hypot(p.sx-pt.x, p.sy-pt.y);
-  return d<SPAN_HANDLE_R ? {dist:d} : null;
+  var best=null;
+  [0,1].forEach(function(end){
+    var p=spanHandleScreen(part,end);
+    var d=Math.hypot(p.sx-pt.x, p.sy-pt.y);
+    if(d<SPAN_HANDLE_R && (!best || d<best.dist)) best={end:end, dist:d};
+  });
+  return best;
 }
-// How long a run can get from this anchor before it leaves the grid or hits something.
-// Not capped at MAX_SPAN - a longer run is legal, it just becomes more than one piece.
-function maxRunFrom(part){
-  var d=partAxis(part), n=0;
+// How long a run can get while the OPPOSITE end stays put, before it leaves the grid or
+// runs into something. Not capped at MAX_SPAN - a longer run is legal, it just becomes
+// more than one cast piece.
+function maxRun(part, end){
+  var fixed=endCell(part, end===0?1:0), u=endDir(part,end), n=0;
   for(var i=0;i<64;i++){
-    var c={x:part.cell.x+d[0]*i, y:part.cell.y+d[1]*i, z:part.cell.z+d[2]*i};
+    var c={x:fixed.x+u[0]*i, y:fixed.y+u[1]*i, z:fixed.z+u[2]*i};
     if(!inGrid(c.x,c.y,c.z)) break;
     if(isOccupied(c.x,c.y,c.z,gizmoPartIdx)) break;
     n++;
   }
   return Math.max(1,n);
+}
+// Lay a run of `len` cells out as cast pieces, growing from one end while the opposite
+// end stays fixed. The first entry is the piece the selected part becomes, so the part
+// you grabbed keeps its identity and stays at the end you are pulling from.
+function runPieces(part, end, len){
+  var u=endDir(part,end);
+  var fixed=endCell(part, end===0?1:0);
+  var out=[], cursor={x:fixed.x, y:fixed.y, z:fixed.z};
+  divideRun(len).forEach(function(k){
+    // every piece is anchored at its own lowest cell along the part's forward axis
+    var anchor = end===0 ? {x:cursor.x, y:cursor.y, z:cursor.z}
+                         : {x:cursor.x+u[0]*(k-1), y:cursor.y+u[1]*(k-1), z:cursor.z+u[2]*(k-1)};
+    out.push({cell:anchor, span:k});
+    cursor={x:cursor.x+u[0]*k, y:cursor.y+u[1]*k, z:cursor.z+u[2]*k};
+  });
+  return out;
 }
 // Greedy 3s with the remainder at the far end, exactly as the old app cut its runs.
 // Greedy is also optimal in piece count here: any run of L cells needs at least
@@ -2118,8 +2171,9 @@ svg.addEventListener("pointerdown", function(e){
     var ringHit=hitGizmoRing(p), arrowHit=hitGizmoArrow(p);
     if(spanHit){
       mode="spanDrag";
-      spanDrag={start:p, base:spanOf(parts[gizmoPartIdx]), len:spanOf(parts[gizmoPartIdx]),
-                max:maxRunFrom(parts[gizmoPartIdx]), pre:snapshot()};
+      spanDrag={start:p, end:spanHit.end,
+                base:spanOf(parts[gizmoPartIdx]), len:spanOf(parts[gizmoPartIdx]),
+                max:maxRun(parts[gizmoPartIdx], spanHit.end), pre:snapshot()};
     } else if(arrowHit && (!ringHit || arrowHit.dist<ringHit.dist)){
       var gp0=parts[gizmoPartIdx];
       mode="gizmoMove";
@@ -2271,12 +2325,15 @@ svg.addEventListener("pointermove", function(e){
   }
   if(mode==="spanDrag"){
     var ptS=svgPointFromClient(e.clientX,e.clientY);
-    var part=parts[gizmoPartIdx], d=partAxis(part);
+    var part=parts[gizmoPartIdx];
+    // Measured along the end being pulled, so dragging outward always lengthens whichever
+    // grip you took hold of - the two ends run in opposite world directions.
+    var u=endDir(part, spanDrag.end);
     var org=pc([part.cell.x,part.cell.y,part.cell.z]);
-    var one=pc([part.cell.x+d[0],part.cell.y+d[1],part.cell.z+d[2]]);
+    var one=pc([part.cell.x+u[0],part.cell.y+u[1],part.cell.z+u[2]]);
     var ux=one.sx-org.sx, uy=one.sy-org.sy, m=Math.hypot(ux,uy)||1;
     var along=((ptS.x-spanDrag.start.x)*ux+(ptS.y-spanDrag.start.y)*uy)/m;
-    spanDrag.len=Math.max(1, Math.min(spanDrag.max, spanDrag.base+Math.round(along/m*1)));
+    spanDrag.len=Math.max(1, Math.min(spanDrag.max, spanDrag.base+Math.round(along/m)));
     render(); return;
   }
   if(mode==="gizmoMove"){
@@ -2367,14 +2424,16 @@ function up(e){
   }
   if(mode==="spanDrag"){
     if(pts.size===0){
-      var sp=spanDrag, part=parts[gizmoPartIdx], d=partAxis(part);
-      var pieces=divideRun(sp.len), off=0;
-      part.span=pieces[0]; off=pieces[0];
-      for(var i=1;i<pieces.length;i++){
+      var sp=spanDrag, part=parts[gizmoPartIdx];
+      var laid=runPieces(part, sp.end, sp.len);
+      // The part you grabbed becomes the first piece and keeps the end you pulled from;
+      // the rest of the run follows behind it as separate casts.
+      part.cell={x:laid[0].cell.x, y:laid[0].cell.y, z:laid[0].cell.z};
+      part.span=laid[0].span;
+      for(var i=1;i<laid.length;i++){
         parts.push({shape:part.shape, shapeKey:part.shapeKey, ports:part.ports,
-          streams:part.streams, poseIdx:part.poseIdx, span:pieces[i],
-          cell:{x:part.cell.x+d[0]*off, y:part.cell.y+d[1]*off, z:part.cell.z+d[2]*off}});
-        off+=pieces[i];
+          streams:part.streams, poseIdx:part.poseIdx, span:laid[i].span,
+          cell:{x:laid[i].cell.x, y:laid[i].cell.y, z:laid[i].cell.z}});
       }
       mode="none"; spanDrag=null;
       pushHistory(sp.pre);
