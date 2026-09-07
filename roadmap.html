@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>PIPEGRID Roadmap</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,400&display=swap">
+
+<style>
+  /* Dark-first: the app itself is a dark instrument, so that is the default here and the
+     light theme derives from the reference sheet's ink-on-paper. Both are real project
+     surfaces, not invented palettes. */
+  :root{
+    --ground:#0b0d10;
+    --panel:#12151b;
+    --panel2:#171b23;
+    --edge:#2c313d;
+    --edge-soft:#1e232c;
+    --text:#c7d3e2;
+    --text-strong:#e6edf6;
+    --dim:#7a8494;
+    --dimmer:#5f6775;
+    --acc:#e0a14e;
+    --acc-soft:rgba(224,161,78,0.10);
+    --ok:#5aa469;
+    --stop:#d8534f;
+    --info:#4a7fb5;
+    --shadow:rgba(0,0,0,0.45);
+    color-scheme:dark;
+  }
+  @media (prefers-color-scheme: light){
+    :root:not([data-theme="dark"]){
+      --ground:#f7f4ec;
+      --panel:#fbfaf5;
+      --panel2:#f1ece0;
+      --edge:#d8d1c1;
+      --edge-soft:#e6e0d2;
+      --text:#232a35;
+      --text-strong:#12161d;
+      --dim:#6b7280;
+      --dimmer:#8a8f99;
+      --acc:#b4590c;
+      --acc-soft:rgba(180,89,12,0.09);
+      --ok:#3f7d4d;
+      --stop:#b03a35;
+      --info:#2f6ea8;
+      --shadow:rgba(35,42,53,0.13);
+      color-scheme:light;
+    }
+  }
+  :root[data-theme="light"]{
+    --ground:#f7f4ec;
+    --panel:#fbfaf5;
+    --panel2:#f1ece0;
+    --edge:#d8d1c1;
+    --edge-soft:#e6e0d2;
+    --text:#232a35;
+    --text-strong:#12161d;
+    --dim:#6b7280;
+    --dimmer:#8a8f99;
+    --acc:#b4590c;
+    --acc-soft:rgba(180,89,12,0.09);
+    --ok:#3f7d4d;
+    --stop:#b03a35;
+    --info:#2f6ea8;
+    --shadow:rgba(35,42,53,0.13);
+    color-scheme:light;
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    background:var(--ground);
+    color:var(--text);
+    font-family:"Newsreader",Georgia,"Times New Roman",serif;
+    font-size:17px;
+    line-height:1.62;
+    margin:0;
+    padding:0 20px 90px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:780px;margin:0 auto;}
+
+  .mono{
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:0.72em;
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+  }
+
+  /* ---- masthead ---- */
+  header{padding:54px 0 30px;border-bottom:1px solid var(--edge);}
+  .eyebrow{
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:10.5px;letter-spacing:0.22em;text-transform:uppercase;
+    color:var(--dimmer);margin:0 0 16px;
+  }
+  h1{
+    font-family:"Bricolage Grotesque","Helvetica Neue",Arial,sans-serif;
+    font-weight:800;font-size:clamp(38px,7vw,60px);line-height:1.0;
+    letter-spacing:-0.025em;margin:0;color:var(--text-strong);
+    text-wrap:balance;
+  }
+  .standfirst{
+    margin:18px 0 0;max-width:60ch;font-size:18px;color:var(--dim);
+    font-weight:300;line-height:1.6;
+  }
+  .meta{
+    display:flex;flex-wrap:wrap;gap:8px 22px;margin-top:26px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:11px;letter-spacing:0.05em;color:var(--dimmer);
+  }
+  .meta b{color:var(--dim);font-weight:400;}
+
+  /* ---- section headings ---- */
+  section{margin-top:56px;}
+  .shead{display:flex;align-items:baseline;gap:14px;margin-bottom:6px;}
+  h2{
+    font-family:"Bricolage Grotesque","Helvetica Neue",Arial,sans-serif;
+    font-weight:700;font-size:25px;letter-spacing:-0.012em;
+    margin:0;color:var(--text-strong);
+  }
+  .count{
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:11px;letter-spacing:0.1em;color:var(--dimmer);
+    border:1px solid var(--edge);border-radius:20px;padding:2px 9px;
+    white-space:nowrap;
+  }
+  .sblurb{margin:0 0 26px;color:var(--dim);max-width:62ch;font-size:16px;font-weight:300;}
+
+  /* ---- decisions: the active part of the page, so these get a surface ---- */
+  .decision{
+    background:var(--panel);
+    border:1px solid var(--edge);
+    border-left:3px solid var(--acc);
+    border-radius:3px;
+    padding:20px 22px;
+    margin-bottom:14px;
+  }
+  .decision h3{
+    font-family:"Bricolage Grotesque","Helvetica Neue",Arial,sans-serif;
+    font-weight:700;font-size:18px;line-height:1.3;letter-spacing:-0.008em;
+    margin:0 0 9px;color:var(--text-strong);text-wrap:balance;
+  }
+  .decision p{margin:0 0 9px;font-size:16px;color:var(--text);}
+  .decision p:last-child{margin-bottom:0;}
+  .rec{
+    margin-top:12px;padding-top:11px;border-top:1px solid var(--edge-soft);
+    font-size:15px;color:var(--dim);
+  }
+  .rec strong{
+    color:var(--acc);font-weight:400;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:10.5px;letter-spacing:0.13em;text-transform:uppercase;
+    display:block;margin-bottom:3px;
+  }
+  .asked{
+    display:inline-block;margin-left:8px;vertical-align:2px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:9.5px;letter-spacing:0.1em;text-transform:uppercase;
+    color:var(--stop);border:1px solid var(--stop);border-radius:3px;
+    padding:1px 5px;white-space:nowrap;
+  }
+
+  /* ---- roadmap: a real build order, so it is numbered ---- */
+  ol.road{list-style:none;margin:0;padding:0;}
+  ol.road li{
+    display:grid;
+    grid-template-columns:38px 1fr;
+    gap:0 16px;
+    padding:17px 0;
+    border-top:1px solid var(--edge-soft);
+  }
+  ol.road li:last-child{border-bottom:1px solid var(--edge-soft);}
+  .num{
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:12px;color:var(--dimmer);padding-top:5px;
+    font-variant-numeric:tabular-nums;
+  }
+  .item h3{
+    font-family:"Bricolage Grotesque","Helvetica Neue",Arial,sans-serif;
+    font-weight:700;font-size:17.5px;margin:0 0 5px;color:var(--text-strong);
+    letter-spacing:-0.006em;
+  }
+  .item p{margin:0;font-size:15.5px;color:var(--dim);max-width:58ch;}
+  .tag{
+    display:inline-block;margin-left:9px;vertical-align:3px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:9.5px;letter-spacing:0.1em;text-transform:uppercase;
+    padding:1px 6px;border-radius:3px;white-space:nowrap;font-weight:400;
+  }
+  .tag.next{color:var(--acc);border:1px solid var(--acc);background:var(--acc-soft);}
+  .tag.parked{color:var(--dimmer);border:1px solid var(--edge);}
+  .tag.blocked{color:var(--info);border:1px solid var(--info);}
+
+  /* ---- the sequencing rule, quoted from the owner ---- */
+  .rule{
+    margin:0 0 30px;padding:16px 20px;
+    border:1px dashed var(--edge);border-radius:3px;
+    background:var(--panel2);
+    font-size:16px;color:var(--dim);
+  }
+  .rule q{color:var(--text);font-style:italic;}
+  .rule cite{
+    display:block;margin-top:6px;font-style:normal;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--dimmer);
+  }
+
+  /* ---- shipped: compact, two columns, ground covered ---- */
+  ul.shipped{
+    list-style:none;margin:0;padding:0;
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));
+    gap:0 30px;
+  }
+  ul.shipped li{
+    display:grid;grid-template-columns:16px 1fr;gap:0 10px;
+    padding:9px 0;border-top:1px solid var(--edge-soft);
+    font-size:15.5px;color:var(--text);
+  }
+  .dot{
+    width:7px;height:7px;border-radius:50%;background:var(--ok);
+    margin-top:9px;
+  }
+  ul.shipped small{display:block;color:var(--dimmer);font-size:13.5px;line-height:1.45;}
+
+  /* ---- the resolved question, shown in the app's own notation ---- */
+  .resolved{
+    margin-top:22px;border:1px solid var(--edge);border-radius:3px;
+    background:var(--panel);padding:20px 22px;
+  }
+  .resolved h3{
+    font-family:"Bricolage Grotesque","Helvetica Neue",Arial,sans-serif;
+    font-weight:700;font-size:17px;margin:0 0 8px;color:var(--text-strong);
+  }
+  .resolved p{margin:0 0 10px;font-size:15.5px;color:var(--text);}
+  .spec{
+    display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;
+    overflow-x:auto;
+  }
+  .chip{
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:11.5px;letter-spacing:0.02em;
+    border:1px solid var(--edge);border-radius:3px;
+    padding:6px 10px;color:var(--text);background:var(--panel2);
+    white-space:nowrap;
+  }
+  .chip b{color:var(--acc);font-weight:400;}
+  .chip i{color:var(--dimmer);font-style:normal;}
+
+  footer{
+    margin-top:64px;padding-top:22px;border-top:1px solid var(--edge);
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:11px;letter-spacing:0.05em;color:var(--dimmer);line-height:1.9;
+  }
+  footer a{color:var(--acc);text-decoration:none;border-bottom:1px solid var(--edge);}
+  footer a:hover,footer a:focus-visible{border-bottom-color:var(--acc);}
+  a:focus-visible{outline:2px solid var(--acc);outline-offset:3px;border-radius:2px;}
+
+  @media (max-width:560px){
+    body{font-size:16px;padding:0 16px 70px;}
+    ol.road li{grid-template-columns:26px 1fr;gap:0 10px;}
+    .meta{gap:6px 16px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">Fabrication instrument · cast &amp; glazed stoneware</p>
+  <h1>PIPEGRID Roadmap</h1>
+  <p class="standfirst">Where the build stands, what comes next, and the five things
+  that are still waiting on a decision from you.</p>
+  <div class="meta">
+    <span><b>Updated</b> 7 Sep 2026</span>
+    <span><b>Build</b> vertical slice · 2,730 lines</span>
+    <span><b>Catalogue</b> 39 of 39 parts</span>
+    <span><b>Live</b> perhoinc.github.io/pipegrid</span>
+  </div>
+</header>
+
+<section>
+  <div class="shead">
+    <h2>Waiting on you</h2>
+    <span class="count">5 open</span>
+  </div>
+  <p class="sblurb">None of these block the build — I can keep going around all of them.
+  But each one is a call I shouldn't make on your behalf.</p>
+
+  <div class="decision">
+    <h3>The largest grid is still slow. Fix it, or leave it?</h3>
+    <p>A 12×12×12 grid takes 13.8 milliseconds to draw each frame, against 1.5 for your
+    4×4×8. That's 1,727 cells of genuine geometry — there's no waste left to remove.</p>
+    <p>The only real fix is to draw just the outside shell of the stack and hide the
+    interior. Faster, but you'd stop seeing through it.</p>
+    <div class="rec"><strong>My read</strong>
+    Leave it until you actually work at that size. If you get there, we decide then —
+    it's a change to what you see, not just how fast it is.</div>
+  </div>
+
+  <div class="decision">
+    <h3>When layers overlap on screen, which one takes the tap?</h3>
+    <p>Seen at an angle, every layer sits on top of every other. A part one floor up
+    routinely covers an empty cell you're aiming at — close enough to steal the tap.</p>
+    <p>I made the layer you're working on win. So to select a part on another layer,
+    you switch to that layer first. The alternative is that parts always win, and
+    you orbit slightly to reach a blocked cell.</p>
+    <div class="rec"><strong>My read</strong>
+    Keep it as is — but you're the one whose thumb knows. Worth a few minutes on the
+    iPad before you decide.</div>
+  </div>
+
+  <div class="decision">
+    <h3>Should deleting ask first?</h3>
+    <p>Right now it doesn't. Delete removes the selected part immediately, and Undo
+    puts it straight back.</p>
+    <div class="rec"><strong>My read</strong>
+    No confirmation. A dialog on every removal costs more than the occasional mis-tap
+    it prevents, and Undo already covers it.</div>
+  </div>
+
+  <div class="decision">
+    <h3>How should the pipes themselves look in 3D?</h3>
+    <p>They're still flat centre-lines. None of the mark grammar from the old
+    app — pipe-colouring for structure, shadowing under rings, chevrons for shared
+    bores — has reached the 3D view.</p>
+    <p>Two directions: carry that 2D grammar across as-is, or design something properly
+    three-dimensional — shading, silhouette, real pipe thickness.</p>
+    <div class="rec"><strong>My read</strong>
+    A 3D equivalent, and on a mockup board first, per your own rule. But this sits
+    behind the mechanics work below either way.</div>
+  </div>
+
+  <div class="decision">
+    <h3>The shape picker glyphs</h3>
+    <p>You flagged these as not great when you picked the dock layout, and they haven't
+    been touched since. There's one simple icon per connectivity family rather than per
+    variant, so a six-way split and a six-way merge look identical in the picker.</p>
+    <div class="rec"><strong>My read</strong>
+    Now that we know the port configuration is what identifies a part, the glyphs
+    arguably need to show inlets and outlets — which makes this a bigger job than
+    redrawing icons.</div>
+  </div>
+
+  <div class="decision">
+    <h3>The parts spec counts 40 topologies. Its own tally adds to 39.</h3>
+    <p>I built 39 and flagged this at the time. Every entry the document itself lists is
+    accounted for, so it's most likely a typo in the prose rather than a missing part —
+    but it has never been settled.</p>
+    <div class="rec"><strong>My read</strong>
+    Almost certainly a doc error. Worth ten minutes of your eyes on the spec to close
+    it, since it's the authority we build the catalogue from.</div>
+  </div>
+</section>
+
+<section>
+  <div class="shead">
+    <h2>Next</h2>
+    <span class="count">mechanics first</span>
+  </div>
+
+  <p class="rule">
+    <q>It's better to focus on the mechanics and back end first. Make it work, then make
+    it look good, right?</q>
+    <cite>Your rule, 25 Aug — the order below follows it</cite>
+  </p>
+
+  <ol class="road">
+    <li>
+      <span class="num">01</span>
+      <div class="item">
+        <h3>Risers, and drawing a part that crosses floors<span class="tag next">recommended next</span></h3>
+        <p>The mechanics already work — a run pointing upward is a riser, and that arrived
+        with the multi-cell work. What is left is the drawing: showing a part on every
+        floor it passes through. That part is designed already — full height shown, the
+        current floor solid, the rest ghosted, and no port at all on the middle floors,
+        since a port there would claim a connection that does not exist on that floor.</p>
+      </div>
+    </li>
+    <li>
+      <span class="num">02</span>
+      <div class="item">
+        <h3>Selecting more than one thing at a time</h3>
+        <p>Everything today acts on exactly one part: the gizmo, delete, the length grips.
+        Selecting several would make delete, move and rotate work on a group — and it is
+        what copy and paste needs underneath it.</p>
+        <p>Two things worth deciding before it is built. <b>How you select</b> — drag a box
+        across the grid, or tap parts one after another to add them? A box is quicker for a
+        block; tapping is more precise in a dense layout, and works better with a thumb.
+        <b>Whether a selection can cross layers</b>, or is confined to the one you are
+        working on, the way placement already is.</p>
+      </div>
+    </li>
+    <li>
+      <span class="num">03</span>
+      <div class="item">
+        <h3>Copy and paste<span class="tag blocked">needs 02</span></h3>
+        <p>Repeat an assembly you have already worked out instead of rebuilding it cell by
+        cell. For modular pieces this is probably the biggest single saving on the list.</p>
+        <p>The real question is <b>where a paste lands</b>: offset a cell from the original,
+        onto the layer you are currently on, or dropped where you next tap. And <b>what
+        happens when it does not fit</b> — refuse the whole paste, or place what fits and
+        say what it left out. Refusing wholesale is safer; partial pasting is friendlier
+        right up until it quietly drops something.</p>
+      </div>
+    </li>
+    <li>
+      <span class="num">04</span>
+      <div class="item">
+        <h3>Trace mode</h3>
+        <p>Follow the flow through a finished layout and see where it actually goes. Your
+        old app has this and the slice has none of it. It sits on top of the existing model
+        rather than changing it, which is why it waits until the editing tools settle.</p>
+      </div>
+    </li>
+    <li>
+      <span class="num">05</span>
+      <div class="item">
+        <h3>Valves, and what flow does at a junction<span class="tag blocked">needs 04</span></h3>
+        <p>A valve part, and the logic that goes with it — a merge behaves like an
+        <em>or</em>, a valve like a <em>not</em> or an <em>and</em>. Parked since before
+        the catalogue work, and it needs trace mode underneath it.</p>
+      </div>
+    </li>
+    <li>
+      <span class="num">06</span>
+      <div class="item">
+        <h3>Exploded stack view<span class="tag parked">parked</span></h3>
+        <p>The whole stack pulled apart along its vertical axis, so you can see every floor
+        at once instead of one at a time. Parked, not dropped.</p>
+      </div>
+    </li>
+    <li>
+      <span class="num">07</span>
+      <div class="item">
+        <h3>Pipe treatment in 3D<span class="tag parked">after mechanics</span></h3>
+        <p>See the open question above. Deliberately behind the mechanics work, per your
+        own sequencing rule.</p>
+      </div>
+    </li>
+  </ol>
+</section>
+
+<section>
+  <div class="shead">
+    <h2>Just settled</h2>
+    <span class="count">the cut list</span>
+  </div>
+
+  <div class="resolved">
+    <h3>A six-way split is not a six-way merge</h3>
+    <p>I'd assumed the 39 catalogue entries collapsed to 9 physical fittings, since
+    they share port layouts and differ only in which openings are inlets. You corrected
+    that: they're cast stoneware, and the connectors are what align each piece for
+    gluing, so the roles <em>are</em> the object.</p>
+    <p>So the list was already grouping correctly. What it was missing is the thing that
+    identifies which mould to pull — now on every row, in the part's own orientation, so
+    a rotated fitting still counts as the same fitting:</p>
+    <div class="spec">
+      <span class="chip">six-way, single-anchor split <i>·</i> <b>in N · out S E W U D</b></span>
+      <span class="chip">six-way, single-anchor merge <i>·</i> <b>in S E W U D · out N</b></span>
+    </div>
+  </div>
+  <div class="resolved" style="margin-top:14px;">
+    <h3>Multi-cell parts landed</h3>
+    <p>A cast piece can now be one, two or three cells. Length is part of what the object
+    is, so it saves with the board and gives each size its own line in the cut list.</p>
+    <p>Both ends of a run carry a grip; pulling one leaves the other where it is. Drag past
+    three cells and the run divides itself into 3s and 2s — the same rule your old app used,
+    and also the fewest pieces possible for any length. The drag and the dividing are one
+    gesture rather than two features: a cast stops at three, so without the dividing a drag
+    would simply hit a wall.</p>
+    <p><b>A riser already works</b> as a run pointing upward. Only the drawing side is left,
+    which is item 01.</p>
+  </div>
+  <div class="resolved" style="margin-top:14px;">
+    <h3>Settled earlier</h3>
+    <p><b>PDF stays as it is.</b> Export to PNG is one tap; a PDF goes through Safari&rsquo;s
+    own dialog. Not worth an outside library in a file that otherwise needs nothing to run.</p>
+    <p><b>Multi-cell comes before multi-layer.</b> Your call, and the right one — a riser is
+    just a multi-cell part standing up, so the general case belongs first.</p>
+    <p><b>Roboto Slab throughout,</b> and the sheet&rsquo;s toolbar rebuilt: a segmented layer
+    control sharing its labels with the 3D view, PNG as the primary action, print secondary.</p>
+  </div>
+</section>
+
+<section>
+  <div class="shead">
+    <h2>Shipped</h2>
+    <span class="count">last two weeks</span>
+  </div>
+  <p class="sblurb">All live on the iPad build.</p>
+
+  <ul class="shipped">
+    <li><span class="dot"></span><div>Multi-cell straights
+      <small>1, 2 or 3 cells; drag either end, longer runs divide themselves</small></div></li>
+    <li><span class="dot"></span><div>Port configuration in the cut list
+      <small>Ordered by port count, each length its own line</small></div></li>
+    <li><span class="dot"></span><div>Reference sheet
+      <small>Paper, title block, plan and isometric, cut list, PNG and print</small></div></li>
+    <li><span class="dot"></span><div>Cut list, both views
+      <small>Per layer on the sheet; whole board in the dock</small></div></li>
+    <li><span class="dot"></span><div>Free placement
+      <small>Pick a layer, tap a cell, pick a shape — no existing part needed</small></div></li>
+    <li><span class="dot"></span><div>Grid you can shape
+      <small>Add or remove at either end of any axis, 1 to 12</small></div></li>
+    <li><span class="dot"></span><div>Whole-stack wireframe
+      <small>Toggle, with the working layer still reading brighter</small></div></li>
+    <li><span class="dot"></span><div>Seven times faster with it on
+      <small>10.09ms down to 1.45ms a frame on your 4×4×8</small></div></li>
+    <li><span class="dot"></span><div>Delete, by thumb
+      <small>Dock button as well as the keyboard shortcut</small></div></li>
+    <li><span class="dot"></span><div>Mouse and keyboard
+      <small>Wheel to zoom, wheel-click to pan</small></div></li>
+    <li><span class="dot"></span><div>Full catalogue
+      <small>All 39 parts, every flow topology in the spec</small></div></li>
+    <li><span class="dot"></span><div>Saving and undo
+      <small>Autosave, file export and import, undo across every change</small></div></li>
+  </ul>
+</section>
+
+<footer>
+  PIPEGRID · a fabrication-planning instrument for cast and glazed stoneware<br>
+  Live build: <a href="https://perhoinc.github.io/pipegrid/boards/pipegrid-vertical-slice.html">perhoinc.github.io/pipegrid</a><br>
+  This page is updated as things land — the link stays the same.
+</footer>
+
+</div>
+</body>
+</html>
