@@ -163,11 +163,22 @@
     padding:1px 5px;white-space:nowrap;
   }
 
+  /* Dates sit quietly in mono - they are reference, not headline. Shipped dates come
+     from the commits themselves; added and raised dates from the day the item was agreed. */
+  .when{
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:9.5px;letter-spacing:0.09em;text-transform:uppercase;
+    color:var(--dimmer);white-space:nowrap;
+  }
+  .when b{color:var(--dim);font-weight:400;}
+  .decision > .when{display:block;margin:-4px 0 8px;}
+  .resolved > .when{display:block;margin:-2px 0 10px;}
+
   /* ---- roadmap: a real build order, so it is numbered ---- */
   ol.road{list-style:none;margin:0;padding:0;}
   ol.road li{
     display:grid;
-    grid-template-columns:38px 1fr;
+    grid-template-columns:52px 1fr;
     gap:0 16px;
     padding:17px 0;
     border-top:1px solid var(--edge-soft);
@@ -178,6 +189,7 @@
     font-size:12px;color:var(--dimmer);padding-top:5px;
     font-variant-numeric:tabular-nums;
   }
+  .num .when{display:block;margin-top:6px;font-size:9px;letter-spacing:0.05em;line-height:1.35;}
   .item h3{
     font-family:"Bricolage Grotesque","Helvetica Neue",Arial,sans-serif;
     font-weight:700;font-size:17.5px;margin:0 0 5px;color:var(--text-strong);
@@ -219,6 +231,8 @@
     padding:9px 0;border-top:1px solid var(--edge-soft);
     font-size:15.5px;color:var(--text);
   }
+  ul.shipped li > div{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 10px;}
+  ul.shipped li > div > small{flex-basis:100%;}
   .dot{
     width:7px;height:7px;border-radius:50%;background:var(--ok);
     margin-top:9px;
@@ -260,7 +274,7 @@
 
   @media (max-width:560px){
     body{font-size:16px;padding:0 16px 70px;}
-    ol.road li{grid-template-columns:26px 1fr;gap:0 10px;}
+    ol.road li{grid-template-columns:44px 1fr;gap:0 10px;}
     .meta{gap:6px 16px;}
   }
 </style>
@@ -290,6 +304,7 @@
   But each one is a call I shouldn't make on your behalf.</p>
 
   <div class="decision">
+    <span class="when"><b>raised</b> 3 Sep &middot; still open</span>
     <h3>The largest grid is still slow. Fix it, or leave it?</h3>
     <p>A 12×12×12 grid takes 13.8 milliseconds to draw each frame, against 1.5 for your
     4×4×8. That's 1,727 cells of genuine geometry — there's no waste left to remove.</p>
@@ -301,6 +316,7 @@
   </div>
 
   <div class="decision">
+    <span class="when"><b>raised</b> 3 Sep &middot; still open</span>
     <h3>When layers overlap on screen, which one takes the tap?</h3>
     <p>Seen at an angle, every layer sits on top of every other. A part one floor up
     routinely covers an empty cell you're aiming at — close enough to steal the tap.</p>
@@ -313,6 +329,7 @@
   </div>
 
   <div class="decision">
+    <span class="when"><b>raised</b> 3 Sep &middot; still open</span>
     <h3>Should deleting ask first?</h3>
     <p>Right now it doesn't. Delete removes the selected part immediately, and Undo
     puts it straight back.</p>
@@ -322,6 +339,7 @@
   </div>
 
   <div class="decision">
+    <span class="when"><b>raised</b> 25 Aug &middot; still open</span>
     <h3>How should the pipes themselves look in 3D?</h3>
     <p>They're still flat centre-lines. None of the mark grammar from the old
     app — pipe-colouring for structure, shadowing under rings, chevrons for shared
@@ -334,6 +352,7 @@
   </div>
 
   <div class="decision">
+    <span class="when"><b>raised</b> 29 Aug &middot; still open</span>
     <h3>The shape picker glyphs</h3>
     <p>You flagged these as not great when you picked the dock layout, and they haven't
     been touched since. There's one simple icon per connectivity family rather than per
@@ -345,6 +364,7 @@
   </div>
 
   <div class="decision">
+    <span class="when"><b>raised</b> 24 Aug &middot; still open</span>
     <h3>The parts spec counts 40 topologies. Its own tally adds to 39.</h3>
     <p>I built 39 and flagged this at the time. Every entry the document itself lists is
     accounted for, so it's most likely a typo in the prose rather than a missing part —
@@ -369,7 +389,7 @@
 
   <ol class="road">
     <li>
-      <span class="num">01</span>
+      <span class="num">01<span class="when">added<br>3 Sep</span></span>
       <div class="item">
         <h3>Risers, and drawing a part that crosses floors<span class="tag next">recommended next</span></h3>
         <p>The mechanics already work — a run pointing upward is a riser, and that arrived
@@ -380,7 +400,7 @@
       </div>
     </li>
     <li>
-      <span class="num">02</span>
+      <span class="num">02<span class="when">added<br>7 Sep</span></span>
       <div class="item">
         <h3>Selecting more than one thing at a time</h3>
         <p>Everything today acts on exactly one part: the gizmo, delete, the length grips.
@@ -394,7 +414,7 @@
       </div>
     </li>
     <li>
-      <span class="num">03</span>
+      <span class="num">03<span class="when">added<br>7 Sep</span></span>
       <div class="item">
         <h3>Copy and paste<span class="tag blocked">needs 02</span></h3>
         <p>Repeat an assembly you have already worked out instead of rebuilding it cell by
@@ -407,7 +427,7 @@
       </div>
     </li>
     <li>
-      <span class="num">04</span>
+      <span class="num">04<span class="when">added<br>31 Aug</span></span>
       <div class="item">
         <h3>Trace mode</h3>
         <p>Follow the flow through a finished layout and see where it actually goes. Your
@@ -416,7 +436,7 @@
       </div>
     </li>
     <li>
-      <span class="num">05</span>
+      <span class="num">05<span class="when">added<br>21 Aug</span></span>
       <div class="item">
         <h3>Valves, and what flow does at a junction<span class="tag blocked">needs 04</span></h3>
         <p>A valve part, and the logic that goes with it — a merge behaves like an
@@ -425,7 +445,7 @@
       </div>
     </li>
     <li>
-      <span class="num">06</span>
+      <span class="num">06<span class="when">added<br>21 Aug</span></span>
       <div class="item">
         <h3>Exploded stack view<span class="tag parked">parked</span></h3>
         <p>The whole stack pulled apart along its vertical axis, so you can see every floor
@@ -433,7 +453,7 @@
       </div>
     </li>
     <li>
-      <span class="num">07</span>
+      <span class="num">07<span class="when">added<br>25 Aug</span></span>
       <div class="item">
         <h3>Pipe treatment in 3D<span class="tag parked">after mechanics</span></h3>
         <p>See the open question above. Deliberately behind the mechanics work, per your
@@ -451,6 +471,7 @@
 
   <div class="resolved">
     <h3>A six-way split is not a six-way merge</h3>
+    <span class="when"><b>settled</b> 5 Sep</span>
     <p>I'd assumed the 39 catalogue entries collapsed to 9 physical fittings, since
     they share port layouts and differ only in which openings are inlets. You corrected
     that: they're cast stoneware, and the connectors are what align each piece for
@@ -465,6 +486,7 @@
   </div>
   <div class="resolved" style="margin-top:14px;">
     <h3>Multi-cell parts landed</h3>
+    <span class="when"><b>settled</b> 6 Sep</span>
     <p>A cast piece can now be one, two or three cells. Length is part of what the object
     is, so it saves with the board and gives each size its own line in the cut list.</p>
     <p>Both ends of a run carry a grip; pulling one leaves the other where it is. Drag past
@@ -477,6 +499,7 @@
   </div>
   <div class="resolved" style="margin-top:14px;">
     <h3>Settled earlier</h3>
+    <span class="when"><b>settled</b> 5 Sep</span>
     <p><b>PDF stays as it is.</b> Export to PNG is one tap; a PDF goes through Safari&rsquo;s
     own dialog. Not worth an outside library in a file that otherwise needs nothing to run.</p>
     <p><b>Multi-cell comes before multi-layer.</b> Your call, and the right one — a riser is
@@ -494,29 +517,29 @@
   <p class="sblurb">All live on the iPad build.</p>
 
   <ul class="shipped">
-    <li><span class="dot"></span><div>Multi-cell straights
+    <li><span class="dot"></span><div>Multi-cell straights<span class="when">6 Sep</span>
       <small>1, 2 or 3 cells; drag either end, longer runs divide themselves</small></div></li>
-    <li><span class="dot"></span><div>Port configuration in the cut list
+    <li><span class="dot"></span><div>Port configuration in the cut list<span class="when">5 Sep</span>
       <small>Ordered by port count, each length its own line</small></div></li>
-    <li><span class="dot"></span><div>Reference sheet
+    <li><span class="dot"></span><div>Reference sheet<span class="when">3 Sep</span>
       <small>Paper, title block, plan and isometric, cut list, PNG and print</small></div></li>
-    <li><span class="dot"></span><div>Cut list, both views
+    <li><span class="dot"></span><div>Cut list, both views<span class="when">3 Sep</span>
       <small>Per layer on the sheet; whole board in the dock</small></div></li>
-    <li><span class="dot"></span><div>Free placement
+    <li><span class="dot"></span><div>Free placement<span class="when">3 Sep</span>
       <small>Pick a layer, tap a cell, pick a shape — no existing part needed</small></div></li>
-    <li><span class="dot"></span><div>Grid you can shape
+    <li><span class="dot"></span><div>Grid you can shape<span class="when">3 Sep</span>
       <small>Add or remove at either end of any axis, 1 to 12</small></div></li>
-    <li><span class="dot"></span><div>Whole-stack wireframe
+    <li><span class="dot"></span><div>Whole-stack wireframe<span class="when">3 Sep</span>
       <small>Toggle, with the working layer still reading brighter</small></div></li>
-    <li><span class="dot"></span><div>Seven times faster with it on
+    <li><span class="dot"></span><div>Seven times faster with it on<span class="when">3 Sep</span>
       <small>10.09ms down to 1.45ms a frame on your 4×4×8</small></div></li>
-    <li><span class="dot"></span><div>Delete, by thumb
+    <li><span class="dot"></span><div>Delete, by thumb<span class="when">3 Sep</span>
       <small>Dock button as well as the keyboard shortcut</small></div></li>
-    <li><span class="dot"></span><div>Mouse and keyboard
+    <li><span class="dot"></span><div>Mouse and keyboard<span class="when">3 Sep</span>
       <small>Wheel to zoom, wheel-click to pan</small></div></li>
-    <li><span class="dot"></span><div>Full catalogue
+    <li><span class="dot"></span><div>Full catalogue<span class="when">24 Aug</span>
       <small>All 39 parts, every flow topology in the spec</small></div></li>
-    <li><span class="dot"></span><div>Saving and undo
+    <li><span class="dot"></span><div>Saving and undo<span class="when">31 Aug</span>
       <small>Autosave, file export and import, undo across every change</small></div></li>
   </ul>
 </section>
