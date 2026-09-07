@@ -111,6 +111,23 @@ entirely; nothing in the spec uses it anymore.
 
 ## Flow topology, by connectivity pattern
 
+**Active total: 39** (corrected 2026-09-07 — this document said 40 in three places while its
+own per-pattern tallies below have always summed to 39; the 40 was a slip in the prose, not a
+missing part). The tally, which is also exactly what `SHAPES` in the vertical slice builds:
+
+| Pattern | Active | Inactive | Note |
+|---|---|---|---|
+| Cap | 1 | — | one opening; src/snk is a role flip, not a second part |
+| Straight | 1 | — | |
+| Elbow | 1 | — | |
+| T | 4 | — | split/merge × anchor on run/branch |
+| Corner | 2 | — | split, merge |
+| Cross | 4 | 3 | `xover`, `xbend`, pinwheel rejected as "two parts, not one" |
+| Corner-through | 8 | 8 | 4 single-anchor + 4 mixing; the non-mixing layer rejected |
+| Five-way | 10 | — | 4 single-anchor + 6 mixing |
+| Six-way | 8 | — | 2 + 4 + 2 across its three layers |
+| **Total** | **39** | **11** | |
+
 Method: for a shape's ports, work out (a) how many genuinely different in/out role-splits
 exist given the shape's *own* rotational symmetry (not the full 24 — only the rotations that
 map the shape back onto itself), and (b) for split counts of 4+ where two separate streams
@@ -361,15 +378,15 @@ configuration, including the complement of any given one, is the same topology p
 The claim was originally derived by hand; the pose system reproduces it without being told.
 
 **The complete catalogue is now on the board too.** Beyond the hand-derived spot checks above, the
-test board carries all **40** active flow topologies from this document with their pose counts, and
-audits them: all 40 are confirmed genuinely distinct under rotation (nothing in this document's
+test board carries all **39** active flow topologies from this document with their pose counts, and
+audits them: all 39 are confirmed genuinely distinct under rotation (nothing in this document's
 enumeration is secretly the same part twice), and the two entries this document claims *should*
 collapse — six-way's 3-in-3-out T-type and corner-type, split versus merge — are verified to
 actually collapse, with T's ordinary `tsplit`/`tmerge` as a control that stays distinct. Channels
 are generated from the construction rule rather than hand-written per part, so the board draws
 parts the same way the mockup boards do.
 
-Total pose count across the active catalogue: the 40 topologies span 1 to 24 distinct orientations
+Total pose count across the active catalogue: the 39 topologies span 1 to 24 distinct orientations
 each. Notable that **the Y-family parts often have fewer poses than their T-shaped siblings** —
 `tsplitb` has 12 where `tsplit` has 24, because the Y's two branches are interchangeable and half
 its orientations are therefore duplicates. Symmetry in the part means fewer distinct ways to place
@@ -383,7 +400,7 @@ same failure mode — validating a *sample* instead of enumerating against this 
    `vup`/`vdn` are hand-built vertical *elbow* exceptions and they are the motivating example in
    this document's opening paragraph. The pose system's headline claim is that those exceptions
    dissolve into "the elbow, posed differently," and the validation skipped exactly that shape.
-2. Even with all nine patterns present, only 13 of the 40 active flow topologies were covered.
+2. Even with all nine patterns present, only 13 of the 39 active flow topologies were covered.
    The owner identified the pattern behind the gap precisely: the missing ones were the variants
    where **the anchor has no opposite port among the shape's own ports** — T's `tsplitb`/`tmergeb`
    and corner-through's arm-anchored tripods — so every channel is an elbow and no straight segment
