@@ -1295,11 +1295,37 @@ function renderReferenceView(){
     b.addEventListener("click", function(){ setActiveLayer(z); });
     picker.appendChild(b);
   });
-  var layerParts=parts.filter(function(p){ return p.cell.z===activeLayer; });
+  // Selected by ANY cell the part occupies, not by its anchor. A riser anchored on Z0
+  // passes through Z1 and Z2 and belongs on all three sheets; filtering on the anchor
+  // made it vanish from the two floors it climbs into - the same mistake as reading a
+  // port's neighbour off the anchor, which is what broke building off a run's far end.
+  var layerParts=parts.filter(function(p){
+    return cellsOf(p).some(function(c){ return c.z===activeLayer; });
+  });
   document.getElementById("layerstat").textContent=layerParts.length+" part(s) on this layer";
   drawSheet(layerParts);
   renderCutListPanel();
 }
+
+/* ---- a part seen from a floor it passes through ------------------------------------
+   All three derive from cellsOf() and portCell() - the same two functions placement and
+   collision use - so nothing here knows or cares that only straights span cells today.
+   A four-cell corner-through added later draws correctly without this code changing. */
+function cellsOnLayer(part, z){
+  return cellsOf(part).filter(function(c){ return c.z===z; });
+}
+// The ports that open from one particular cell of a part. On a single-cell part that is
+// all of them; on a run it is only the ones at that end.
+function portsAtCell(part, cell){
+  return part.ports.filter(function(p){
+    var pc0=portCell(part, p.dir);
+    return pc0.x===cell.x && pc0.y===cell.y && pc0.z===cell.z;
+  });
+}
+function hasPortOnLayer(part, z){
+  return part.ports.some(function(p){ return portCell(part, p.dir).z===z; });
+}
+var OFF_PORT_ISO_OPACITY=0.32;   // a floor the part only passes through, owning no port
 
 function drawSheet(layerParts){
   var svg=document.getElementById("sheetSvg");
@@ -1387,10 +1413,9 @@ function drawPlanPanel(svg,x,y,w,h,label,layerParts){
     // lookup the 3D renderer already uses. Checking p.dir directly here was a real bug:
     // it would only ever match a shape whose home orientation happens to already use
     // U/D, never a part that got rotated so some OTHER port now points up/down.
-    var up=part.ports.filter(function(p){return DMAPS[part.poseIdx][p.dir]==="U";})[0];
-    var dn=part.ports.filter(function(p){return DMAPS[part.poseIdx][p.dir]==="D";})[0];
-    if(dn) svg.appendChild(sEl("circle",{cx:c.x, cy:c.y, r:cs*0.16,
-      fill:"none", stroke:LINE, "stroke-width":2, opacity:0.6}));
+    // Channels first. A stream running vertically projects to a point in plan, which the
+    // end-on guard below already discards - so a riser contributes no line here and is
+    // represented entirely by the per-cell marks that follow. Nothing to special-case.
     part.streams.forEach(function(s){
       var pts=streamLocal(part,s,16).map(planPt);
       var span=Math.max.apply(null,pts.map(function(p){return Math.hypot(p.x-c.x,p.y-c.y);}));
@@ -1399,19 +1424,38 @@ function drawPlanPanel(svg,x,y,w,h,label,layerParts){
         fill:"none", stroke:INK, "stroke-width":chanW.toFixed(2),
         "stroke-linecap":"round", "stroke-linejoin":"round"}));
     });
-    part.ports.forEach(function(p){
-      var wd=DMAPS[part.poseIdx][p.dir];
-      if(wd==="U"||wd==="D") return;      // vertical ports get the ring marks below instead
-      var q=planPt(portLocal(part,p));
-      svg.appendChild(sEl("circle",{cx:q.x.toFixed(1), cy:q.y.toFixed(1), r:portR.toFixed(2),
-        fill:p.role==="in"?ACC_INK:PANELBG, stroke:INK, "stroke-width":1.6}));
+
+    // Then one pass per cell this part occupies ON THIS FLOOR. Marks are drawn at the
+    // cell the port actually opens from, not at the part's anchor - on a run those are
+    // different cells and often different floors.
+    cellsOnLayer(part, activeLayer).forEach(function(cell){
+      var cc=ctr(cell.x, cell.y);
+      var here=portsAtCell(part, cell);
+      var up=here.filter(function(p){ return DMAPS[part.poseIdx][p.dir]==="U"; })[0];
+      var dn=here.filter(function(p){ return DMAPS[part.poseIdx][p.dir]==="D"; })[0];
+      var horiz=here.filter(function(p){
+        var wd=DMAPS[part.poseIdx][p.dir];
+        return wd!=="U" && wd!=="D";
+      });
+      if(dn) svg.appendChild(sEl("circle",{cx:cc.x, cy:cc.y, r:cs*0.16,
+        fill:"none", stroke:LINE, "stroke-width":2, opacity:0.6}));
+      horiz.forEach(function(p){
+        var q=planPt(portLocal(part,p));
+        svg.appendChild(sEl("circle",{cx:q.x.toFixed(1), cy:q.y.toFixed(1), r:portR.toFixed(2),
+          fill:p.role==="in"?ACC_INK:LINE, stroke:INK, "stroke-width":1.6}));
+      });
+      if(up){
+        svg.appendChild(sEl("circle",{cx:cc.x, cy:cc.y, r:cs*0.11, fill:PANELBG,
+          stroke:up.role==="in"?ACC_INK:INK, "stroke-width":1.8}));
+        svg.appendChild(sEl("circle",{cx:cc.x, cy:cc.y, r:2, fill:up.role==="in"?ACC_INK:LINE}));
+      }
+      // No port on this floor and no line drawn either: the pipe simply passes through.
+      // A solid dot at the pipe's own diameter reads as what it is - a section cut, the
+      // view straight down the bore. Owner's call, and it is what a plan drawing does.
+      if(!here.length) svg.appendChild(sEl("circle",{cx:cc.x, cy:cc.y,
+        r:(chanW/2).toFixed(2), fill:INK}));
+      if(showPlanThumbs) drawCellThumbnail(svg, part, cc.x-cs/2, cc.y-cs/2, cs);
     });
-    if(up){
-      svg.appendChild(sEl("circle",{cx:c.x, cy:c.y, r:cs*0.11, fill:PANELBG,
-        stroke:up.role==="in"?ACC_INK:INK, "stroke-width":1.8}));
-      svg.appendChild(sEl("circle",{cx:c.x, cy:c.y, r:2, fill:up.role==="in"?ACC_INK:INK}));
-    }
-    if(showPlanThumbs) drawCellThumbnail(svg, part, c.x-cs/2, c.y-cs/2, cs);
   });
 }
 
@@ -1442,7 +1486,7 @@ function drawCellThumbnail(svg, part, ox, oy, cs){
         fill:"none", stroke:INK, "stroke-width":1.3, "stroke-linecap":"round", opacity:0.9}));
     } else {
       svg.appendChild(sEl("circle",{cx:d.x.toFixed(1), cy:d.y.toFixed(1), r:1.6,
-        fill:d.role==="in"?ACC_INK:PANELBG, stroke:INK, "stroke-width":0.9}));
+        fill:d.role==="in"?ACC_INK:LINE, stroke:INK, "stroke-width":0.9}));
     }
   });
 }
@@ -1496,31 +1540,42 @@ function drawIsoPanel(svg,x,y,w,h,label,layerParts){
   layerParts.forEach(function(part,partIdx){
     // Cells are centred on the grid's own middle so the drawing sits in the panel
     // regardless of where the board's bounds happen to fall.
+    // Z is measured RELATIVE to the floor being drawn, so a part that climbs into this
+    // floor from below sits correctly below the plane and one that carries on upward
+    // pokes out above it. The part is drawn at its FULL extent on every floor it touches
+    // (owner's call) rather than sliced, so you can see where it goes, not just that
+    // something passes through.
     var off=[(part.cell.x-(GRID.x.lo+GRID.x.hi)/2)*ISO_CELL,
-             (part.cell.y-(GRID.y.lo+GRID.y.hi)/2)*ISO_CELL, 0];
+             (part.cell.y-(GRID.y.lo+GRID.y.hi)/2)*ISO_CELL,
+             (part.cell.z-activeLayer)*ISO_CELL];
     var cellDepth=place(off).depth, pose=ROTS[part.poseIdx];
+    // Owns a port on this floor, or is only passing through? That decides the weight it
+    // is drawn at - a pass-through is context, not something you connect to here.
+    var faded=!hasPortOnLayer(part, activeLayer);
     part.streams.forEach(function(st){
       var pts=streamLocal(part,st,14)
         .map(function(p){ var wv=matApply(pose,p); return [wv[0]+off[0],wv[1]+off[1],wv[2]+off[2]]; })
         .map(place);
-      items.push({cellDepth:cellDepth, cellIdx:partIdx,
+      items.push({cellDepth:cellDepth, cellIdx:partIdx, faded:faded,
         depth:pts.reduce(function(acc,p){return acc+p.depth;},0)/pts.length, kind:"chan", pts:pts});
     });
     part.ports.forEach(function(p){
       var wv=matApply(pose,portLocal(part,p));
       var pt=place([wv[0]+off[0],wv[1]+off[1],wv[2]+off[2]]);
-      items.push({cellDepth:cellDepth, cellIdx:partIdx, depth:pt.depth, kind:"port", pt:pt, role:p.role});
+      items.push({cellDepth:cellDepth, cellIdx:partIdx, faded:faded,
+        depth:pt.depth, kind:"port", pt:pt, role:p.role});
     });
   });
   items.sort(function(p,q){ return (p.cellDepth-q.cellDepth)||(p.cellIdx-q.cellIdx)||(p.depth-q.depth); });
   items.forEach(function(it){
+    var op=it.faded ? OFF_PORT_ISO_OPACITY : 1;
     if(it.kind==="chan"){
       svg.appendChild(sEl("path",{d:"M "+it.pts.map(function(p){return p.x.toFixed(1)+" "+p.y.toFixed(1);}).join(" L "),
         fill:"none", stroke:INK, "stroke-width":chanW.toFixed(2),
-        "stroke-linecap":"round", "stroke-linejoin":"round"}));
+        "stroke-linecap":"round", "stroke-linejoin":"round", opacity:op}));
     } else {
       svg.appendChild(sEl("circle",{cx:it.pt.x.toFixed(1), cy:it.pt.y.toFixed(1), r:portR.toFixed(2),
-        fill:it.role==="in"?ACC_INK:PANELBG, stroke:INK, "stroke-width":1.4}));
+        fill:it.role==="in"?ACC_INK:LINE, stroke:INK, "stroke-width":1.4, opacity:op}));
     }
   });
 }
