@@ -71,18 +71,24 @@
        letter-spacing:.3px;}
   .layerbar button.on{border-color:var(--acc);color:var(--acc);}
 
-  /* One block per axis: the count on top, then the two ends side by side, because the
-     end is the thing being chosen - "a layer on top" and "a layer below" are different
-     actions, not a single count going up. */
-  .gridaxis{display:flex;flex-direction:column;gap:5px;}
   .gridhead{display:flex;align-items:center;font-size:10px;color:var(--dim);}
   .gridhead .lbl{flex:1;letter-spacing:.6px;}
-  .gridhead .num{color:var(--text);font-size:11px;}
-  .gridends{display:flex;gap:8px;}
-  .gridends .end{flex:1;display:flex;align-items:center;gap:5px;}
-  .gridends .endlbl{flex:1;font-size:8px;letter-spacing:.9px;color:var(--dim);}
-  .gridends button{width:30px;height:30px;border-radius:7px;border:1px solid var(--edge);
-       background:var(--panel2);color:var(--text);font-family:inherit;font-size:14px;}
+  /* All three axes as ONE table: axis name, then each end's label with its own − + and
+     the count between the two ends. Columns line up across rows, so the three counts read
+     as a single column and every button sits right beside the end it changes. The old
+     layout was three stacked blocks with flex spacers that pushed each end's buttons to
+     the far side of the popover, away from their own label. */
+  .gridtable{display:grid;grid-template-columns:auto auto auto 2.4em auto auto;
+       align-items:center;justify-content:start;gap:6px 8px;font-size:10px;color:var(--dim);}
+  .gt-axis{letter-spacing:.6px;text-transform:uppercase;padding-right:6px;}
+  .gt-end{font-size:8.5px;letter-spacing:.9px;text-transform:uppercase;text-align:right;}
+  .gt-end.hi{text-align:left;}
+  .gt-num{text-align:center;color:var(--text);font-size:12px;font-weight:500;}
+  .gt-btns{display:flex;gap:3px;}
+  .gt-btns button{width:28px;height:28px;padding:0;line-height:1;border-radius:7px;
+       border:1px solid var(--edge);background:var(--panel2);color:var(--text);
+       font-family:inherit;font-size:14px;}
+  .btnpair{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
   .gridnote{font-size:9.5px;color:var(--dim);line-height:1.5;}
 
   .viewbtns{position:absolute;bottom:10px;right:10px;display:flex;gap:6px;z-index:15;}
@@ -99,6 +105,9 @@
   .dockbtn .ic{font-size:18px;line-height:1;}
   .dockbtn.on{color:var(--acc);}
   .dockbtn:disabled{opacity:0.3;}
+  /* The bar spans the screen but its buttons don't: on a desktop monitor seven buttons
+     stretched edge to edge sat hundreds of pixels apart. Centred group, full-width bar. */
+  .dock{padding-left:max(0px, calc((100% - 760px) / 2));padding-right:max(0px, calc((100% - 760px) / 2));}
   /* Red only while it can actually fire. Disabled it falls back to the same dimmed
      grey as UNDO/REDO, so the dock doesn't carry a standing red warning for an action
      that isn't available - it colours up exactly when a part is selected. */
@@ -109,6 +118,13 @@
        max-height:min(420px, 66vh);overflow-y:auto;z-index:25;box-shadow:0 -8px 24px rgba(0,0,0,0.35);
        transform:translateY(8px);opacity:0;pointer-events:none;transition:.16s ease;}
   .popover.open{transform:translateY(0);opacity:1;pointer-events:auto;}
+  /* Capped and centred instead of stretched edge to edge. Full width on a desktop monitor
+     put a part's name at one side of the screen and its count at the other, and spread
+     each grid end's buttons away from its own label. Things that belong together have to
+     sit within one glance. The shape picker gets more room: it is a grid of tiles. */
+  .popover{margin-left:auto;margin-right:auto;max-width:440px;}
+  #popShapes{max-width:680px;}
+  #popCut{max-width:400px;}
   .popoverhead{padding:10px 14px;font-size:10px;letter-spacing:1.2px;color:var(--dim);
        border-bottom:1px solid var(--edge);
        display:flex;align-items:center;justify-content:space-between;gap:12px;}
@@ -135,13 +151,16 @@
   #jobname{width:100%;box-sizing:border-box;font-family:inherit;font-size:11px;
        background:var(--panel2);color:var(--text);border:1px solid var(--edge);border-radius:6px;padding:8px;}
   /* Cut list in the 3D view: same rows the sheet prints, as plain HTML. */
-  .cutrow{display:flex;align-items:baseline;gap:8px;font-size:10.5px;padding:3px 0;
+  /* Name, a dotted leader, then the count - the way a printed parts list carries the eye
+     across a row. The port configuration runs underneath on its own line, because it is
+     what identifies the mould: quieter, but always present. */
+  .cutrow{display:grid;grid-template-columns:minmax(0,max-content) minmax(12px,1fr) auto;
+       align-items:baseline;column-gap:6px;font-size:10.5px;padding:4px 0;
        border-bottom:1px solid var(--edge);}
-  .cutrow .nm{flex:1;color:var(--text);}
-  /* The port configuration is what identifies the mould, so it sits with the name rather
-     than being something you look up elsewhere - quieter, but always present. */
-  .cutrow .pc{display:block;font-size:9px;color:var(--dim);letter-spacing:.3px;margin-top:1px;}
-  .cutrow .qt{color:var(--acc);font-weight:700;}
+  .cutrow .nm{color:var(--text);}
+  .cutrow .lead{align-self:end;margin-bottom:4px;border-bottom:1px dotted var(--edge);}
+  .cutrow .qt{color:var(--acc);font-weight:700;text-align:right;}
+  .cutrow .pc{grid-column:1 / -1;font-size:9px;color:var(--dim);letter-spacing:.3px;margin-top:1px;}
   .cuttotal{font-size:9.5px;color:var(--dim);padding-top:8px;}
   #savedata{width:100%;height:90px;box-sizing:border-box;font-family:inherit;font-size:9.5px;
        background:var(--panel2);color:var(--text);border:1px solid var(--edge);border-radius:6px;
@@ -155,7 +174,13 @@
      same pill, none of which said which was a choice and which was a thing that happens.
      It also inherited the 3D bar's floating vertical positioning and had to fight it. */
   .rig2d .sheetbar{flex:none;display:flex;align-items:center;gap:12px;flex-wrap:wrap;
-       padding:9px 12px;border-bottom:1px solid var(--edge);background:var(--panel);}
+       border-bottom:1px solid var(--edge);background:var(--panel);
+       /* Side padding tracks the sheet's own width (it caps at 1000px, centred), so on a
+          wide screen the toolbar's ends line up with the drawing's edges instead of the
+          layer control and the export buttons sitting at opposite ends of the monitor. */
+       padding:9px max(12px, calc((100% - 1000px) / 2));}
+  #sheetSvg.zoomed{cursor:grab;}
+  #sheetSvg.zoomed.panning{cursor:grabbing;}
   .sbLabel{flex:none;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dimmer,var(--dim));}
   /* Segmented control: choosing a layer is picking one of a set, and one connected group
      says that where separate pills say "three unrelated buttons". Same labels as the 3D
@@ -185,7 +210,9 @@
      scrolled, which is no way to read a drawing. The ratio lets the browser shrink the
      width when height is the binding limit, so the paper never ends up wider than the
      drawing printed on it. */
-  #sheetSvg{display:block;background:#f7f4ec;aspect-ratio:1000/760;
+  /* touch-action:none hands every finger on the sheet to its own zoom/pan, instead of
+     letting Safari scroll or page-zoom the whole app underneath the gesture. */
+  #sheetSvg{display:block;background:#f7f4ec;aspect-ratio:1000/760;touch-action:none;
        width:min(100%,1000px);height:auto;max-height:100%;
        box-shadow:0 2px 14px rgba(0,0,0,0.4);}
   /* Print: hide the app chrome by visibility (not display) so the sheet's own layout is
@@ -225,6 +252,11 @@
       <span class="sbLabel">Layer</span>
       <span class="seg" id="layerPicker"></span>
       <span class="sbStat" id="layerstat"></span>
+      <span class="seg" title="Zoom - pinch, scroll or drag on the sheet; double-tap to fit">
+        <button id="sheetZoomOut" title="Zoom out">−</button>
+        <button id="sheetZoomPct" title="Fit the whole sheet">100%</button>
+        <button id="sheetZoomIn" title="Zoom in">+</button>
+      </span>
       <span class="sbActs">
         <button class="sbBtn" id="printbtn">Print</button>
         <button class="sbBtn primary" id="pngbtn">Export PNG</button>
@@ -256,36 +288,33 @@
     <div class="boardrow">
       <div class="gridhead"><span class="lbl">JOB NAME</span></div>
       <input type="text" id="jobname" placeholder="e.g. Harbour piece, north wing" />
-      <div class="gridaxis">
-        <div class="gridhead"><span class="lbl">COLUMNS</span><span class="num" id="numCols">5</span></div>
-        <div class="gridends">
-          <span class="end"><span class="endlbl">WEST</span>
-            <button data-axis="x" data-side="lo" data-d="-1">−</button><button data-axis="x" data-side="lo" data-d="1">+</button></span>
-          <span class="end"><span class="endlbl">EAST</span>
-            <button data-axis="x" data-side="hi" data-d="-1">−</button><button data-axis="x" data-side="hi" data-d="1">+</button></span>
-        </div>
-      </div>
-      <div class="gridaxis">
-        <div class="gridhead"><span class="lbl">ROWS</span><span class="num" id="numRows">5</span></div>
-        <div class="gridends">
-          <span class="end"><span class="endlbl">SOUTH</span>
-            <button data-axis="y" data-side="lo" data-d="-1">−</button><button data-axis="y" data-side="lo" data-d="1">+</button></span>
-          <span class="end"><span class="endlbl">NORTH</span>
-            <button data-axis="y" data-side="hi" data-d="-1">−</button><button data-axis="y" data-side="hi" data-d="1">+</button></span>
-        </div>
-      </div>
-      <div class="gridaxis">
-        <div class="gridhead"><span class="lbl">LAYERS</span><span class="num" id="numLayers">3</span></div>
-        <div class="gridends">
-          <span class="end"><span class="endlbl">BELOW</span>
-            <button data-axis="z" data-side="lo" data-d="-1">−</button><button data-axis="z" data-side="lo" data-d="1">+</button></span>
-          <span class="end"><span class="endlbl">ON TOP</span>
-            <button data-axis="z" data-side="hi" data-d="-1">−</button><button data-axis="z" data-side="hi" data-d="1">+</button></span>
-        </div>
+      <div class="gridtable">
+        <span class="gt-axis">Columns</span>
+        <span class="gt-end">West</span>
+        <span class="gt-btns"><button data-axis="x" data-side="lo" data-d="-1" title="Remove the west column">−</button><button data-axis="x" data-side="lo" data-d="1" title="Add a column on the west">+</button></span>
+        <span class="gt-num" id="numCols">5</span>
+        <span class="gt-btns"><button data-axis="x" data-side="hi" data-d="-1" title="Remove the east column">−</button><button data-axis="x" data-side="hi" data-d="1" title="Add a column on the east">+</button></span>
+        <span class="gt-end hi">East</span>
+
+        <span class="gt-axis">Rows</span>
+        <span class="gt-end">South</span>
+        <span class="gt-btns"><button data-axis="y" data-side="lo" data-d="-1" title="Remove the south row">−</button><button data-axis="y" data-side="lo" data-d="1" title="Add a row on the south">+</button></span>
+        <span class="gt-num" id="numRows">5</span>
+        <span class="gt-btns"><button data-axis="y" data-side="hi" data-d="-1" title="Remove the north row">−</button><button data-axis="y" data-side="hi" data-d="1" title="Add a row on the north">+</button></span>
+        <span class="gt-end hi">North</span>
+
+        <span class="gt-axis">Layers</span>
+        <span class="gt-end">Below</span>
+        <span class="gt-btns"><button data-axis="z" data-side="lo" data-d="-1" title="Remove the bottom layer">−</button><button data-axis="z" data-side="lo" data-d="1" title="Add a layer below">+</button></span>
+        <span class="gt-num" id="numLayers">3</span>
+        <span class="gt-btns"><button data-axis="z" data-side="hi" data-d="-1" title="Remove the top layer">−</button><button data-axis="z" data-side="hi" data-d="1" title="Add a layer on top">+</button></span>
+        <span class="gt-end hi">Top</span>
       </div>
       <div class="gridnote" id="gridnote">Each end grows or shrinks on its own. Removing an end is refused while parts sit there.</div>
-      <button class="btn" id="exportbtn">Export to file</button>
-      <button class="btn" id="importbtn">Import from file</button>
+      <div class="btnpair">
+        <button class="btn" id="exportbtn">Export to file</button>
+        <button class="btn" id="importbtn">Import from file</button>
+      </div>
       <input type="file" id="importfile" accept="application/json,.json" style="display:none;" />
       <span id="savestat">Autosaves as you build.</span>
     </div>
@@ -1326,11 +1355,70 @@ function hasPortOnLayer(part, z){
   return part.ports.some(function(p){ return portCell(part, p.dir).z===z; });
 }
 var OFF_PORT_ISO_OPACITY=0.32;   // a floor the part only passes through, owning no port
+// Section dot diameter as a multiple of the pipe's drawn width. At exactly 1x it was
+// faint on every screen the owner tried. 1.5x reads clearly while staying well under a
+// port mark (which carries a coloured core and a dark outline on top of its radius) and
+// under the up-mark's ringed dot - solid ink, no outline, no ring, so it can't be taken
+// for a connection. Both it and the ports scale with cell size, so the gap holds at
+// every grid size.
+var SECTION_DOT_SCALE=1.5;
+
+/* ---------- zoom and pan on the sheet --------------------------------------------------
+   Done by moving the SVG's viewBox, not by scaling the element with a CSS transform: the
+   sheet is vector, and a transformed element can be rasterised and then stretched (Safari
+   does this), which would blur exactly the fine detail you zoom in to read. The view keeps
+   the sheet's own 1000:760 proportion at every zoom, so it never distorts (a short stage can still letterbox the box - sheetFrame allows for that),
+   and it can't be dragged off the paper. Print and PNG export always use the whole sheet,
+   whatever the zoom - they are of the drawing, not of where you happen to be looking. */
+var SHEET_ZOOM_MAX=8;
+var sheetView={x:0, y:0, w:SHEET_W};
+function sheetViewH(v){ return v.w*SHEET_H/SHEET_W; }
+function clampSheetView(v){
+  v.w=Math.max(SHEET_W/SHEET_ZOOM_MAX, Math.min(SHEET_W, v.w));
+  v.x=Math.max(0, Math.min(SHEET_W-v.w, v.x));
+  v.y=Math.max(0, Math.min(SHEET_H-sheetViewH(v), v.y));
+  return v;
+}
+function applySheetView(){
+  var svg=document.getElementById("sheetSvg");
+  svg.setAttribute("viewBox", sheetView.x.toFixed(2)+" "+sheetView.y.toFixed(2)+" "+
+    sheetView.w.toFixed(2)+" "+sheetViewH(sheetView).toFixed(2));
+  var pct=document.getElementById("sheetZoomPct");
+  if(pct) pct.textContent=Math.round(SHEET_W/sheetView.w*100)+"%";
+  svg.classList.toggle("zoomed", sheetView.w < SHEET_W-0.5);
+}
+// Screen-to-sheet mapping for a given view. Honours preserveAspectRatio "meet" rather than
+// assuming the element box matches the view exactly, so a sub-pixel difference in the
+// element's size can't accumulate into drift during a long pinch.
+function sheetFrame(v){
+  var r=document.getElementById("sheetSvg").getBoundingClientRect(), h=sheetViewH(v);
+  var s=Math.min(r.width/v.w, r.height/h);
+  return {s:s, ox:r.left+(r.width-v.w*s)/2, oy:r.top+(r.height-h*s)/2};
+}
+function sheetPointFromClient(cx, cy, v){
+  var f=sheetFrame(v);
+  return {x:v.x+(cx-f.ox)/f.s, y:v.y+(cy-f.oy)/f.s};
+}
+// Zoom to a new view width with sheet point p held exactly under screen point (cx,cy), so
+// whatever you pinch or point at stays put - the same feel as the 3D view's wheel zoom.
+function zoomSheetAt(newW, p, cx, cy){
+  var v={w:Math.max(SHEET_W/SHEET_ZOOM_MAX, Math.min(SHEET_W, newW)), x:0, y:0};
+  var f=sheetFrame(v);
+  v.x=p.x-(cx-f.ox)/f.s; v.y=p.y-(cy-f.oy)/f.s;
+  sheetView=clampSheetView(v);
+  applySheetView();
+}
+function zoomSheetBy(factor){          // the toolbar buttons zoom about the middle of the view
+  var r=document.getElementById("sheetSvg").getBoundingClientRect();
+  var p={x:sheetView.x+sheetView.w/2, y:sheetView.y+sheetViewH(sheetView)/2};
+  zoomSheetAt(sheetView.w/factor, p, r.left+r.width/2, r.top+r.height/2);
+}
+function fitSheet(){ sheetView={x:0, y:0, w:SHEET_W}; applySheetView(); }
 
 function drawSheet(layerParts){
   var svg=document.getElementById("sheetSvg");
   while(svg.firstChild) svg.removeChild(svg.firstChild);
-  svg.setAttribute("viewBox","0 0 "+SHEET_W+" "+SHEET_H);
+  applySheetView();   // the drawing always spans the whole sheet; zoom only moves the view
   svg.appendChild(sEl("rect",{x:0,y:0,width:SHEET_W,height:SHEET_H,fill:PAPER}));
   svg.appendChild(sEl("rect",{x:SHEET_MARGIN,y:SHEET_MARGIN,
     width:SHEET_W-2*SHEET_MARGIN, height:SHEET_H-2*SHEET_MARGIN,
@@ -1452,8 +1540,9 @@ function drawPlanPanel(svg,x,y,w,h,label,layerParts){
       // No port on this floor and no line drawn either: the pipe simply passes through.
       // A solid dot at the pipe's own diameter reads as what it is - a section cut, the
       // view straight down the bore. Owner's call, and it is what a plan drawing does.
+      // Padded past the pipe's exact width (see SECTION_DOT_SCALE) - at 1x it was faint.
       if(!here.length) svg.appendChild(sEl("circle",{cx:cc.x, cy:cc.y,
-        r:(chanW/2).toFixed(2), fill:INK}));
+        r:(chanW*SECTION_DOT_SCALE/2).toFixed(2), fill:INK}));
       if(showPlanThumbs) drawCellThumbnail(svg, part, cc.x-cs/2, cc.y-cs/2, cs);
     });
   });
@@ -1661,12 +1750,12 @@ function renderCutListPanel(){
   host.innerHTML="";
   rows.forEach(function(r){
     var d=document.createElement("div"); d.className="cutrow";
-    var n=document.createElement("span"); n.className="nm";
-    n.textContent=r.name;
-    var pc=document.createElement("span"); pc.className="pc"; pc.textContent=r.ports;
-    n.appendChild(pc);
+    var n=document.createElement("span"); n.className="nm"; n.textContent=r.name;
+    var ld=document.createElement("span"); ld.className="lead";   // dotted leader to the count
     var q=document.createElement("span"); q.className="qt"; q.textContent="×"+r.count;
-    d.appendChild(n); d.appendChild(q); host.appendChild(d);
+    var pc=document.createElement("span"); pc.className="pc"; pc.textContent=r.ports;
+    d.appendChild(n); d.appendChild(ld); d.appendChild(q); d.appendChild(pc);
+    host.appendChild(d);
   });
   var t=document.createElement("div"); t.className="cuttotal";
   t.textContent=rows.length+" distinct part(s) · "+parts.length+" total across "+
@@ -1685,6 +1774,8 @@ function exportSheetPNG(){
   var clone=svg.cloneNode(true);
   clone.setAttribute("xmlns","http://www.w3.org/2000/svg");
   clone.setAttribute("width",SHEET_W); clone.setAttribute("height",SHEET_H);
+  // The clone carries whatever view you were zoomed to; the export is of the whole sheet.
+  clone.setAttribute("viewBox","0 0 "+SHEET_W+" "+SHEET_H);
   var url=URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(clone)],
                                        {type:"image/svg+xml;charset=utf-8"}));
   var img=new Image();
@@ -2558,7 +2649,7 @@ document.getElementById("exportbtn").addEventListener("click", function(){
   var name=exportBoardFile();
   document.getElementById("savestat").textContent="Exported "+name;
 });
-[].slice.call(document.querySelectorAll(".gridends button")).forEach(function(b){
+[].slice.call(document.querySelectorAll(".gridtable button")).forEach(function(b){
   b.addEventListener("click", function(){
     var err=nudgeGrid(b.getAttribute("data-axis"), b.getAttribute("data-side"),
                       parseInt(b.getAttribute("data-d"),10));
@@ -2707,6 +2798,90 @@ document.getElementById("dockCut").addEventListener("click", function(){
 });
 document.getElementById("pngbtn").addEventListener("click", exportSheetPNG);
 document.getElementById("printbtn").addEventListener("click", function(){ window.print(); });
+// Print the whole sheet however far in you're zoomed, then put the view back. Listening
+// for the print events rather than wrapping the button catches Cmd-P and Share > Print too.
+var viewBeforePrint=null;
+window.addEventListener("beforeprint", function(){
+  viewBeforePrint=sheetView; sheetView={x:0, y:0, w:SHEET_W}; applySheetView();
+});
+window.addEventListener("afterprint", function(){
+  if(viewBeforePrint){ sheetView=viewBeforePrint; viewBeforePrint=null; applySheetView(); }
+});
+document.getElementById("sheetZoomIn").addEventListener("click", function(){ zoomSheetBy(1.5); });
+document.getElementById("sheetZoomOut").addEventListener("click", function(){ zoomSheetBy(1/1.5); });
+document.getElementById("sheetZoomPct").addEventListener("click", fitSheet);
+
+// Sheet gestures: one finger or the mouse drags, two fingers pinch (and pan around their
+// midpoint), the wheel zooms about the cursor, a quick double-tap fits the whole sheet.
+// Nothing is edited on the sheet, so a single finger has no other job to compete with.
+(function(){
+  var svg=document.getElementById("sheetSvg");
+  var sp=new Map(), g=null, lastTap=null;
+  function startPan(pt){
+    g={type:"pan", sx:pt.x, sy:pt.y, v0:{x:sheetView.x, y:sheetView.y, w:sheetView.w}, moved:0};
+  }
+  svg.addEventListener("pointerdown", function(e){
+    e.preventDefault();
+    // Same self-heal as the 3D rig: iPad can swallow the end event for one finger of a
+    // two-finger gesture, leaving a stale pointer that would turn the next single-finger
+    // drag into a phantom pinch. No gesture running + leftover pointers = stale.
+    if(!g && sp.size>0 && !sp.has(e.pointerId)) sp.clear();
+    try{ svg.setPointerCapture(e.pointerId); }catch(err){}
+    sp.set(e.pointerId, {x:e.clientX, y:e.clientY});
+    if(sp.size===1){ startPan({x:e.clientX, y:e.clientY}); svg.classList.add("panning"); }
+    else if(sp.size===2){
+      var a=Array.from(sp.values());
+      var mx=(a[0].x+a[1].x)/2, my=(a[0].y+a[1].y)/2;
+      g={type:"pinch", d0:Math.hypot(a[0].x-a[1].x, a[0].y-a[1].y)||1,
+         p:sheetPointFromClient(mx, my, sheetView), w0:sheetView.w};
+    }
+  });
+  svg.addEventListener("pointermove", function(e){
+    if(!sp.has(e.pointerId) || !g) return;
+    e.preventDefault();
+    sp.set(e.pointerId, {x:e.clientX, y:e.clientY});
+    if(g.type==="pinch" && sp.size>=2){
+      var a=Array.from(sp.values());
+      var d=Math.hypot(a[0].x-a[1].x, a[0].y-a[1].y)||1;
+      zoomSheetAt(g.w0*g.d0/d, g.p, (a[0].x+a[1].x)/2, (a[0].y+a[1].y)/2);
+    } else if(g.type==="pan"){
+      var dx=e.clientX-g.sx, dy=e.clientY-g.sy;
+      g.moved=Math.max(g.moved, Math.hypot(dx,dy));
+      var f=sheetFrame(g.v0);
+      sheetView=clampSheetView({x:g.v0.x-dx/f.s, y:g.v0.y-dy/f.s, w:g.v0.w});
+      applySheetView();
+    }
+  });
+  function end(e){
+    if(!sp.has(e.pointerId)) return;
+    sp.delete(e.pointerId);
+    if(g && g.type==="pinch"){
+      // Lifting one finger of a pinch hands over to a pan from the finger still down,
+      // rather than freezing until you lift and press again.
+      if(sp.size===1){ startPan(Array.from(sp.values())[0]); g.moved=99; }
+      else if(sp.size===0){ g=null; svg.classList.remove("panning"); }
+      return;
+    }
+    if(g && g.type==="pan" && sp.size===0){
+      if(g.moved<6 && e.type==="pointerup"){
+        var now=Date.now();
+        if(lastTap && now-lastTap.t<350 && Math.hypot(e.clientX-lastTap.x, e.clientY-lastTap.y)<30){
+          fitSheet(); lastTap=null;
+        } else lastTap={t:now, x:e.clientX, y:e.clientY};
+      }
+      g=null; svg.classList.remove("panning");
+    }
+  }
+  svg.addEventListener("pointerup", end);
+  svg.addEventListener("pointercancel", end);
+  svg.addEventListener("auxclick", function(e){ if(e.button===1) e.preventDefault(); });
+  svg.addEventListener("wheel", function(e){
+    e.preventDefault();
+    var dy=e.deltaY*(e.deltaMode===1 ? 16 : e.deltaMode===2 ? 400 : 1);
+    var p=sheetPointFromClient(e.clientX, e.clientY, sheetView);
+    zoomSheetAt(sheetView.w*Math.exp(dy*0.0015), p, e.clientX, e.clientY);
+  }, {passive:false});
+})();
 document.getElementById("jobname").addEventListener("input", function(){
   jobName=this.value;
   autosave(); render();   // the title block reads it, so the sheet redraws with it
