@@ -288,8 +288,8 @@
   <p class="standfirst">Where the build stands, what comes next, and the two things
   that are still waiting on a decision from you.</p>
   <div class="meta">
-    <span><b>Updated</b> 7 Sep 2026</span>
-    <span><b>Build</b> vertical slice · 2,730 lines</span>
+    <span><b>Updated</b> 15 Sep 2026</span>
+    <span><b>Build</b> vertical slice &middot; 3,103 lines</span>
     <span><b>Catalogue</b> 39 of 39 parts</span>
     <span><b>Live</b> perhoinc.github.io/pipegrid</span>
   </div>
@@ -347,20 +347,9 @@
 
   <ol class="road">
     <li>
-      <span class="num">01<span class="when">added<br>3 Sep</span></span>
+      <span class="num">01<span class="when">added<br>7 Sep</span></span>
       <div class="item">
-        <h3>Risers, and drawing a part that crosses floors<span class="tag next">recommended next</span></h3>
-        <p>The mechanics already work — a run pointing upward is a riser, and that arrived
-        with the multi-cell work. What is left is the drawing: showing a part on every
-        floor it passes through. That part is designed already — full height shown, the
-        current floor solid, the rest ghosted, and no port at all on the middle floors,
-        since a port there would claim a connection that does not exist on that floor.</p>
-      </div>
-    </li>
-    <li>
-      <span class="num">02<span class="when">added<br>7 Sep</span></span>
-      <div class="item">
-        <h3>Selecting more than one thing at a time</h3>
+        <h3>Selecting more than one thing at a time<span class="tag next">recommended next</span></h3>
         <p>Everything today acts on exactly one part: the gizmo, delete, the length grips.
         Selecting several would make delete, move and rotate work on a group — and it is
         what copy and paste needs underneath it.</p>
@@ -372,9 +361,9 @@
       </div>
     </li>
     <li>
-      <span class="num">03<span class="when">added<br>7 Sep</span></span>
+      <span class="num">02<span class="when">added<br>7 Sep</span></span>
       <div class="item">
-        <h3>Copy and paste<span class="tag blocked">needs 02</span></h3>
+        <h3>Copy and paste<span class="tag blocked">needs 01</span></h3>
         <p>Repeat an assembly you have already worked out instead of rebuilding it cell by
         cell. For modular pieces this is probably the biggest single saving on the list.</p>
         <p>The real question is <b>where a paste lands</b>: offset a cell from the original,
@@ -385,7 +374,7 @@
       </div>
     </li>
     <li>
-      <span class="num">04<span class="when">added<br>31 Aug</span></span>
+      <span class="num">03<span class="when">added<br>31 Aug</span></span>
       <div class="item">
         <h3>Trace mode</h3>
         <p>Follow the flow through a finished layout and see where it actually goes. Your
@@ -394,16 +383,16 @@
       </div>
     </li>
     <li>
-      <span class="num">05<span class="when">added<br>21 Aug</span></span>
+      <span class="num">04<span class="when">added<br>21 Aug</span></span>
       <div class="item">
-        <h3>Valves, and what flow does at a junction<span class="tag blocked">needs 04</span></h3>
+        <h3>Valves, and what flow does at a junction<span class="tag blocked">needs 03</span></h3>
         <p>A valve part, and the logic that goes with it — a merge behaves like an
         <em>or</em>, a valve like a <em>not</em> or an <em>and</em>. Parked since before
         the catalogue work, and it needs trace mode underneath it.</p>
       </div>
     </li>
     <li>
-      <span class="num">06<span class="when">added<br>21 Aug</span></span>
+      <span class="num">05<span class="when">added<br>21 Aug</span></span>
       <div class="item">
         <h3>Exploded stack view<span class="tag parked">parked</span></h3>
         <p>The whole stack pulled apart along its vertical axis, so you can see every floor
@@ -411,7 +400,7 @@
       </div>
     </li>
     <li>
-      <span class="num">07<span class="when">added<br>25 Aug</span></span>
+      <span class="num">06<span class="when">added<br>25 Aug</span></span>
       <div class="item">
         <h3>Pipe treatment in 3D<span class="tag parked">after mechanics</span></h3>
         <p>See the open question above. Deliberately behind the mechanics work, per your
@@ -424,10 +413,21 @@
 <section>
   <div class="shead">
     <h2>Just settled</h2>
-    <span class="count">the cut list</span>
+    <span class="count">newest first</span>
   </div>
 
   <div class="resolved">
+    <h3>How a pipe passing through a floor is drawn</h3>
+    <span class="when"><b>settled</b> 15 Sep</span>
+    <p><b>Plan:</b> a port mark where the part has a port on that floor; otherwise a solid
+    dot showing the pipe cut through. The dot is one and a half times the pipe&rsquo;s width
+    &mdash; at exactly the pipe&rsquo;s width it was faint on every screen &mdash; and stays
+    solid ink with no outline, so it cannot be read as a port.</p>
+    <p><b>Isometric:</b> the part at its full height on every floor it touches, dimmed on
+    floors where it owns no port.</p>
+    <p><b>Outlets are grey on the sheet</b> now, matching the 3D view.</p>
+  </div>
+  <div class="resolved" style="margin-top:14px;">
     <h3>Four decisions closed</h3>
     <span class="when"><b>settled</b> 7 Sep</span>
     <p><b>The 12&times;12&times;12 slowdown stays.</b> Not worth losing the ability to see
@@ -476,8 +476,8 @@
     and also the fewest pieces possible for any length. The drag and the dividing are one
     gesture rather than two features: a cast stops at three, so without the dividing a drag
     would simply hit a wall.</p>
-    <p><b>A riser already works</b> as a run pointing upward. Only the drawing side is left,
-    which is item 01.</p>
+    <p><b>A riser already works</b> as a run pointing upward, and since 10 Sep it is drawn on
+    every floor it crosses.</p>
   </div>
   <div class="resolved" style="margin-top:14px;">
     <h3>Settled earlier</h3>
@@ -499,6 +499,12 @@
   <p class="sblurb">All live on the iPad build.</p>
 
   <ul class="shipped">
+    <li><span class="dot"></span><div>Zoom and pan on the sheet<span class="when">15 Sep</span>
+      <small>Pinch, scroll or drag; double-tap to fit; print and PNG stay whole</small></div></li>
+    <li><span class="dot"></span><div>Tighter menus on big screens<span class="when">15 Sep</span>
+      <small>Grid controls in one table, cut list with leaders, centred dock</small></div></li>
+    <li><span class="dot"></span><div>Parts drawn on every floor they cross<span class="when">10 Sep</span>
+      <small>Section dot where a pipe passes through; full height, dimmed, in isometric</small></div></li>
     <li><span class="dot"></span><div>Multi-cell straights<span class="when">6 Sep</span>
       <small>1, 2 or 3 cells; drag either end, longer runs divide themselves</small></div></li>
     <li><span class="dot"></span><div>Port configuration in the cut list<span class="when">5 Sep</span>
