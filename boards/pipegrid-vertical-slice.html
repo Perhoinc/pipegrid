@@ -203,17 +203,20 @@
   /* The sheet is a DRAWING, not a screen view: it keeps its own ink-on-paper palette in
      both themes and sits on a neutral desk surround, so what you see is what prints.
      Scrolls rather than squashing - a drawing that reflows isn't a drawing. */
-  .rig2d .sheetwrap{flex:1;min-height:0;overflow:auto;background:#3a3a38;padding:12px;
-       display:flex;align-items:center;justify-content:center;}
-  /* aspect-ratio alongside BOTH max constraints is what makes the whole sheet visible at
-     once: with width alone the page runs off the bottom of a short stage and has to be
-     scrolled, which is no way to read a drawing. The ratio lets the browser shrink the
-     width when height is the binding limit, so the paper never ends up wider than the
-     drawing printed on it. */
+  /* The wrap is the window and the sheet is a page inside it that genuinely gets bigger as
+     you zoom. It used to be a fixed-size box with a moving viewBox, which the owner read
+     exactly right: peering through a little window where the paper never grew and only the
+     slice visible through it changed. No padding here - an absolutely positioned child
+     ignores it - so the margin around the page comes out of the fit calculation instead. */
+  .rig2d .sheetwrap{flex:1;min-height:0;overflow:hidden;position:relative;background:#3a3a38;}
   /* touch-action:none hands every finger on the sheet to its own zoom/pan, instead of
-     letting Safari scroll or page-zoom the whole app underneath the gesture. */
-  #sheetSvg{display:block;background:#f7f4ec;aspect-ratio:1000/760;touch-action:none;
-       width:min(100%,1000px);height:auto;max-height:100%;
+     letting Safari scroll or page-zoom the whole app underneath the gesture. Width is set
+     in pixels by applySheetZoom and aspect-ratio supplies the height, so the page keeps its
+     1000:760 proportion. Only ever TRANSLATED, never scaled by transform: a scaled SVG can
+     be rasterised and then stretched, blurring the very detail you zoomed in to read,
+     whereas resizing the element re-renders it crisp. */
+  #sheetSvg{display:block;position:absolute;left:0;top:0;transform-origin:0 0;
+       background:#f7f4ec;aspect-ratio:1000/760;height:auto;touch-action:none;
        box-shadow:0 2px 14px rgba(0,0,0,0.4);}
   /* Print: hide the app chrome by visibility (not display) so the sheet's own layout is
      never re-flowed by its ancestors collapsing, then lift the sheet to the page origin. */
@@ -221,7 +224,9 @@
     body *{visibility:hidden;}
     #sheetwrap, #sheetwrap *{visibility:visible;}
     #sheetwrap{position:fixed;left:0;top:0;width:100%;padding:0;background:#fff;overflow:visible;}
-    #sheetSvg{width:100%;max-width:none;box-shadow:none;}
+    /* Beats the inline width and offset that the zoom leaves on the element. */
+    #sheetSvg{position:static !important;transform:none !important;
+         width:100% !important;max-width:none;box-shadow:none;}
   }
 
   table{border-collapse:collapse;width:100%;font-size:10.5px;}
@@ -1364,61 +1369,67 @@ var OFF_PORT_ISO_OPACITY=0.32;   // a floor the part only passes through, owning
 var SECTION_DOT_SCALE=1.5;
 
 /* ---------- zoom and pan on the sheet --------------------------------------------------
-   Done by moving the SVG's viewBox, not by scaling the element with a CSS transform: the
-   sheet is vector, and a transformed element can be rasterised and then stretched (Safari
-   does this), which would blur exactly the fine detail you zoom in to read. The view keeps
-   the sheet's own 1000:760 proportion at every zoom, so it never distorts (a short stage can still letterbox the box - sheetFrame allows for that),
-   and it can't be dragged off the paper. Print and PNG export always use the whole sheet,
-   whatever the zoom - they are of the drawing, not of where you happen to be looking. */
-var SHEET_ZOOM_MAX=8;
-var sheetView={x:0, y:0, w:SHEET_W};
-function sheetViewH(v){ return v.w*SHEET_H/SHEET_W; }
-function clampSheetView(v){
-  v.w=Math.max(SHEET_W/SHEET_ZOOM_MAX, Math.min(SHEET_W, v.w));
-  v.x=Math.max(0, Math.min(SHEET_W-v.w, v.x));
-  v.y=Math.max(0, Math.min(SHEET_H-sheetViewH(v), v.y));
-  return v;
+   The sheet is a PAGE that gets bigger, not a window you peer through. Zooming sets the
+   SVG element's own width in pixels and the wrap clips whatever spills; panning slides the
+   page behind that opening. The first version moved the viewBox inside a fixed-size box,
+   and the owner described the result exactly: a little window you could only zoom inside,
+   where the paper never grew. The element is only ever translated, never scaled by a CSS
+   transform - a scaled SVG can be rasterised and then stretched, blurring the detail you
+   zoomed in to read, whereas resizing it re-renders crisp at the new size.
+   The viewBox stays the whole sheet at every zoom, which is also why print and PNG export
+   need nothing clever: they are already of the whole drawing. */
+var SHEET_ZOOM_MAX=8, SHEET_MARGIN_PX=12;
+var sheetZoom=1, sheetPan={x:0, y:0};
+// The width at which the whole page just fits its window - this is what 100% means.
+function sheetFitW(){
+  var wrap=document.getElementById("sheetwrap");
+  var availW=Math.max(40, wrap.clientWidth-2*SHEET_MARGIN_PX);
+  var availH=Math.max(30, wrap.clientHeight-2*SHEET_MARGIN_PX);
+  return Math.min(availW, availH*SHEET_W/SHEET_H);
 }
-function applySheetView(){
-  var svg=document.getElementById("sheetSvg");
-  svg.setAttribute("viewBox", sheetView.x.toFixed(2)+" "+sheetView.y.toFixed(2)+" "+
-    sheetView.w.toFixed(2)+" "+sheetViewH(sheetView).toFixed(2));
+function applySheetZoom(){
+  var svg=document.getElementById("sheetSvg"), wrap=document.getElementById("sheetwrap");
+  var W=sheetFitW()*sheetZoom, H=W*SHEET_H/SHEET_W;
+  svg.style.width=W.toFixed(1)+"px";
+  // Centred while it fits; once it is bigger than the window, clamped to its own edges so
+  // the page can be pushed around but never wanders off into the grey.
+  sheetPan.x = W<=wrap.clientWidth ? (wrap.clientWidth-W)/2
+             : Math.max(wrap.clientWidth-W, Math.min(0, sheetPan.x));
+  sheetPan.y = H<=wrap.clientHeight ? (wrap.clientHeight-H)/2
+             : Math.max(wrap.clientHeight-H, Math.min(0, sheetPan.y));
+  svg.style.transform="translate("+sheetPan.x.toFixed(1)+"px,"+sheetPan.y.toFixed(1)+"px)";
   var pct=document.getElementById("sheetZoomPct");
-  if(pct) pct.textContent=Math.round(SHEET_W/sheetView.w*100)+"%";
-  svg.classList.toggle("zoomed", sheetView.w < SHEET_W-0.5);
+  if(pct) pct.textContent=Math.round(sheetZoom*100)+"%";
+  svg.classList.toggle("zoomed", sheetZoom>1.001);
 }
-// Screen-to-sheet mapping for a given view. Honours preserveAspectRatio "meet" rather than
-// assuming the element box matches the view exactly, so a sub-pixel difference in the
-// element's size can't accumulate into drift during a long pinch.
-function sheetFrame(v){
-  var r=document.getElementById("sheetSvg").getBoundingClientRect(), h=sheetViewH(v);
-  var s=Math.min(r.width/v.w, r.height/h);
-  return {s:s, ox:r.left+(r.width-v.w*s)/2, oy:r.top+(r.height-h*s)/2};
+// Where a point on screen falls on the page, in sheet units (0..1000 by 0..760).
+function sheetPointFromClient(cx, cy){
+  var wrap=document.getElementById("sheetwrap").getBoundingClientRect();
+  var scale=sheetFitW()*sheetZoom/SHEET_W;
+  return {x:(cx-wrap.left-sheetPan.x)/scale, y:(cy-wrap.top-sheetPan.y)/scale};
 }
-function sheetPointFromClient(cx, cy, v){
-  var f=sheetFrame(v);
-  return {x:v.x+(cx-f.ox)/f.s, y:v.y+(cy-f.oy)/f.s};
+// Zoom with one point of the page pinned under one point on screen, so whatever you pinch
+// or point at stays where it is.
+function zoomSheetAt(newZoom, p, cx, cy){
+  var wrap=document.getElementById("sheetwrap").getBoundingClientRect();
+  sheetZoom=Math.max(1, Math.min(SHEET_ZOOM_MAX, newZoom));
+  var scale=sheetFitW()*sheetZoom/SHEET_W;
+  sheetPan.x=cx-wrap.left-p.x*scale;
+  sheetPan.y=cy-wrap.top-p.y*scale;
+  applySheetZoom();
 }
-// Zoom to a new view width with sheet point p held exactly under screen point (cx,cy), so
-// whatever you pinch or point at stays put - the same feel as the 3D view's wheel zoom.
-function zoomSheetAt(newW, p, cx, cy){
-  var v={w:Math.max(SHEET_W/SHEET_ZOOM_MAX, Math.min(SHEET_W, newW)), x:0, y:0};
-  var f=sheetFrame(v);
-  v.x=p.x-(cx-f.ox)/f.s; v.y=p.y-(cy-f.oy)/f.s;
-  sheetView=clampSheetView(v);
-  applySheetView();
+function zoomSheetBy(factor){        // toolbar buttons zoom about the middle of the window
+  var wrap=document.getElementById("sheetwrap").getBoundingClientRect();
+  var cx=wrap.left+wrap.width/2, cy=wrap.top+wrap.height/2;
+  zoomSheetAt(sheetZoom*factor, sheetPointFromClient(cx,cy), cx, cy);
 }
-function zoomSheetBy(factor){          // the toolbar buttons zoom about the middle of the view
-  var r=document.getElementById("sheetSvg").getBoundingClientRect();
-  var p={x:sheetView.x+sheetView.w/2, y:sheetView.y+sheetViewH(sheetView)/2};
-  zoomSheetAt(sheetView.w/factor, p, r.left+r.width/2, r.top+r.height/2);
-}
-function fitSheet(){ sheetView={x:0, y:0, w:SHEET_W}; applySheetView(); }
+function fitSheet(){ sheetZoom=1; sheetPan={x:0, y:0}; applySheetZoom(); }
 
 function drawSheet(layerParts){
   var svg=document.getElementById("sheetSvg");
   while(svg.firstChild) svg.removeChild(svg.firstChild);
-  applySheetView();   // the drawing always spans the whole sheet; zoom only moves the view
+  svg.setAttribute("viewBox","0 0 "+SHEET_W+" "+SHEET_H);   // always the whole drawing
+  applySheetZoom();                                          // zoom only changes its size
   svg.appendChild(sEl("rect",{x:0,y:0,width:SHEET_W,height:SHEET_H,fill:PAPER}));
   svg.appendChild(sEl("rect",{x:SHEET_MARGIN,y:SHEET_MARGIN,
     width:SHEET_W-2*SHEET_MARGIN, height:SHEET_H-2*SHEET_MARGIN,
@@ -1492,6 +1503,26 @@ function drawPlanPanel(svg,x,y,w,h,label,layerParts){
     svg.appendChild(sEl("rect",{x:c0.x-cs/2, y:c0.y-cs/2, width:cs, height:cs,
       fill:"none", stroke:LINE, "stroke-width":0.75, opacity:0.55}));
   }
+  /* Thumbnails first, so the plan's own ink draws over them instead of the other way round,
+     and only where they earn their place. One per part, not one per cell, and only for a
+     part the plan CANNOT show properly: anything with a vertical port or vertical extent
+     collapses to a ring or a dot seen from above, so the little isometric is the only thing
+     saying which way it actually goes. A part lying flat in this layer is already drawn in
+     full here - repeating it is noise, and repeating it in every cell of a multi-cell
+     straight was what cluttered the drawing: three copies of a straight line with the pipe
+     running through all of them. The whole-layer isometric panel alongside covers the rest. */
+  if(showPlanThumbs) layerParts.forEach(function(part){
+    var vertical=part.ports.some(function(p){
+      var wd=DMAPS[part.poseIdx][p.dir];
+      return wd==="U" || wd==="D";
+    }) || cellsOf(part).some(function(c){ return c.z!==activeLayer; });
+    if(!vertical) return;
+    var home=cellsOnLayer(part, activeLayer)[0];
+    if(!home) return;
+    var hc=ctr(home.x, home.y);
+    drawCellThumbnail(svg, part, hc.x-cs/2, hc.y-cs/2, cs);
+  });
+
   layerParts.forEach(function(part){
     var c=ctr(part.cell.x, part.cell.y);
     var pose=ROTS[part.poseIdx];
@@ -1543,7 +1574,6 @@ function drawPlanPanel(svg,x,y,w,h,label,layerParts){
       // Padded past the pipe's exact width (see SECTION_DOT_SCALE) - at 1x it was faint.
       if(!here.length) svg.appendChild(sEl("circle",{cx:cc.x, cy:cc.y,
         r:(chanW*SECTION_DOT_SCALE/2).toFixed(2), fill:INK}));
-      if(showPlanThumbs) drawCellThumbnail(svg, part, cc.x-cs/2, cc.y-cs/2, cs);
     });
   });
 }
@@ -1774,7 +1804,9 @@ function exportSheetPNG(){
   var clone=svg.cloneNode(true);
   clone.setAttribute("xmlns","http://www.w3.org/2000/svg");
   clone.setAttribute("width",SHEET_W); clone.setAttribute("height",SHEET_H);
-  // The clone carries whatever view you were zoomed to; the export is of the whole sheet.
+  // The live element carries the zoom as an inline width and offset; the export is of the
+  // whole drawing at its own size, so the clone starts from neither.
+  clone.removeAttribute("style");
   clone.setAttribute("viewBox","0 0 "+SHEET_W+" "+SHEET_H);
   var url=URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(clone)],
                                        {type:"image/svg+xml;charset=utf-8"}));
@@ -2800,12 +2832,19 @@ document.getElementById("pngbtn").addEventListener("click", exportSheetPNG);
 document.getElementById("printbtn").addEventListener("click", function(){ window.print(); });
 // Print the whole sheet however far in you're zoomed, then put the view back. Listening
 // for the print events rather than wrapping the button catches Cmd-P and Share > Print too.
-var viewBeforePrint=null;
+var styleBeforePrint=null;
 window.addEventListener("beforeprint", function(){
-  viewBeforePrint=sheetView; sheetView={x:0, y:0, w:SHEET_W}; applySheetView();
+  // The zoom lives in an inline width and offset on the element; clearing them lets the
+  // print stylesheet lay the page out at full width, and it goes back afterwards.
+  var svg=document.getElementById("sheetSvg");
+  styleBeforePrint={w:svg.style.width, t:svg.style.transform};
+  svg.style.width=""; svg.style.transform="";
 });
 window.addEventListener("afterprint", function(){
-  if(viewBeforePrint){ sheetView=viewBeforePrint; viewBeforePrint=null; applySheetView(); }
+  if(!styleBeforePrint) return;
+  var svg=document.getElementById("sheetSvg");
+  svg.style.width=styleBeforePrint.w; svg.style.transform=styleBeforePrint.t;
+  styleBeforePrint=null;
 });
 document.getElementById("sheetZoomIn").addEventListener("click", function(){ zoomSheetBy(1.5); });
 document.getElementById("sheetZoomOut").addEventListener("click", function(){ zoomSheetBy(1/1.5); });
@@ -2818,7 +2857,7 @@ document.getElementById("sheetZoomPct").addEventListener("click", fitSheet);
   var svg=document.getElementById("sheetSvg");
   var sp=new Map(), g=null, lastTap=null;
   function startPan(pt){
-    g={type:"pan", sx:pt.x, sy:pt.y, v0:{x:sheetView.x, y:sheetView.y, w:sheetView.w}, moved:0};
+    g={type:"pan", sx:pt.x, sy:pt.y, x0:sheetPan.x, y0:sheetPan.y, moved:0};
   }
   svg.addEventListener("pointerdown", function(e){
     e.preventDefault();
@@ -2833,7 +2872,7 @@ document.getElementById("sheetZoomPct").addEventListener("click", fitSheet);
       var a=Array.from(sp.values());
       var mx=(a[0].x+a[1].x)/2, my=(a[0].y+a[1].y)/2;
       g={type:"pinch", d0:Math.hypot(a[0].x-a[1].x, a[0].y-a[1].y)||1,
-         p:sheetPointFromClient(mx, my, sheetView), w0:sheetView.w};
+         p:sheetPointFromClient(mx, my), z0:sheetZoom};
     }
   });
   svg.addEventListener("pointermove", function(e){
@@ -2843,13 +2882,13 @@ document.getElementById("sheetZoomPct").addEventListener("click", fitSheet);
     if(g.type==="pinch" && sp.size>=2){
       var a=Array.from(sp.values());
       var d=Math.hypot(a[0].x-a[1].x, a[0].y-a[1].y)||1;
-      zoomSheetAt(g.w0*g.d0/d, g.p, (a[0].x+a[1].x)/2, (a[0].y+a[1].y)/2);
+      zoomSheetAt(g.z0*d/g.d0, g.p, (a[0].x+a[1].x)/2, (a[0].y+a[1].y)/2);
     } else if(g.type==="pan"){
       var dx=e.clientX-g.sx, dy=e.clientY-g.sy;
       g.moved=Math.max(g.moved, Math.hypot(dx,dy));
-      var f=sheetFrame(g.v0);
-      sheetView=clampSheetView({x:g.v0.x-dx/f.s, y:g.v0.y-dy/f.s, w:g.v0.w});
-      applySheetView();
+      // The page follows the finger one for one; applySheetZoom does the clamping.
+      sheetPan.x=g.x0+dx; sheetPan.y=g.y0+dy;
+      applySheetZoom();
     }
   });
   function end(e){
@@ -2878,9 +2917,14 @@ document.getElementById("sheetZoomPct").addEventListener("click", fitSheet);
   svg.addEventListener("wheel", function(e){
     e.preventDefault();
     var dy=e.deltaY*(e.deltaMode===1 ? 16 : e.deltaMode===2 ? 400 : 1);
-    var p=sheetPointFromClient(e.clientX, e.clientY, sheetView);
-    zoomSheetAt(sheetView.w*Math.exp(dy*0.0015), p, e.clientX, e.clientY);
+    var p=sheetPointFromClient(e.clientX, e.clientY);
+    zoomSheetAt(sheetZoom*Math.exp(-dy*0.0015), p, e.clientX, e.clientY);
   }, {passive:false});
+  // What 100% means depends on the window's size, so a rotation or a split-view change
+  // has to re-fit. Only while the sheet is actually up: hidden, the wrap measures zero.
+  window.addEventListener("resize", function(){
+    if(document.getElementById("rig2d").style.display==="flex") applySheetZoom();
+  });
 })();
 document.getElementById("jobname").addEventListener("input", function(){
   jobName=this.value;
