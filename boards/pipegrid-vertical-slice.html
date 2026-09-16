@@ -1359,6 +1359,13 @@ function portsAtCell(part, cell){
 function hasPortOnLayer(part, z){
   return part.ports.some(function(p){ return portCell(part, p.dir).z===z; });
 }
+// Does this part leave the floor being drawn? Only a part that does can be "passing
+// through" it, which is what separates a riser's blank middle floor - where a section dot
+// belongs - from the middle cell of a flat run, which has no port either but is already
+// drawn as a continuous line straight through.
+function crossesFloors(part){
+  return cellsOf(part).some(function(c){ return c.z!==activeLayer; });
+}
 var OFF_PORT_ISO_OPACITY=0.32;   // a floor the part only passes through, owning no port
 // Section dot diameter as a multiple of the pipe's drawn width. At exactly 1x it was
 // faint on every screen the owner tried. 1.5x reads clearly while staying well under a
@@ -1568,11 +1575,14 @@ function drawPlanPanel(svg,x,y,w,h,label,layerParts){
           stroke:up.role==="in"?ACC_INK:INK, "stroke-width":1.8}));
         svg.appendChild(sEl("circle",{cx:cc.x, cy:cc.y, r:2, fill:up.role==="in"?ACC_INK:LINE}));
       }
-      // No port on this floor and no line drawn either: the pipe simply passes through.
-      // A solid dot at the pipe's own diameter reads as what it is - a section cut, the
-      // view straight down the bore. Owner's call, and it is what a plan drawing does.
-      // Padded past the pipe's exact width (see SECTION_DOT_SCALE) - at 1x it was faint.
-      if(!here.length) svg.appendChild(sEl("circle",{cx:cc.x, cy:cc.y,
+      // A pipe passing vertically THROUGH this floor: no port here, and no line either,
+      // because a vertical stream projects to a point from above. A solid dot reads as
+      // what it is - a section cut, the view straight down the bore. Padded past the
+      // pipe's exact width (see SECTION_DOT_SCALE); at 1x it was faint on every screen.
+      // The crossesFloors test is what keeps this off a FLAT run: the middle cell of a
+      // horizontal 3-cell straight has no port either, but its pipe is already drawn
+      // straight through the cell, so a dot there is just a blemish on the line.
+      if(!here.length && crossesFloors(part)) svg.appendChild(sEl("circle",{cx:cc.x, cy:cc.y,
         r:(chanW*SECTION_DOT_SCALE/2).toFixed(2), fill:INK}));
     });
   });
