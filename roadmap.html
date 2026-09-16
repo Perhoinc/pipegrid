@@ -288,8 +288,8 @@
   <p class="standfirst">Where the build stands, what comes next, and the two things
   that are still waiting on a decision from you.</p>
   <div class="meta">
-    <span><b>Updated</b> 15 Sep 2026</span>
-    <span><b>Build</b> vertical slice &middot; 3,103 lines</span>
+    <span><b>Updated</b> 16 Sep 2026</span>
+    <span><b>Build</b> vertical slice &middot; 3,147 lines</span>
     <span><b>Catalogue</b> 39 of 39 parts</span>
     <span><b>Live</b> perhoinc.github.io/pipegrid</span>
   </div>
@@ -417,6 +417,21 @@
   </div>
 
   <div class="resolved">
+    <h3>Two corrections to the sheet</h3>
+    <span class="when"><b>settled</b> 16 Sep</span>
+    <p><b>Zoom was built wrong and is rebuilt.</b> It kept the page a fixed size and moved a
+    window across it, which felt like peering through a letterbox. The page itself now gets
+    bigger and you push it around behind the opening, the way zooming a drawing should feel.
+    It still cannot be zoomed smaller than a full page, cannot be pushed off into the grey,
+    and print and export are unaffected.</p>
+    <p><b>The little isometric in each plan square is now one per part,</b> and only for
+    parts the plan genuinely can&rsquo;t show &mdash; anything with a vertical port or
+    vertical run, which from above collapses to a ring or a dot. A part lying flat is
+    already drawn in full in the plan, and repeating it in every cell of a multi-cell
+    straight was what cluttered the drawing. The full isometric panel alongside covers the
+    rest, so nothing is lost.</p>
+  </div>
+  <div class="resolved" style="margin-top:14px;">
     <h3>How a pipe passing through a floor is drawn</h3>
     <span class="when"><b>settled</b> 15 Sep</span>
     <p><b>Plan:</b> a port mark where the part has a port on that floor; otherwise a solid
@@ -499,8 +514,10 @@
   <p class="sblurb">All live on the iPad build.</p>
 
   <ul class="shipped">
-    <li><span class="dot"></span><div>Zoom and pan on the sheet<span class="when">15 Sep</span>
-      <small>Pinch, scroll or drag; double-tap to fit; print and PNG stay whole</small></div></li>
+    <li><span class="dot"></span><div>Zoom and pan on the sheet<span class="when">16 Sep</span>
+      <small>The page itself grows; pinch, scroll or drag, double-tap to fit</small></div></li>
+    <li><span class="dot"></span><div>Less clutter in the plan<span class="when">16 Sep</span>
+      <small>One small isometric per part, only where the plan can&rsquo;t show its shape</small></div></li>
     <li><span class="dot"></span><div>Tighter menus on big screens<span class="when">15 Sep</span>
       <small>Grid controls in one table, cut list with leaders, centred dock</small></div></li>
     <li><span class="dot"></span><div>Parts drawn on every floor they cross<span class="when">10 Sep</span>
