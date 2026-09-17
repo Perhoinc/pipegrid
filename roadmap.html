@@ -285,11 +285,11 @@
 <header>
   <p class="eyebrow">Fabrication instrument · cast &amp; glazed stoneware</p>
   <h1>PIPEGRID Roadmap</h1>
-  <p class="standfirst">Where the build stands, what comes next, and the three things
+  <p class="standfirst">Where the build stands, what comes next, and the two things
   that are still waiting on a decision from you.</p>
   <div class="meta">
     <span><b>Updated</b> 17 Sep 2026</span>
-    <span><b>Build</b> vertical slice &middot; 3,157 lines</span>
+    <span><b>Build</b> vertical slice &middot; 3,173 lines</span>
     <span><b>Catalogue</b> 39 of 39 parts</span>
     <span><b>Live</b> perhoinc.github.io/pipegrid</span>
   </div>
@@ -298,27 +298,11 @@
 <section>
   <div class="shead">
     <h2>Waiting on you</h2>
-    <span class="count">3 open</span>
+    <span class="count">2 open</span>
   </div>
   <p class="sblurb">None of these block the build — I can keep going around all of them.
   But each one is a call I shouldn't make on your behalf.</p>
 
-  <div class="decision">
-    <span class="when"><b>raised</b> 17 Sep &middot; still open</span>
-    <h3>How big should a part be drawn in its plan cell?</h3>
-    <p>The plan draws a part at half the proportion the 3D view gives it: a port sits 42% of
-    the way from the cell centre to the cell edge, where in 3D it sits at 84%. That is why
-    parts look small in large cells.</p>
-    <p>It also makes multi-cell runs wrong rather than merely small. A 3-cell straight is
-    drawn <b>1.42 cells</b> long when it should be 2.84, so the pipe stops short of the cells
-    it actually fills.</p>
-    <p>Four sizes to compare, same layer in each:
-    <a href="boards/pipegrid-2d-part-scale-mockups.html">how big should a part be in its plan
-    cell</a>.</p>
-    <div class="rec"><strong>My read</strong>
-    D, matching the 3D view — the only one where a part is drawn across the cells it really
-    occupies. If it reads too heavy, size and line weight can be separated.</div>
-  </div>
 
 
 
@@ -434,6 +418,17 @@
   </div>
 
   <div class="resolved">
+    <h3>Parts now fill their cells</h3>
+    <span class="when"><b>settled</b> 17 Sep</span>
+    <p>Option D from the board: a part is drawn at the proportion the 3D view gives it, so it
+    spans the cells it genuinely occupies. A 3-cell straight measures <b>2.84 cells</b> where
+    it measured 1.42. Line weight and port size scale with it, so the drawing keeps its weight
+    instead of thinning out.</p>
+    <p>The isometric panel carried the identical fault &mdash; cells spaced twice as far apart
+    as the parts drawn inside them &mdash; so it took the same correction and the two panels
+    agree again.</p>
+  </div>
+  <div class="resolved" style="margin-top:14px;">
     <h3>Three corrections to the sheet</h3>
     <span class="when"><b>settled</b> 16 Sep</span>
     <p><b>Zoom was built wrong and is rebuilt.</b> It kept the page a fixed size and moved a
@@ -532,6 +527,8 @@
   <p class="sblurb">All live on the iPad build.</p>
 
   <ul class="shipped">
+    <li><span class="dot"></span><div>Parts fill their cells<span class="when">17 Sep</span>
+      <small>Plan and isometric draw a part across the cells it occupies</small></div></li>
     <li><span class="dot"></span><div>Zoom and pan on the sheet<span class="when">16 Sep</span>
       <small>The page itself grows; pinch, scroll or drag, double-tap to fit</small></div></li>
     <li><span class="dot"></span><div>Less clutter in the plan<span class="when">16 Sep</span>

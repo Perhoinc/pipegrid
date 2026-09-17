@@ -1293,7 +1293,13 @@ var SHEET_W=1000, SHEET_H=760, SHEET_MARGIN=22, SHEET_TB_H=76, SHEET_GAP=14;
 // paper. Everything else in the app follows the theme; this panel is the exception.
 var INK="#232a35", DIMC="#7a8494", LINE="#8a95a6", ACC_INK="#c2620f",
     PAPER="#f7f4ec", PANELBG="#fbfaf5";
-var ISO_CELL=2.0;
+/* One world unit per cell, matching the 3D rig - which is what makes a part's own geometry
+   (a port sits PR from its cell centre) come out at the right proportion here too. It was
+   2.0, which spaced the cells twice as far apart as the parts were drawn: exactly the same
+   half-scale fault the plan had, and just as visible on a multi-cell run. The panel's pixel
+   scale is derived from the mesh, so halving this changes nothing about how big the drawing
+   lands on the sheet - only how big the parts are within it. */
+var ISO_CELL=1.0;
 var REF_AZ_DEG=50, REF_EL_DEG=20;   // settled angle from pipegrid-2d-reference-sheet-mockups.html - do not change without asking
 var jobName="";                     // shown in the title block, edited in the Board popover
 var showPlanThumbs=true;            // per-cell iso overlays drawn into the plan squares
@@ -1502,7 +1508,15 @@ function drawPlanPanel(svg,x,y,w,h,label,layerParts){
   function ctr(cx,cy){ return {x:ox+(cx-GRID.x.lo)*cs+cs/2, y:oy+(GRID.y.hi-cy)*cs+cs/2}; }
   // Mark weights were tuned against the mockup's own cell size (~133px); expressed as
   // ratios of it so a 12-wide board doesn't end up drawn with 12-wide-board-sized pipes.
-  var chanW=cs*0.030, portR=cs*0.026;
+  /* Owner picked option D from pipegrid-2d-part-scale-mockups.html. PLAN_PART_SCALE is the
+     multiplier taking a part's own units into plan units. It was 0.5, which drew every part
+     at half the proportion the 3D view gives it and left a multi-cell run stopping short of
+     its own cells - a 3-cell straight measured 1.42 cells long where it should be 2.84. At
+     1.0 a part is drawn across the cells it actually occupies, and the plan and the 3D view
+     agree about how much of a cell a fitting fills. Every mark rides along on PLAN_MARK_K so
+     the drawing keeps its weight relative to the part rather than thinning out. */
+  var PLAN_PART_SCALE=1.0, PLAN_MARK_K=PLAN_PART_SCALE/0.5;
+  var chanW=cs*0.030*PLAN_MARK_K, portR=cs*0.026*PLAN_MARK_K;
 
   for(var gx=GRID.x.lo; gx<=GRID.x.hi; gx++)
   for(var gy=GRID.y.lo; gy<=GRID.y.hi; gy++){
@@ -1533,7 +1547,8 @@ function drawPlanPanel(svg,x,y,w,h,label,layerParts){
   layerParts.forEach(function(part){
     var c=ctr(part.cell.x, part.cell.y);
     var pose=ROTS[part.poseIdx];
-    function planPt(p){ var wv=matApply(pose,p); return {x:c.x+wv[0]*(cs/2), y:c.y-wv[1]*(cs/2)}; }
+    function planPt(p){ var wv=matApply(pose,p);
+      return {x:c.x+wv[0]*cs*PLAN_PART_SCALE, y:c.y-wv[1]*cs*PLAN_PART_SCALE}; }
     // p.dir is the shape's CANONICAL/home-orientation direction, not where the port
     // actually faces after this part's pose - that's DMAPS[poseIdx][p.dir], the same
     // lookup the 3D renderer already uses. Checking p.dir directly here was a real bug:
@@ -1563,17 +1578,18 @@ function drawPlanPanel(svg,x,y,w,h,label,layerParts){
         var wd=DMAPS[part.poseIdx][p.dir];
         return wd!=="U" && wd!=="D";
       });
-      if(dn) svg.appendChild(sEl("circle",{cx:cc.x, cy:cc.y, r:cs*0.16,
-        fill:"none", stroke:LINE, "stroke-width":2, opacity:0.6}));
+      if(dn) svg.appendChild(sEl("circle",{cx:cc.x, cy:cc.y, r:cs*0.16*PLAN_MARK_K,
+        fill:"none", stroke:LINE, "stroke-width":2*PLAN_MARK_K, opacity:0.6}));
       horiz.forEach(function(p){
         var q=planPt(portLocal(part,p));
         svg.appendChild(sEl("circle",{cx:q.x.toFixed(1), cy:q.y.toFixed(1), r:portR.toFixed(2),
-          fill:p.role==="in"?ACC_INK:LINE, stroke:INK, "stroke-width":1.6}));
+          fill:p.role==="in"?ACC_INK:LINE, stroke:INK, "stroke-width":1.6*PLAN_MARK_K}));
       });
       if(up){
-        svg.appendChild(sEl("circle",{cx:cc.x, cy:cc.y, r:cs*0.11, fill:PANELBG,
-          stroke:up.role==="in"?ACC_INK:INK, "stroke-width":1.8}));
-        svg.appendChild(sEl("circle",{cx:cc.x, cy:cc.y, r:2, fill:up.role==="in"?ACC_INK:LINE}));
+        svg.appendChild(sEl("circle",{cx:cc.x, cy:cc.y, r:cs*0.11*PLAN_MARK_K, fill:PANELBG,
+          stroke:up.role==="in"?ACC_INK:INK, "stroke-width":1.8*PLAN_MARK_K}));
+        svg.appendChild(sEl("circle",{cx:cc.x, cy:cc.y, r:2*PLAN_MARK_K,
+          fill:up.role==="in"?ACC_INK:LINE}));
       }
       // A pipe passing vertically THROUGH this floor: no port here, and no line either,
       // because a vertical stream projects to a point from above. A solid dot reads as
@@ -1632,7 +1648,7 @@ function drawIsoPanel(svg,x,y,w,h,label,layerParts){
   // so on any other shape a single divisor either overflows sideways or - what actually
   // happened here first - leaves most of the panel's height empty. Same approach
   // gridFitScale() already uses for the 3D camera: project the corners, measure, fit.
-  var HEAD=0.9;   // parts reach ~PR beyond a cell centre; a little air on top of that
+  var HEAD=0.45;  // parts reach ~PR beyond a cell centre; a little air on top of that
   var exs=[], eys=[];
   [[-hx,-hy],[-hx,hy],[hx,-hy],[hx,hy]].forEach(function(c){
     [z0, ISO_CELL/2+HEAD].forEach(function(z){
