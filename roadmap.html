@@ -289,7 +289,7 @@
   that are still waiting on a decision from you.</p>
   <div class="meta">
     <span><b>Updated</b> 17 Sep 2026</span>
-    <span><b>Build</b> vertical slice &middot; 3,173 lines</span>
+    <span><b>Build</b> vertical slice &middot; 3,120 lines</span>
     <span><b>Catalogue</b> 39 of 39 parts</span>
     <span><b>Live</b> perhoinc.github.io/pipegrid</span>
   </div>
@@ -436,12 +436,11 @@
     bigger and you push it around behind the opening, the way zooming a drawing should feel.
     It still cannot be zoomed smaller than a full page, cannot be pushed off into the grey,
     and print and export are unaffected.</p>
-    <p><b>The little isometric in each plan square is now one per part,</b> and only for
-    parts the plan genuinely can&rsquo;t show &mdash; anything with a vertical port or
-    vertical run, which from above collapses to a ring or a dot. A part lying flat is
-    already drawn in full in the plan, and repeating it in every cell of a multi-cell
-    straight was what cluttered the drawing. The full isometric panel alongside covers the
-    rest, so nothing is lost.</p>
+    <p><b>The little isometric in each plan square is gone.</b> It was first cut back to one
+    per part and only where the part ran vertically; on 17 Sep it came out altogether, which
+    was the intent all along. The full isometric panel sits beside the plan on the same
+    sheet, so the small one was saying the same thing twice, and the room it gave back went
+    into drawing the parts at their true size.</p>
     <p><b>A stray dot on flat runs is gone.</b> The section mark meant for a pipe passing vertically through a floor was also landing on the middle cell of a horizontal multi-cell straight, which has no port there either but is already drawn as one line straight through the cell.</p>
   </div>
   <div class="resolved" style="margin-top:14px;">
@@ -527,6 +526,8 @@
   <p class="sblurb">All live on the iPad build.</p>
 
   <ul class="shipped">
+    <li><span class="dot"></span><div>Per-cell isometric icons removed<span class="when">17 Sep</span>
+      <small>Redundant beside the isometric panel; the space went to the parts</small></div></li>
     <li><span class="dot"></span><div>Parts fill their cells<span class="when">17 Sep</span>
       <small>Plan and isometric draw a part across the cells it occupies</small></div></li>
     <li><span class="dot"></span><div>Zoom and pan on the sheet<span class="when">16 Sep</span>

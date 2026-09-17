@@ -1302,7 +1302,6 @@ var INK="#232a35", DIMC="#7a8494", LINE="#8a95a6", ACC_INK="#c2620f",
 var ISO_CELL=1.0;
 var REF_AZ_DEG=50, REF_EL_DEG=20;   // settled angle from pipegrid-2d-reference-sheet-mockups.html - do not change without asking
 var jobName="";                     // shown in the title block, edited in the Board popover
-var showPlanThumbs=true;            // per-cell iso overlays drawn into the plan squares
 
 function refIsoProject(p){
   var az=REF_AZ_DEG*Math.PI/180, el=REF_EL_DEG*Math.PI/180;
@@ -1524,26 +1523,6 @@ function drawPlanPanel(svg,x,y,w,h,label,layerParts){
     svg.appendChild(sEl("rect",{x:c0.x-cs/2, y:c0.y-cs/2, width:cs, height:cs,
       fill:"none", stroke:LINE, "stroke-width":0.75, opacity:0.55}));
   }
-  /* Thumbnails first, so the plan's own ink draws over them instead of the other way round,
-     and only where they earn their place. One per part, not one per cell, and only for a
-     part the plan CANNOT show properly: anything with a vertical port or vertical extent
-     collapses to a ring or a dot seen from above, so the little isometric is the only thing
-     saying which way it actually goes. A part lying flat in this layer is already drawn in
-     full here - repeating it is noise, and repeating it in every cell of a multi-cell
-     straight was what cluttered the drawing: three copies of a straight line with the pipe
-     running through all of them. The whole-layer isometric panel alongside covers the rest. */
-  if(showPlanThumbs) layerParts.forEach(function(part){
-    var vertical=part.ports.some(function(p){
-      var wd=DMAPS[part.poseIdx][p.dir];
-      return wd==="U" || wd==="D";
-    }) || cellsOf(part).some(function(c){ return c.z!==activeLayer; });
-    if(!vertical) return;
-    var home=cellsOnLayer(part, activeLayer)[0];
-    if(!home) return;
-    var hc=ctr(home.x, home.y);
-    drawCellThumbnail(svg, part, hc.x-cs/2, hc.y-cs/2, cs);
-  });
-
   layerParts.forEach(function(part){
     var c=ctr(part.cell.x, part.cell.y);
     var pose=ROTS[part.poseIdx];
@@ -1601,38 +1580,6 @@ function drawPlanPanel(svg,x,y,w,h,label,layerParts){
       if(!here.length && crossesFloors(part)) svg.appendChild(sEl("circle",{cx:cc.x, cy:cc.y,
         r:(chanW*SECTION_DOT_SCALE/2).toFixed(2), fill:INK}));
     });
-  });
-}
-
-// Per-cell iso overlay drawn into the plan square itself - treatment B's thumbnails,
-// which the owner kept as a toggle DISTINCT from the whole-layer iso panel. Same settled
-// angle as that panel so the two never disagree about which way a part faces.
-function drawCellThumbnail(svg, part, ox, oy, cs){
-  var size=cs*0.34, tx=ox+cs-size/2-4, ty=oy+cs-size/2-4, sc=size*0.42;
-  svg.appendChild(sEl("rect",{x:tx-size/2, y:ty-size/2, width:size, height:size, rx:2,
-    fill:PANELBG, stroke:LINE, "stroke-width":0.75, opacity:0.92}));
-  var pose=ROTS[part.poseIdx], draw=[];
-  part.streams.forEach(function(st){
-    var vw=streamLocal(part,st,10)
-      .map(function(p){
-        var wv=matApply(pose,p), v=refIsoProject(wv);
-        return {x:tx+v.vx*sc, y:ty-v.vz*sc-v.vy*sc*0.32, d:v.vy};
-      });
-    draw.push({d:vw.reduce(function(a,p){return a+p.d;},0)/vw.length, kind:"chan", pts:vw});
-  });
-  part.ports.forEach(function(p){
-    var wv=matApply(pose,portLocal(part,p)), q=refIsoProject(wv);
-    draw.push({d:q.vy, kind:"port", x:tx+q.vx*sc, y:ty-q.vz*sc-q.vy*sc*0.32, role:p.role});
-  });
-  draw.sort(function(a,b){ return a.d-b.d; });
-  draw.forEach(function(d){
-    if(d.kind==="chan"){
-      svg.appendChild(sEl("path",{d:"M "+d.pts.map(function(p){return p.x.toFixed(1)+" "+p.y.toFixed(1);}).join(" L "),
-        fill:"none", stroke:INK, "stroke-width":1.3, "stroke-linecap":"round", opacity:0.9}));
-    } else {
-      svg.appendChild(sEl("circle",{cx:d.x.toFixed(1), cy:d.y.toFixed(1), r:1.6,
-        fill:d.role==="in"?ACC_INK:LINE, stroke:INK, "stroke-width":0.9}));
-    }
   });
 }
 
