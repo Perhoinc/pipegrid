@@ -142,6 +142,12 @@
   .btn{font-family:inherit;font-size:10px;letter-spacing:.5px;text-transform:uppercase;
        padding:8px 10px;border:1px solid var(--edge);border-radius:6px;background:var(--panel2);
        color:var(--text);cursor:pointer;}
+  /* Destructive, so it reads apart from Export/Import rather than sitting in the pair with
+     them. Not a warning though - one undo brings the whole board back, which is what
+     stands in for a confirmation here. */
+  .btn.danger{color:var(--danger);width:100%;margin-top:2px;}
+  .btn.danger:hover,.btn.danger:focus-visible{border-color:var(--danger);}
+  .btn.danger:disabled{color:var(--dim);border-color:var(--edge);cursor:default;}
   /* In the popover's header rather than among its controls: it leaves the app, so it
      isn't another thing that acts on this board - and the header is the one row that
      stays put, where a link at the end of a scrolling popover would sit below the fold. */
@@ -320,6 +326,8 @@
         <button class="btn" id="exportbtn">Export to file</button>
         <button class="btn" id="importbtn">Import from file</button>
       </div>
+      <button class="btn danger" id="clearbtn"
+              title="Delete every part. The grid stays as it is, and one undo brings the board back.">Clear all parts</button>
       <input type="file" id="importfile" accept="application/json,.json" style="display:none;" />
       <span id="savestat">Autosaves as you build.</span>
     </div>
@@ -1280,7 +1288,9 @@ function renderLayerBar(){
 // Mirrors deletePart()'s own guards exactly, so the button is never offering something
 // the action would then refuse: nothing selected, or the last part left on the board.
 function syncDeleteButton(){
-  document.getElementById("deletebtn").disabled = (gizmoPartIdx==null || parts.length<=1);
+  document.getElementById("deletebtn").disabled = (gizmoPartIdx==null);
+  var clearEl=document.getElementById("clearbtn");
+  if(clearEl) clearEl.disabled = !parts.length;
 }
 function syncGridNumbers(){
   document.getElementById("numCols").textContent=axisCount("x");
@@ -1795,8 +1805,9 @@ function renderCutListPanel(){
     host.appendChild(d);
   });
   var t=document.createElement("div"); t.className="cuttotal";
-  t.textContent=rows.length+" distinct part(s) · "+parts.length+" total across "+
-                axisCount("z")+" layer(s).";
+  t.textContent = parts.length
+    ? rows.length+" distinct part(s) · "+parts.length+" total across "+axisCount("z")+" layer(s)."
+    : "Nothing placed yet · "+axisCount("z")+" layer(s) ready.";
   host.appendChild(t);
 }
 
@@ -2025,7 +2036,10 @@ function serializeBoard(){
 function loadBoard(data, opts){
   opts=opts||{};
   if(!data || data.schema!==SAVE_SCHEMA) throw new Error("unrecognized save schema: "+(data&&data.schema));
-  if(!Array.isArray(data.parts) || data.parts.length===0) throw new Error("save data has no parts");
+  // An empty board is legal. Clear all has to survive a reload like any other state, and
+  // the autosave that follows it writes exactly this. Only a MISSING list is a broken save -
+  // an empty one is a board with nothing on it yet, which is where every board starts.
+  if(!Array.isArray(data.parts)) throw new Error("save data has no parts list");
   var newParts=data.parts.map(function(rec,idx){
     var def=SHAPES[rec.shape];
     if(!def) throw new Error("part "+idx+": unknown shape key \""+rec.shape+"\"");
@@ -2125,19 +2139,37 @@ function doUndo(){ stepHistory(history, future); }
 function doRedo(){ stepHistory(future, history); }
 
 // Deletes whichever part currently has the gizmo, if any. No-ops with nothing
-// selected, and refuses to remove the last remaining part - same guard the old
-// pop-only undo used, since loadBoard() itself requires at least one part (the
-// save schema has nowhere to represent an empty board). Safe to splice from the
+// selected. It used to refuse to remove the last remaining part, because loadBoard()
+// required at least one and the save schema had nowhere to represent an empty board;
+// both of those are gone now, so the board can be emptied. Safe to splice from the
 // middle of the array: nothing else holds onto a part's index across renders -
 // gizmoPartIdx and lastPlacement are the only persistent ones, and both get
 // cleared here regardless of which part was removed.
 function deletePart(){
-  if(gizmoPartIdx==null || parts.length<=1) return;
+  // No floor of one part any more. It was there because an empty board could not be
+  // loaded or validated; now that it can, refusing to delete the last part would just be
+  // an arbitrary stop, and inconsistent with Clear all emptying the board in one tap.
+  if(gizmoPartIdx==null) return;
   var pre=snapshot();
   parts.splice(gizmoPartIdx,1);
   gizmoPartIdx=null; gizmoDrag=null; lastPlacement=null; mode="none";
   pushHistory(pre);
   render(); runValidation();
+}
+
+// Empties the board without touching the grid: the frame you set up stays, so this is
+// "start again on the same grid", not "reset everything". One history entry, so a single
+// undo brings the whole board back - which is what stands in for a confirmation prompt
+// here, per the owner's standing call that deleting should not ask first.
+function clearAll(){
+  if(!parts.length) return 0;
+  var pre=snapshot(), n=parts.length;
+  parts=[];
+  gizmoPartIdx=null; gizmoDrag=null; lastPlacement=null; mode="none"; pts.clear();
+  selectedCell=null;
+  pushHistory(pre);
+  render(); runValidation();
+  return n;
 }
 
 function exportBoardFile(){
@@ -2684,6 +2716,13 @@ document.getElementById("resetbtn").addEventListener("click", function(){
 });
 document.getElementById("undobtn").addEventListener("click", doUndo);
 document.getElementById("redobtn").addEventListener("click", doRedo);
+document.getElementById("clearbtn").addEventListener("click", function(){
+  var cleared=clearAll();
+  var st=document.getElementById("savestat");
+  if(st) st.textContent = cleared
+    ? cleared+" part(s) cleared · undo puts them back"
+    : "Board is already empty.";
+});
 document.getElementById("exportbtn").addEventListener("click", function(){
   var name=exportBoardFile();
   document.getElementById("savestat").textContent="Exported "+name;
@@ -3026,7 +3065,7 @@ window.__pgSlice={get parts(){return parts;}, get gizmoPartIdx(){return gizmoPar
   pc:pc,   // world point -> screen point, so cellAtPoint's inverse can be checked against it
   render:function(){ render(); },
   svgPointFromClient:svgPointFromClient, serializeBoard:serializeBoard, loadBoard:loadBoard,
-  doUndo:doUndo, doRedo:doRedo, snapshot:snapshot, LS_KEY:LS_KEY};
+  doUndo:doUndo, doRedo:doRedo, snapshot:snapshot, clearAll:clearAll, LS_KEY:LS_KEY};
 
 /* ================= validation ================= */
 function badge(ok){ return '<span class="badge '+(ok?"pass":"fail")+'">'+(ok?"PASS":"FAIL")+'</span>'; }
@@ -3036,9 +3075,15 @@ function badge(ok){ return '<span class="badge '+(ok?"pass":"fail")+'">'+(ok?"PA
 function status(ok,yes,no){ return '<span class="badge" style="background:'+(ok?"#4a7fb5":"#8a95a6")+';color:#0b0d10">'+(ok?yes:no)+'</span>'; }
 function runValidation(){
   var rows=[];
-  var seed=parts[0];
-
   rows.push(["24 rotations generated", ROTS.length===24]);
+
+  // Everything from here to the Z-up check reads parts[0]. On an empty board there is no
+  // such part, so these are skipped rather than crashing the panel - the checks that do
+  // not need a part still run, and the panel says why the rest are missing.
+  if(!parts.length){
+    rows.push(["Part checks", status(false,"","N/A - board is empty")]);
+  } else {
+  var seed=parts[0];
 
   // Checked across ALL of the seed part's ports, not just one: an earlier version of this
   // check looked only at U and failed even though the pose was correctly applied, because
@@ -3087,6 +3132,8 @@ function runValidation(){
     return true;
   });
   rows.push(["Every part's opposite/non-opposite port relationships preserved under its pose", shapeOk]);
+
+  }
 
   var testPt=[0,0,1];
   var atEl0 = rotPt(testPt[0],testPt[1],testPt[2], 1.0, 0);

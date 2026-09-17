@@ -289,7 +289,7 @@
   that are still waiting on a decision from you.</p>
   <div class="meta">
     <span><b>Updated</b> 17 Sep 2026</span>
-    <span><b>Build</b> vertical slice &middot; 3,154 lines</span>
+    <span><b>Build</b> vertical slice &middot; 3,201 lines</span>
     <span><b>Catalogue</b> 39 of 39 parts</span>
     <span><b>Live</b> perhoinc.github.io/pipegrid</span>
   </div>
@@ -430,6 +430,18 @@
   </div>
 
   <div class="resolved">
+    <h3>The board can be empty</h3>
+    <span class="when"><b>settled</b> 17 Sep</span>
+    <p>It could not be before. Three separate things kept at least one part on the board:
+    the delete action refused to remove the last one, a save with no parts was rejected as
+    broken, and the checks panel read the first part without asking whether there was one.
+    All three are lifted, so <b>Clear all parts</b> in the Board menu empties the board and
+    leaves the grid exactly as you set it up &mdash; start again on the same frame.</p>
+    <p>No confirmation, per your standing call that deleting should not ask first. One undo
+    puts the whole board back in a single step, which is what stands in for the prompt.
+    Deleting the last part by hand now works too, for the same reason.</p>
+  </div>
+  <div class="resolved" style="margin-top:14px;">
     <h3>Three faults the owner caught on screen</h3>
     <span class="when"><b>settled</b> 17 Sep</span>
     <p><b>The 3D view turned about the wrong point.</b> The camera span about the world&rsquo;s
@@ -555,6 +567,8 @@
   <p class="sblurb">All live on the iPad build.</p>
 
   <ul class="shipped">
+    <li><span class="dot"></span><div>Clear all parts<span class="when">17 Sep</span>
+      <small>Empties the board, keeps the grid; one undo brings it back</small></div></li>
     <li><span class="dot"></span><div>Orbit turns about the grid&rsquo;s middle<span class="when">17 Sep</span>
       <small>Was the world&rsquo;s zero point, a quarter of the screen off on a tall stack</small></div></li>
     <li><span class="dot"></span><div>Isometric depth order corrected<span class="when">17 Sep</span>
