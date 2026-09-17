@@ -585,7 +585,7 @@ function poseSequenceFor(axis, basePoseIdx){
   return seq;
 }
 var GIZMO_RING_R=0.62, GIZMO_ARROW_L=0.8;
-function pc(p){ return proj(rotPt(p[0],p[1],p[2],cam.az,cam.el)); }
+function pc(p){ return proj(viewPt(p[0],p[1],p[2],cam.az,cam.el)); }
 function gizmoCellArr(part){ return [part.cell.x, part.cell.y, part.cell.z]; }
 function ringPoints(axis, cellArr, radius){
   radius = radius===undefined ? GIZMO_RING_R : radius;
@@ -646,6 +646,24 @@ function rotPt(x,y,z,az,el){
   var ce=Math.cos(el), se=Math.sin(el);
   var y2=y1*ce-z1*se, z2=y1*se+z1*ce;
   return {x:x1, y:y2, z:z2};
+}
+
+/* The camera turns about the middle of the GRID, not the worlds zero point. Those were the
+   same place for as long as the grid was a symmetric square centred on the origin, which is
+   why this only surfaced once the per-end controls let a board grow lopsided: add columns
+   east, or layers on top, and the grids middle walks away from the point everything spins
+   around. Measured before the fix, on a 370px stage: 0px out on a symmetric 5x5, 82px on a
+   board grown east and up, 98px on the owners 4x4x8 - a quarter of the screen.
+   Signature deliberately matches rotPts so the call sites are a rename and nothing more.
+   NOT used by the axis triad (direction vectors, no world position by design), by
+   gridFitScale (it measures an extent, which a constant offset cannot change) or by the
+   self-checks that test rotPts own arithmetic. */
+function gridCentre(){
+  return [(GRID.x.lo+GRID.x.hi)/2, (GRID.y.lo+GRID.y.hi)/2, (GRID.z.lo+GRID.z.hi)/2];
+}
+function viewPt(x,y,z,az,el){
+  var g=gridCentre();
+  return rotPt(x-g[0], y-g[1], z-g[2], az, el);
 }
 // All four are re-derived from the stage's real size by fitStage() below; these are
 // only sane pre-measurement defaults so anything running before first layout works.
@@ -908,7 +926,7 @@ function drawWireframe(){
     var i, c, v;
     for(i=0;i<8;i++){
       c=WIRE_CORNERS[i];
-      v=proj(rotPt(cu.x+c[0]*WIRE_H, cu.y+c[1]*WIRE_H, cu.z+c[2]*WIRE_H, cam.az, cam.el));
+      v=proj(viewPt(cu.x+c[0]*WIRE_H, cu.y+c[1]*WIRE_H, cu.z+c[2]*WIRE_H, cam.az, cam.el));
       // Math.round over toFixed: same one-decimal result, without toFixed's formatting
       // machinery, and this runs 8 times per cell per frame - ~14k calls at the biggest grid.
       wireSX[i]=Math.round(v.sx*10)/10; wireSY[i]=Math.round(v.sy*10)/10;
@@ -947,7 +965,7 @@ function render(){
   // The cell you've picked to build into, drawn last-ish in its own right so it reads as
   // a target rather than as part of the wireframe it sits in.
   if(selectedCell){
-    var sd=rotPt(selectedCell.x,selectedCell.y,selectedCell.z,cam.az,cam.el).y;
+    var sd=viewPt(selectedCell.x,selectedCell.y,selectedCell.z,cam.az,cam.el).y;
     items.push({depth:sd, cellDepth:sd, cellIdx:-0.5, kind:"selcell", cu:selectedCell});
   }
 
@@ -959,14 +977,14 @@ function render(){
     // while actively turning this part's gizmo, draw the live free-angle preview;
     // otherwise (and for every other part) draw its actual committed pose.
     var pose = (gizmoDrag && gizmoDrag.type==="rot" && partIdx===gizmoPartIdx) ? gizmoLiveMatrix() : ROTS[part.poseIdx];
-    var cellDepth=rotPt(part.cell.x,part.cell.y,part.cell.z,cam.az,cam.el).y;
+    var cellDepth=viewPt(part.cell.x,part.cell.y,part.cell.z,cam.az,cam.el).y;
     // Parts away from the active layer stay fully interactive (owner chose highlight,
     // not lock) but drop back visually so the layer you're working on reads first.
     var onActive = part.cell.z===activeLayer;
     part.streams.forEach(function(st){
       var pts3=streamLocal(part,st,14)
         .map(function(p){ var w=matApply(pose,p); return [w[0]+part.cell.x, w[1]+part.cell.y, w[2]+part.cell.z]; });
-      var view=pts3.map(function(p){ return rotPt(p[0],p[1],p[2],cam.az,cam.el); });
+      var view=pts3.map(function(p){ return viewPt(p[0],p[1],p[2],cam.az,cam.el); });
       items.push({cellDepth:cellDepth, cellIdx:partIdx, onActive:onActive,
         depth:view.reduce(function(a,p){return a+p.y;},0)/view.length, kind:"chan", pts:view});
     });
@@ -974,7 +992,7 @@ function render(){
       var w=matApply(pose, portLocal(part,p));
       var world=[w[0]+part.cell.x, w[1]+part.cell.y, w[2]+part.cell.z];
       lastPortWorld[partIdx][p.dir]=world;
-      var view=rotPt(world[0],world[1],world[2],cam.az,cam.el);
+      var view=viewPt(world[0],world[1],world[2],cam.az,cam.el);
       var sp=proj(view);
       var worldDir=DMAPS[part.poseIdx][p.dir];
       items.push({cellDepth:cellDepth, cellIdx:partIdx, onActive:onActive, depth:view.y, kind:"port", view:view, role:p.role});
@@ -993,8 +1011,8 @@ function render(){
   items.forEach(function(it){
     if(it.kind==="selcell"){
       edgesOf(it.cu.x,it.cu.y,it.cu.z,0.47).forEach(function(seg){
-        var pa=rotPt(seg[0][0],seg[0][1],seg[0][2],cam.az,cam.el);
-        var pb=rotPt(seg[1][0],seg[1][1],seg[1][2],cam.az,cam.el);
+        var pa=viewPt(seg[0][0],seg[0][1],seg[0][2],cam.az,cam.el);
+        var pb=viewPt(seg[1][0],seg[1][1],seg[1][2],cam.az,cam.el);
         var sa=proj(pa), sb=proj(pb);
         var ln=svgNS("line");
         ln.setAttribute("x1",sa.sx); ln.setAttribute("y1",sa.sy);
@@ -1054,7 +1072,7 @@ function render(){
   var PLACE_RING_R=0.3;
   if(mode==="connect" && connectDrag){
     var pcp=connectDrag.prep.portWorldPos;
-    ringPoints(connectDrag.prep.axis, pcp, PLACE_RING_R).map(function(p){ return {v:rotPt(p[0],p[1],p[2],cam.az,cam.el)}; })
+    ringPoints(connectDrag.prep.axis, pcp, PLACE_RING_R).map(function(p){ return {v:viewPt(p[0],p[1],p[2],cam.az,cam.el)}; })
       .map(function(o){ o.p=proj(o.v); return o; })
       .reduce(function(segs,o,i,arr){
         var far=o.v.y>0.02;
@@ -1192,7 +1210,7 @@ function render(){
     });
 
     GIZMO_AXES.forEach(function(axis){
-      var pts=ringPoints(axis,cellArr).map(function(p){ return {v:rotPt(p[0],p[1],p[2],cam.az,cam.el)}; });
+      var pts=ringPoints(axis,cellArr).map(function(p){ return {v:viewPt(p[0],p[1],p[2],cam.az,cam.el)}; });
       pts.forEach(function(o){ o.p=proj(o.v); });
       var active=gizmoDrag && gizmoDrag.type==="rot" && gizmoDrag.axis.id===axis.id;
       var segs=[[]];
@@ -1557,17 +1575,25 @@ function drawPlanPanel(svg,x,y,w,h,label,layerParts){
         var wd=DMAPS[part.poseIdx][p.dir];
         return wd!=="U" && wd!=="D";
       });
-      if(dn) svg.appendChild(sEl("circle",{cx:cc.x, cy:cc.y, r:cs*0.16*PLAN_MARK_K,
-        fill:"none", stroke:LINE, "stroke-width":2*PLAN_MARK_K, opacity:0.6}));
+      // Vertical ports are seen end-on from above, so they get a ring rather than the
+      // sideways ports dot. Halved (owners call): at full size they were six times the
+      // width of a sideways port and stopped reading as the same kind of thing. Colour
+      // follows ROLE like every other port - amber in, grey out. A downward inlet used to
+      // draw grey whatever it was, which was the one place on the sheet where role went
+      // missing. Down stays unfilled and slightly soft, up is filled with paper and cored
+      // with a dot: that pair is what says which way the opening faces.
+      if(dn) svg.appendChild(sEl("circle",{cx:cc.x, cy:cc.y, r:cs*0.08*PLAN_MARK_K,
+        fill:"none", stroke:dn.role==="in"?ACC_INK:LINE, "stroke-width":1*PLAN_MARK_K,
+        opacity:0.75}));
       horiz.forEach(function(p){
         var q=planPt(portLocal(part,p));
         svg.appendChild(sEl("circle",{cx:q.x.toFixed(1), cy:q.y.toFixed(1), r:portR.toFixed(2),
           fill:p.role==="in"?ACC_INK:LINE, stroke:INK, "stroke-width":1.6*PLAN_MARK_K}));
       });
       if(up){
-        svg.appendChild(sEl("circle",{cx:cc.x, cy:cc.y, r:cs*0.11*PLAN_MARK_K, fill:PANELBG,
-          stroke:up.role==="in"?ACC_INK:INK, "stroke-width":1.8*PLAN_MARK_K}));
-        svg.appendChild(sEl("circle",{cx:cc.x, cy:cc.y, r:2*PLAN_MARK_K,
+        svg.appendChild(sEl("circle",{cx:cc.x, cy:cc.y, r:cs*0.055*PLAN_MARK_K, fill:PANELBG,
+          stroke:up.role==="in"?ACC_INK:LINE, "stroke-width":0.9*PLAN_MARK_K}));
+        svg.appendChild(sEl("circle",{cx:cc.x, cy:cc.y, r:1*PLAN_MARK_K,
           fill:up.role==="in"?ACC_INK:LINE}));
       }
       // A pipe passing vertically THROUGH this floor: no port here, and no line either,
@@ -1625,9 +1651,17 @@ function drawIsoPanel(svg,x,y,w,h,label,layerParts){
       stroke:LINE,"stroke-width":0.75,opacity:0.5}));
   }
 
-  // Depth-sort at the CELL level first; fine per-point depth only breaks ties within one
-  // part. Sorting on fine depth alone falls apart at steep elevation, where every cell
-  // sits at nearly the same distance and segments from different parts interleave.
+  // Painters algorithm: farthest drawn FIRST so nearer geometry covers it. refIsoProject
+  // shares rotPts convention, in which a SMALLER depth is nearer the viewer, so the sort
+  // runs descending - the same corrected rule the 3D scene and the axis triad already use.
+  // This panel had it ascending, painting far geometry over near: a parts near port ended
+  // up buried under its own pipe while its far port sat proud on top, so the part read
+  // back to front. Owner spotted it on an elbow and on the top of a riser.
+  // Each item also carries its OWN depth now, not its parts anchor cell. A 3-cell straight
+  // running toward the camera was sorted entirely at its far end, which is why the long
+  // runs were the worst of it. The cell-level tier that used to sort first goes with that:
+  // it existed to survive steep elevation, and this panel is fixed at REF_EL_DEG, so the
+  // case it guarded against cannot arise here.
   var items=[], chanW=s*0.091, portR=s*0.12;
   layerParts.forEach(function(part,partIdx){
     // Cells are centred on the grid's own middle so the drawing sits in the panel
@@ -1640,7 +1674,7 @@ function drawIsoPanel(svg,x,y,w,h,label,layerParts){
     var off=[(part.cell.x-(GRID.x.lo+GRID.x.hi)/2)*ISO_CELL,
              (part.cell.y-(GRID.y.lo+GRID.y.hi)/2)*ISO_CELL,
              (part.cell.z-activeLayer)*ISO_CELL];
-    var cellDepth=place(off).depth, pose=ROTS[part.poseIdx];
+    var pose=ROTS[part.poseIdx];
     // Owns a port on this floor, or is only passing through? That decides the weight it
     // is drawn at - a pass-through is context, not something you connect to here.
     var faded=!hasPortOnLayer(part, activeLayer);
@@ -1648,17 +1682,17 @@ function drawIsoPanel(svg,x,y,w,h,label,layerParts){
       var pts=streamLocal(part,st,14)
         .map(function(p){ var wv=matApply(pose,p); return [wv[0]+off[0],wv[1]+off[1],wv[2]+off[2]]; })
         .map(place);
-      items.push({cellDepth:cellDepth, cellIdx:partIdx, faded:faded,
+      items.push({cellIdx:partIdx, faded:faded,
         depth:pts.reduce(function(acc,p){return acc+p.depth;},0)/pts.length, kind:"chan", pts:pts});
     });
     part.ports.forEach(function(p){
       var wv=matApply(pose,portLocal(part,p));
       var pt=place([wv[0]+off[0],wv[1]+off[1],wv[2]+off[2]]);
-      items.push({cellDepth:cellDepth, cellIdx:partIdx, faded:faded,
+      items.push({cellIdx:partIdx, faded:faded,
         depth:pt.depth, kind:"port", pt:pt, role:p.role});
     });
   });
-  items.sort(function(p,q){ return (p.cellDepth-q.cellDepth)||(p.cellIdx-q.cellIdx)||(p.depth-q.depth); });
+  items.sort(function(p,q){ return (q.depth-p.depth)||(p.cellIdx-q.cellIdx); });
   items.forEach(function(it){
     var op=it.faded ? OFF_PORT_ISO_OPACITY : 1;
     if(it.kind==="chan"){
@@ -1857,7 +1891,7 @@ var pendingPort=null, lastPlacement=null;  // lastPlacement read by validation
    separate runs of pipe could never be started independently. This is the owner's stated
    alternative: choose the layer, tap the empty cell you want, then pick the shape. */
 var selectedCell=null;   // an empty cell on the active layer, chosen as the next build target
-// Screen point -> which cell of the ACTIVE layer's plane it lands in. rotPt() is linear
+// Screen point -> which cell of the ACTIVE layer's plane it lands in. viewPt() is linear
 // and proj() is affine in its result, so at a fixed z the whole world->screen map is
 // affine: build the 2x2 that takes one cell step in x and one in y to their screen
 // offsets, and invert it. Worth solving exactly rather than reaching for the obvious
@@ -1866,9 +1900,9 @@ var selectedCell=null;   // an empty cell on the active layer, chosen as the nex
 // corner. Cheap either way; only one of them is right.
 function cellAtPoint(pt){
   var z=activeLayer;
-  var o =proj(rotPt(0,0,z,cam.az,cam.el));
-  var ex=proj(rotPt(1,0,z,cam.az,cam.el));
-  var ey=proj(rotPt(0,1,z,cam.az,cam.el));
+  var o =proj(viewPt(0,0,z,cam.az,cam.el));
+  var ex=proj(viewPt(1,0,z,cam.az,cam.el));
+  var ey=proj(viewPt(0,1,z,cam.az,cam.el));
   var a=ex.sx-o.sx, b=ey.sx-o.sx, c=ex.sy-o.sy, d=ey.sy-o.sy;
   var det=a*d-b*c;
   if(!det) return null;                    // layer seen exactly edge-on: no plane to point at
@@ -1928,7 +1962,7 @@ function hitPartBody(pt){
     part.streams.forEach(function(st){
       var pts3=streamLocal(part,st,14)
         .map(function(p){ var w=matApply(pose,p); return [w[0]+part.cell.x, w[1]+part.cell.y, w[2]+part.cell.z]; });
-      var pts2=pts3.map(function(p){ return proj(rotPt(p[0],p[1],p[2],cam.az,cam.el)); });
+      var pts2=pts3.map(function(p){ return proj(viewPt(p[0],p[1],p[2],cam.az,cam.el)); });
       for(var i=0;i<pts2.length-1;i++){
         var d=distToSegment(pt.x,pt.y,pts2[i].sx,pts2[i].sy,pts2[i+1].sx,pts2[i+1].sy);
         if(d<BODY_HIT_R && (!best||d<best.dist)) best={partIdx:partIdx, dist:d};

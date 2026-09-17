@@ -285,11 +285,11 @@
 <header>
   <p class="eyebrow">Fabrication instrument · cast &amp; glazed stoneware</p>
   <h1>PIPEGRID Roadmap</h1>
-  <p class="standfirst">Where the build stands, what comes next, and the two things
+  <p class="standfirst">Where the build stands, what comes next, and the three things
   that are still waiting on a decision from you.</p>
   <div class="meta">
     <span><b>Updated</b> 17 Sep 2026</span>
-    <span><b>Build</b> vertical slice &middot; 3,120 lines</span>
+    <span><b>Build</b> vertical slice &middot; 3,154 lines</span>
     <span><b>Catalogue</b> 39 of 39 parts</span>
     <span><b>Live</b> perhoinc.github.io/pipegrid</span>
   </div>
@@ -298,7 +298,7 @@
 <section>
   <div class="shead">
     <h2>Waiting on you</h2>
-    <span class="count">2 open</span>
+    <span class="count">3 open</span>
   </div>
   <p class="sblurb">None of these block the build — I can keep going around all of them.
   But each one is a call I shouldn't make on your behalf.</p>
@@ -307,6 +307,18 @@
 
 
 
+  <div class="decision">
+    <span class="when"><b>raised</b> 17 Sep &middot; awaiting your eye</span>
+    <h3>Does the isometric read correctly now?<span class="asked">needs you</span></h3>
+    <p>The panel was painting far geometry over near, so parts read back to front. That is
+    fixed. What is not settled is whether the drawing is now legible on its own, or whether
+    two pipes crossing still need the nearer one to visibly break the one behind it.</p>
+    <p>That break is a change to the drawing&rsquo;s visual language, so by your own rule it
+    gets a static mockup board with alternatives before anything goes into the app.</p>
+    <div class="rec"><strong>My read</strong>
+    Look at it first. The order being wrong may have been the whole problem, in which case
+    there is nothing more to do here and this closes.</div>
+  </div>
   <div class="decision">
     <span class="when"><b>raised</b> 25 Aug &middot; still open</span>
     <h3>How should the pipes themselves look in 3D?</h3>
@@ -418,6 +430,23 @@
   </div>
 
   <div class="resolved">
+    <h3>Three faults the owner caught on screen</h3>
+    <span class="when"><b>settled</b> 17 Sep</span>
+    <p><b>The 3D view turned about the wrong point.</b> The camera span about the world&rsquo;s
+    zero point, which stopped being the middle of the board the day the per-end controls let
+    a grid grow lopsided. Grow east, or add layers on top, and the middle walked away from
+    the pivot: 98px out of centre on a 370px stage for a 4&times;4&times;8. It now turns about
+    the grid&rsquo;s own middle, measured at nought drift through three orbits.</p>
+    <p><b>The sheet&rsquo;s isometric was painting back to front.</b> It drew far geometry over
+    near &mdash; the opposite of the rule the 3D view and the axis triad already follow &mdash;
+    so a part&rsquo;s near port was buried under its own pipe while its far port sat on top,
+    and the part read as heading away when it came toward you. Long runs were worst because
+    each was sorted by one end only.</p>
+    <p><b>Vertical ports were drawn six times the width of sideways ones.</b> Halved, so they
+    read as the same kind of mark. Both now take their colour from the port&rsquo;s role like
+    everything else &mdash; a downward inlet used to draw grey whatever it was.</p>
+  </div>
+  <div class="resolved" style="margin-top:14px;">
     <h3>Parts now fill their cells</h3>
     <span class="when"><b>settled</b> 17 Sep</span>
     <p>Option D from the board: a part is drawn at the proportion the 3D view gives it, so it
@@ -526,6 +555,12 @@
   <p class="sblurb">All live on the iPad build.</p>
 
   <ul class="shipped">
+    <li><span class="dot"></span><div>Orbit turns about the grid&rsquo;s middle<span class="when">17 Sep</span>
+      <small>Was the world&rsquo;s zero point, a quarter of the screen off on a tall stack</small></div></li>
+    <li><span class="dot"></span><div>Isometric depth order corrected<span class="when">17 Sep</span>
+      <small>Near geometry now covers far; long runs sorted along their length</small></div></li>
+    <li><span class="dot"></span><div>Vertical port marks halved<span class="when">17 Sep</span>
+      <small>And both now coloured by role, amber in and grey out</small></div></li>
     <li><span class="dot"></span><div>Per-cell isometric icons removed<span class="when">17 Sep</span>
       <small>Redundant beside the isometric panel; the space went to the parts</small></div></li>
     <li><span class="dot"></span><div>Parts fill their cells<span class="when">17 Sep</span>
