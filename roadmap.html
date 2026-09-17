@@ -285,10 +285,10 @@
 <header>
   <p class="eyebrow">Fabrication instrument · cast &amp; glazed stoneware</p>
   <h1>PIPEGRID Roadmap</h1>
-  <p class="standfirst">Where the build stands, what comes next, and the two things
+  <p class="standfirst">Where the build stands, what comes next, and the three things
   that are still waiting on a decision from you.</p>
   <div class="meta">
-    <span><b>Updated</b> 16 Sep 2026</span>
+    <span><b>Updated</b> 17 Sep 2026</span>
     <span><b>Build</b> vertical slice &middot; 3,157 lines</span>
     <span><b>Catalogue</b> 39 of 39 parts</span>
     <span><b>Live</b> perhoinc.github.io/pipegrid</span>
@@ -298,10 +298,27 @@
 <section>
   <div class="shead">
     <h2>Waiting on you</h2>
-    <span class="count">2 open</span>
+    <span class="count">3 open</span>
   </div>
   <p class="sblurb">None of these block the build — I can keep going around all of them.
   But each one is a call I shouldn't make on your behalf.</p>
+
+  <div class="decision">
+    <span class="when"><b>raised</b> 17 Sep &middot; still open</span>
+    <h3>How big should a part be drawn in its plan cell?</h3>
+    <p>The plan draws a part at half the proportion the 3D view gives it: a port sits 42% of
+    the way from the cell centre to the cell edge, where in 3D it sits at 84%. That is why
+    parts look small in large cells.</p>
+    <p>It also makes multi-cell runs wrong rather than merely small. A 3-cell straight is
+    drawn <b>1.42 cells</b> long when it should be 2.84, so the pipe stops short of the cells
+    it actually fills.</p>
+    <p>Four sizes to compare, same layer in each:
+    <a href="boards/pipegrid-2d-part-scale-mockups.html">how big should a part be in its plan
+    cell</a>.</p>
+    <div class="rec"><strong>My read</strong>
+    D, matching the 3D view — the only one where a part is drawn across the cells it really
+    occupies. If it reads too heavy, size and line weight can be separated.</div>
+  </div>
 
 
 

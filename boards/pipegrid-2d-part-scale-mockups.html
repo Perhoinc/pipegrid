@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PIPEGRID — how big should a part be in its plan cell?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@300;400;500;700&display=swap">
+<style>
+  :root{ --bg:#0b0d10; --panel:#12151b; --edge:#2c313d; --text:#c7d3e2; --dim:#5f6775; --acc:#e0a14e; }
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  body{background:var(--bg);color:var(--text);
+       font-family:"Roboto Slab",Rockwell,Georgia,serif;-webkit-text-size-adjust:100%;
+       padding:16px;padding-bottom:70px;}
+  .hdr{margin-bottom:14px;}
+  .title{font-size:16px;font-weight:700;letter-spacing:1.5px;}
+  .sub{font-size:10px;letter-spacing:1px;color:var(--dim);margin-top:4px;}
+  .panel{border:1px solid var(--edge);border-radius:8px;background:var(--panel);
+         padding:14px;margin-bottom:14px;max-width:1080px;}
+  .plabel{font-size:11px;font-weight:700;letter-spacing:1.5px;margin-bottom:8px;}
+  .note{font-size:12.5px;color:var(--dim);line-height:1.7;margin:0 0 8px;max-width:78ch;}
+  .note b{color:var(--text);font-weight:500;}
+  .note .warn{color:var(--acc);}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:14px;}
+  .opt{border:1px solid var(--edge);border-radius:6px;background:#0e1116;padding:10px;}
+  .opt.pick{border-color:var(--acc);}
+  .opthead{display:flex;align-items:baseline;gap:8px;margin-bottom:7px;}
+  .optname{font-size:12px;font-weight:700;letter-spacing:.6px;}
+  .opttag{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--acc);
+          border:1px solid var(--acc);border-radius:3px;padding:1px 5px;}
+  .optnums{font-size:10.5px;color:var(--dim);line-height:1.65;margin-top:7px;}
+  .optnums b{color:var(--text);font-weight:500;}
+  svg.sheet{display:block;width:100%;height:auto;background:#f7f4ec;border-radius:3px;}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="title">HOW BIG SHOULD A PART BE IN ITS PLAN CELL?</div>
+  <div class="sub">2D sheet · plan view · four alternatives, same layer in each</div>
+</div>
+
+<div class="panel">
+  <div class="plabel">WHAT THIS IS DECIDING</div>
+  <p class="note">The plan draws a part's geometry at <b>half</b> the proportion it has in the 3D
+  view. A port sits 42% of the way from the cell centre to the cell edge here, where in 3D it
+  sits at 84%. That is why the parts look small in large cells, and it is the same number for
+  every option below — only the multiplier changes.</p>
+  <p class="note"><span class="warn">It also makes multi-cell runs wrong, not just small.</span>
+  A 3-cell straight occupies three cells but is drawn at half that length, so the pipe stops
+  short of the cells it actually fills. Watch the long run on the left of each panel: at
+  <b>×0.50</b> it reaches barely past the middle cell; at <b>×1.00</b> it reaches its own far
+  cell, the way the 3D view draws it.</p>
+  <p class="note">Line weight and port size scale with the part in each option, so each one is
+  internally consistent. Option A is exactly what the sheet draws today. Every panel below has
+  the identical layer in it: a flat elbow, a T, a corner with an upward port, runs of 3, 2 and
+  1 cells, and one pipe passing vertically through the floor.</p>
+</div>
+
+<div class="panel">
+  <div class="plabel">FOUR SIZES · 5 × 5 BOARD</div>
+  <div class="grid" id="row5"></div>
+</div>
+
+<div class="panel">
+  <div class="plabel">THE SAME FOUR ON A 9 × 9 BOARD</div>
+  <p class="note">Cells get smaller as the board grows, and the marks shrink with them. This is
+  the check that whichever size you pick still reads when the board is big.</p>
+  <div class="grid" id="row9"></div>
+</div>
+
+<div class="panel">
+  <div class="plabel">MY READ</div>
+  <p class="note"><b>D, matching the 3D view.</b> Not mainly for looks: it is the only one where
+  a part is drawn across the cells it genuinely occupies, so a 3-cell straight on the sheet is
+  as long as the three cells it fills. It also means the plan and the 3D view agree about how
+  much of a cell a fitting takes up, which matters when you are reading one against the other.</p>
+  <p class="note">If D feels too heavy, the size and the line weight can be separated — take D's
+  geometry with C's line weight, for instance. Say the word and I will add that pairing here
+  rather than guess.</p>
+</div>
+
+<script>
+(function(){
+"use strict";
+var NS="http://www.w3.org/2000/svg";
+var V={N:[0,1,0],S:[0,-1,0],E:[1,0,0],W:[-1,0,0],U:[0,0,1],D:[0,0,-1]};
+var OPP={N:"S",S:"N",E:"W",W:"E",U:"D",D:"U"};
+var PR=0.42;
+var INK="#232a35", DIMC="#7a8494", LINE="#8a95a6", ACC="#c2620f", PANELBG="#fbfaf5";
+var SECTION_DOT_SCALE=1.5;
+
+/* Geometry lifted from the app so the comparison is honest - same construction rule, same
+   PR, same elbow arc. No pose system here: every sample part is shown in its home
+   orientation, which is all this question needs. */
+function P(spec){ return spec.split(" ").map(function(t){
+  return {dir:t.slice(0,-1), role:t.slice(-1)==="+"?"in":"out"}; }); }
+function streamsFor(ports){
+  var ins=ports.filter(function(p){return p.role==="in";});
+  var outs=ports.filter(function(p){return p.role==="out";});
+  var o=[];
+  ins.forEach(function(i){ outs.forEach(function(u){
+    o.push({type:OPP[i.dir]===u.dir?"straight":"elbow", from:i.dir, to:u.dir}); }); });
+  return o;
+}
+function straight3(a,b,reach){
+  var u=V[a], v=V[b];
+  var ra=(reach&&reach[a])||PR, rb=(reach&&reach[b])||PR;
+  return [[u[0]*ra,u[1]*ra,u[2]*ra],[v[0]*rb,v[1]*rb,v[2]*rb]];
+}
+function elbow3(a,b,n){
+  var u=V[a], v=V[b], o=[];
+  for(var i=0;i<=n;i++){ var t=(i/n)*(Math.PI/2), s=Math.sin(t), c=Math.cos(t);
+    o.push([PR*(u[0]+v[0])-PR*(s*u[0]+c*v[0]),
+            PR*(u[1]+v[1])-PR*(s*u[1]+c*v[1]),
+            PR*(u[2]+v[2])-PR*(s*u[2]+c*v[2])]); }
+  return o;
+}
+function el(tag,a){ var e=document.createElementNS(NS,tag); for(var k in a) e.setAttribute(k,a[k]); return e; }
+function txt(x,y,s,opt){
+  opt=opt||{};
+  var t=el("text",{x:x,y:y,"font-family":"'Roboto Slab',Rockwell,Georgia,serif",
+    "font-size":opt.size||10, fill:opt.fill||INK, "font-weight":opt.weight||400,
+    "text-anchor":opt.anchor||"start","letter-spacing":opt.ls||"0"});
+  t.textContent=s; return t;
+}
+
+// One layer, used unchanged in every panel: the cases that show the difference.
+var LAYOUT=[
+  {spec:"N+ E-",     cell:{x:-2,y:2}},              // flat elbow
+  {spec:"N+ S- E-",  cell:{x:0, y:2}},              // T
+  {spec:"N+ E- U-",  cell:{x:2, y:2}},              // corner, one port straight up
+  {spec:"N+ S-",     cell:{x:-2,y:-2}, span:3},     // the run that is drawn too short today
+  {spec:"N+ S-",     cell:{x:0, y:-2}, span:2},
+  {spec:"N+ S-",     cell:{x:2, y:-2}},
+  {passThrough:true, cell:{x:2, y:0}}               // a pipe crossing this floor
+];
+LAYOUT.forEach(function(p){
+  if(!p.spec) return;
+  p.ports=P(p.spec); p.streams=streamsFor(p.ports);
+});
+function reachOf(p){
+  if(!p.span || p.span<2) return null;
+  var r={}; r[p.ports[0].dir]=PR+(p.span-1); return r;
+}
+function localPort(p, port){
+  var r=reachOf(p), d=(r&&r[port.dir])||PR, v=V[port.dir];
+  return [v[0]*d, v[1]*d, v[2]*d];
+}
+
+/* scale: the multiplier taking a part's own units to plan units. The app uses 0.5 today
+   (planPt multiplies by cs/2); 1.0 is the proportion the 3D view draws at. Everything else
+   in the drawing is tied to it, so each option holds together. */
+function drawPanel(scale, n, W, H){
+  var svg=el("svg",{viewBox:"0 0 "+W+" "+H, xmlns:NS});
+  svg.setAttribute("class","sheet");
+  svg.appendChild(el("rect",{x:0,y:0,width:W,height:H,fill:"#f7f4ec"}));
+  var pad=10;
+  svg.appendChild(el("rect",{x:pad,y:pad,width:W-2*pad,height:H-2*pad,
+    fill:PANELBG,stroke:INK,"stroke-width":1}));
+  svg.appendChild(txt(pad+8,pad+15,"PLAN — VIEW FROM ABOVE",{size:8,fill:DIMC,ls:"1px",weight:700}));
+
+  var lo=-Math.floor(n/2), hi=lo+n-1;
+  var innerY=pad+22, innerH=H-pad-innerY-6;
+  var cs=Math.min((W-2*pad-20)/n, innerH/n);
+  var ox=pad+(W-2*pad-cs*n)/2, oy=innerY+(innerH-cs*n)/2;
+  function ctr(cx,cy){ return {x:ox+(cx-lo)*cs+cs/2, y:oy+(hi-cy)*cs+cs/2}; }
+
+  // weights ride with the part size, so A is today's drawing and D is twice its ink
+  var k=scale/0.5;
+  var chanW=cs*0.030*k, portR=cs*0.026*k;
+  var upR=cs*0.11*k, dnR=cs*0.16*k;
+
+  for(var gx=lo; gx<=hi; gx++) for(var gy=lo; gy<=hi; gy++){
+    var c0=ctr(gx,gy);
+    svg.appendChild(el("rect",{x:c0.x-cs/2,y:c0.y-cs/2,width:cs,height:cs,
+      fill:"none",stroke:LINE,"stroke-width":0.75,opacity:0.55}));
+  }
+
+  LAYOUT.forEach(function(part){
+    var c=ctr(part.cell.x, part.cell.y);
+    function planPt(p){ return {x:c.x+p[0]*cs*scale, y:c.y-p[1]*cs*scale}; }
+
+    if(part.passThrough){
+      svg.appendChild(el("circle",{cx:c.x,cy:c.y,
+        r:(chanW*SECTION_DOT_SCALE/2).toFixed(2), fill:INK}));
+      return;
+    }
+    var r=reachOf(part);
+    part.streams.forEach(function(s){
+      var pts=(s.type==="straight" ? straight3(s.from,s.to,r) : elbow3(s.from,s.to,16)).map(planPt);
+      var span=Math.max.apply(null,pts.map(function(p){return Math.hypot(p.x-c.x,p.y-c.y);}));
+      if(span<3) return;               // a stream seen end-on is a dot, not a line
+      svg.appendChild(el("path",{d:"M "+pts.map(function(p){return p.x.toFixed(1)+" "+p.y.toFixed(1);}).join(" L "),
+        fill:"none",stroke:INK,"stroke-width":chanW.toFixed(2),
+        "stroke-linecap":"round","stroke-linejoin":"round"}));
+    });
+    var up=part.ports.filter(function(p){return p.dir==="U";})[0];
+    var dn=part.ports.filter(function(p){return p.dir==="D";})[0];
+    if(dn) svg.appendChild(el("circle",{cx:c.x,cy:c.y,r:dnR.toFixed(2),
+      fill:"none",stroke:LINE,"stroke-width":2,opacity:0.6}));
+    part.ports.forEach(function(p){
+      if(p.dir==="U"||p.dir==="D") return;
+      var q=planPt(localPort(part,p));
+      svg.appendChild(el("circle",{cx:q.x.toFixed(1),cy:q.y.toFixed(1),r:portR.toFixed(2),
+        fill:p.role==="in"?ACC:LINE,stroke:INK,"stroke-width":(1.6*k).toFixed(2)}));
+    });
+    if(up){
+      svg.appendChild(el("circle",{cx:c.x,cy:c.y,r:upR.toFixed(2),fill:PANELBG,
+        stroke:up.role==="in"?ACC:INK,"stroke-width":(1.8*k).toFixed(2)}));
+      svg.appendChild(el("circle",{cx:c.x,cy:c.y,r:(2*k).toFixed(2),
+        fill:up.role==="in"?ACC:LINE}));
+    }
+  });
+  return svg;
+}
+
+var OPTIONS=[
+  {id:"A", scale:0.50, name:"A · ×0.50", tag:"as built today"},
+  {id:"B", scale:0.70, name:"B · ×0.70", tag:""},
+  {id:"C", scale:0.85, name:"C · ×0.85", tag:""},
+  {id:"D", scale:1.00, name:"D · ×1.00", tag:"matches the 3D view"}
+];
+
+function build(hostId, n, W, H){
+  var host=document.getElementById(hostId);
+  OPTIONS.forEach(function(o){
+    var box=document.createElement("div");
+    box.className="opt"+(o.id==="D"?" pick":"");
+    var head=document.createElement("div"); head.className="opthead";
+    var nm=document.createElement("span"); nm.className="optname"; nm.textContent=o.name;
+    head.appendChild(nm);
+    if(o.tag){ var tg=document.createElement("span"); tg.className="opttag"; tg.textContent=o.tag; head.appendChild(tg); }
+    box.appendChild(head);
+    box.appendChild(drawPanel(o.scale, n, W, H));
+    var nums=document.createElement("div"); nums.className="optnums";
+    nums.innerHTML=
+      "A port sits <b>"+Math.round(PR*o.scale*200)+"%</b> of the way to the cell edge"+
+      " <span style='opacity:.6'>(3D view: 84%)</span><br>"+
+      "A 3-cell run is drawn at <b>"+Math.round(o.scale*100)+"%</b> of the cells it fills<br>"+
+      "Pipe <b>"+(o.scale/0.5).toFixed(2)+"×</b> today's weight";
+    box.appendChild(nums);
+    host.appendChild(box);
+  });
+}
+build("row5", 5, 420, 400);
+build("row9", 9, 420, 400);
+})();
+</script>
+</body>
+</html>
