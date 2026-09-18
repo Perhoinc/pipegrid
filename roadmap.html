@@ -285,11 +285,11 @@
 <header>
   <p class="eyebrow">Fabrication instrument · cast &amp; glazed stoneware</p>
   <h1>PIPEGRID Roadmap</h1>
-  <p class="standfirst">Where the build stands, what comes next, and the two things
+  <p class="standfirst">Where the build stands, what comes next, and the three things
   that are still waiting on a decision from you.</p>
   <div class="meta">
-    <span><b>Updated</b> 19 Sep 2026</span>
-    <span><b>Build</b> vertical slice &middot; 3,237 lines</span>
+    <span><b>Updated</b> 17 Sep 2026</span>
+    <span><b>Build</b> vertical slice &middot; 3,201 lines</span>
     <span><b>Catalogue</b> 39 of 39 parts</span>
     <span><b>Live</b> perhoinc.github.io/pipegrid</span>
   </div>
@@ -298,7 +298,7 @@
 <section>
   <div class="shead">
     <h2>Waiting on you</h2>
-    <span class="count">2 open</span>
+    <span class="count">3 open</span>
   </div>
   <p class="sblurb">None of these block the build — I can keep going around all of them.
   But each one is a call I shouldn't make on your behalf.</p>
@@ -307,6 +307,18 @@
 
 
 
+  <div class="decision">
+    <span class="when"><b>raised</b> 17 Sep &middot; awaiting your eye</span>
+    <h3>Does the isometric read correctly now?<span class="asked">needs you</span></h3>
+    <p>The panel was painting far geometry over near, so parts read back to front. That is
+    fixed. What is not settled is whether the drawing is now legible on its own, or whether
+    two pipes crossing still need the nearer one to visibly break the one behind it.</p>
+    <p>That break is a change to the drawing&rsquo;s visual language, so by your own rule it
+    gets a static mockup board with alternatives before anything goes into the app.</p>
+    <div class="rec"><strong>My read</strong>
+    Look at it first. The order being wrong may have been the whole problem, in which case
+    there is nothing more to do here and this closes.</div>
+  </div>
   <div class="decision">
     <span class="when"><b>raised</b> 25 Aug &middot; still open</span>
     <h3>How should the pipes themselves look in 3D?</h3>
@@ -418,24 +430,6 @@
   </div>
 
   <div class="resolved">
-    <h3>The isometric reads correctly</h3>
-    <span class="when"><b>settled</b> 19 Sep</span>
-    <p>Your verdict after the depth-order fix was that it reads well, with two instances
-    left where it did not &mdash; both elbows arcing up and away from the camera. They had
-    the same cause. A whole pipe was sorted on the <b>average</b> depth of its length, which
-    is only right for a pipe lying flat to you. On an arc climbing away, the two ends sit at
-    very different depths and the average falls between them, so the pipe was drawn later
-    than its far end deserved and painted over the port sitting there. On a board of 25
-    elbows, <b>48 of 100 pipe ends</b> were buried under their own pipe &mdash; near enough
-    the half you would predict, since every arc loses at whichever end is farther than its
-    average. Now nought.</p>
-    <p>Each length of pipe is sorted in short pieces, each with its own depth, and a port is
-    sorted against the pieces that actually reach it &mdash; a connector caps the end of a
-    tube, so nothing of that tube can be in front of it.</p>
-    <p><b>No depth cue needed after all.</b> The mockup board for breaking one pipe where
-    another crosses it is not required; the order being wrong was the whole problem.</p>
-  </div>
-  <div class="resolved" style="margin-top:14px;">
     <h3>The board can be empty</h3>
     <span class="when"><b>settled</b> 17 Sep</span>
     <p>It could not be before. Three separate things kept at least one part on the board:
@@ -573,8 +567,6 @@
   <p class="sblurb">All live on the iPad build.</p>
 
   <ul class="shipped">
-    <li><span class="dot"></span><div>Pipe ends no longer buried<span class="when">19 Sep</span>
-      <small>Pipes depth-sorted in pieces; a port always caps its own tube</small></div></li>
     <li><span class="dot"></span><div>Clear all parts<span class="when">17 Sep</span>
       <small>Empties the board, keeps the grid; one undo brings it back</small></div></li>
     <li><span class="dot"></span><div>Orbit turns about the grid&rsquo;s middle<span class="when">17 Sep</span>

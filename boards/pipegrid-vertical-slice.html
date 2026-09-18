@@ -1672,31 +1672,7 @@ function drawIsoPanel(svg,x,y,w,h,label,layerParts){
   // runs were the worst of it. The cell-level tier that used to sort first goes with that:
   // it existed to survive steep elevation, and this panel is fixed at REF_EL_DEG, so the
   // case it guarded against cannot arise here.
-  // A whole stream used to be sorted on the AVERAGE depth of its points, which is only
-  // right for a stream that lies flat to the camera. On an arc climbing away from you the
-  // two ends sit at very different depths, and the average sits between them - so the arc
-  // was drawn later than its own far end deserved and painted straight over the port there.
-  // Measured on a board of 25 elbows: 48 of 100 pipe-ends were buried under their own pipe,
-  // very close to the half you would predict, since each arc loses at whichever end is
-  // farther than its average. Owner caught it on elbows arcing up and away.
-  // Each segment now carries its own depth. Butt caps, not round: adjacent segments then
-  // abut instead of overlapping, which matters because a pass-through part is drawn at
-  // OFF_PORT_ISO_OPACITY and overlapping translucent caps would bead at every joint. The
-  // outer ends lose their round cap too, but a port circle is wider than the pipe and
-  // covers them. On a 90-degree arc sampled 14 times each joint turns about 7 degrees, so
-  // the notch a butt joint leaves on the outside of the bend is a fraction of a pixel.
   var items=[], chanW=s*0.091, portR=s*0.12;
-  // A port sits proud of the tube it caps - the connector is the last thing on the end of
-  // the pipe, so nothing of that pipe can be in front of it. Segmenting alone does not give
-  // you this: a stream ends AT the port, so its final segment sits inside the port circle
-  // and, being a hair nearer than the port centre, would still draw across it.
-  // A fixed nudge does not do it either, and the riser is what proves that: streamLocal
-  // samples a straight stream far more coarsely than a curve, so a 3-cell riser arrives as
-  // a handful of long segments whose midpoints sit a long way in front of the end port.
-  // So the port is sorted against the segments that actually touch it, measured, and this
-  // constant is only the tiebreak that puts it in front of them. Small enough that it can
-  // never reorder two different parts, which sit a whole cell apart.
-  var PORT_PROUD=0.001;
   layerParts.forEach(function(part,partIdx){
     // Cells are centred on the grid's own middle so the drawing sits in the panel
     // regardless of where the board's bounds happen to fall.
@@ -1712,30 +1688,18 @@ function drawIsoPanel(svg,x,y,w,h,label,layerParts){
     // Owns a port on this floor, or is only passing through? That decides the weight it
     // is drawn at - a pass-through is context, not something you connect to here.
     var faded=!hasPortOnLayer(part, activeLayer);
-    var ownSegs=[];   // this part's own segments, so its ports can be sorted against them
     part.streams.forEach(function(st){
       var pts=streamLocal(part,st,14)
         .map(function(p){ var wv=matApply(pose,p); return [wv[0]+off[0],wv[1]+off[1],wv[2]+off[2]]; })
         .map(place);
-      for(var k=0;k<pts.length-1;k++){
-        var seg={cellIdx:partIdx, faded:faded,
-          depth:(pts[k].depth+pts[k+1].depth)/2, kind:"chan", pts:[pts[k],pts[k+1]]};
-        items.push(seg); ownSegs.push(seg);
-      }
+      items.push({cellIdx:partIdx, faded:faded,
+        depth:pts.reduce(function(acc,p){return acc+p.depth;},0)/pts.length, kind:"chan", pts:pts});
     });
     part.ports.forEach(function(p){
       var wv=matApply(pose,portLocal(part,p));
       var pt=place([wv[0]+off[0],wv[1]+off[1],wv[2]+off[2]]);
-      // Nearest of: the port itself, and every segment of this part that reaches it.
-      // Touching is judged on screen, within one pipe width of the port centre - which is
-      // what "this segment ends here" looks like once projected.
-      var d=pt.depth;
-      ownSegs.forEach(function(sg){
-        if(sg.pts.some(function(q){ return Math.hypot(q.x-pt.x, q.y-pt.y) < chanW; }))
-          d=Math.min(d, sg.depth);
-      });
       items.push({cellIdx:partIdx, faded:faded,
-        depth:d-PORT_PROUD, kind:"port", pt:pt, role:p.role});
+        depth:pt.depth, kind:"port", pt:pt, role:p.role});
     });
   });
   items.sort(function(p,q){ return (q.depth-p.depth)||(p.cellIdx-q.cellIdx); });
@@ -1744,7 +1708,7 @@ function drawIsoPanel(svg,x,y,w,h,label,layerParts){
     if(it.kind==="chan"){
       svg.appendChild(sEl("path",{d:"M "+it.pts.map(function(p){return p.x.toFixed(1)+" "+p.y.toFixed(1);}).join(" L "),
         fill:"none", stroke:INK, "stroke-width":chanW.toFixed(2),
-        "stroke-linecap":"butt", opacity:op}));
+        "stroke-linecap":"round", "stroke-linejoin":"round", opacity:op}));
     } else {
       svg.appendChild(sEl("circle",{cx:it.pt.x.toFixed(1), cy:it.pt.y.toFixed(1), r:portR.toFixed(2),
         fill:it.role==="in"?ACC_INK:LINE, stroke:INK, "stroke-width":1.4, opacity:op}));
