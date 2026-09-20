@@ -288,8 +288,8 @@
   <p class="standfirst">Where the build stands, what comes next, and the three things
   that are still waiting on a decision from you.</p>
   <div class="meta">
-    <span><b>Updated</b> 17 Sep 2026</span>
-    <span><b>Build</b> vertical slice &middot; 3,201 lines</span>
+    <span><b>Updated</b> 20 Sep 2026</span>
+    <span><b>Build</b> vertical slice &middot; 3,244 lines</span>
     <span><b>Catalogue</b> 39 of 39 parts</span>
     <span><b>Live</b> perhoinc.github.io/pipegrid</span>
   </div>
@@ -310,14 +310,19 @@
   <div class="decision">
     <span class="when"><b>raised</b> 17 Sep &middot; awaiting your eye</span>
     <h3>Does the isometric read correctly now?<span class="asked">needs you</span></h3>
-    <p>The panel was painting far geometry over near, so parts read back to front. That is
-    fixed. What is not settled is whether the drawing is now legible on its own, or whether
-    two pipes crossing still need the nearer one to visibly break the one behind it.</p>
-    <p>That break is a change to the drawing&rsquo;s visual language, so by your own rule it
-    gets a static mockup board with alternatives before anything goes into the app.</p>
+    <p>You said it reads well apart from a few ports that a pipe was drawing straight
+    through &mdash; always the far end of an arc climbing away from you.</p>
+    <p><b>One attempt was reverted.</b> Cutting each pipe into short pieces so every piece
+    carried its own depth fixed the fault but wrecked the look: the joins all showed, so the
+    arcs came out like combs, and lifting each port above its own pipe lifted it above every
+    other pipe too, including ones genuinely in front of it. Reverted the same day.</p>
+    <p><b>What is in now</b> is much smaller: each pipe simply stops at the edge of its own
+    port circle instead of running to the centre. Nothing is reordered, no pipe is cut up,
+    and since the circle is wider than the pipe, the only place it looks any different is
+    the place that was broken. Measured across elbows, risers and flat runs: no pipe ink
+    inside any port circle, and every pipe end still meeting its circle with no daylight.</p>
     <div class="rec"><strong>My read</strong>
-    Look at it first. The order being wrong may have been the whole problem, in which case
-    there is nothing more to do here and this closes.</div>
+    Look at it. If the ports you circled are whole now, this closes.</div>
   </div>
   <div class="decision">
     <span class="when"><b>raised</b> 25 Aug &middot; still open</span>
@@ -567,6 +572,8 @@
   <p class="sblurb">All live on the iPad build.</p>
 
   <ul class="shipped">
+    <li><span class="dot"></span><div>Pipes stop at their own port<span class="when">20 Sep</span>
+      <small>No pipe draws through its own end cap; nothing else about the drawing changes</small></div></li>
     <li><span class="dot"></span><div>Clear all parts<span class="when">17 Sep</span>
       <small>Empties the board, keeps the grid; one undo brings it back</small></div></li>
     <li><span class="dot"></span><div>Orbit turns about the grid&rsquo;s middle<span class="when">17 Sep</span>

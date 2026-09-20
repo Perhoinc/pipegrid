@@ -1619,6 +1619,46 @@ function drawPlanPanel(svg,x,y,w,h,label,layerParts){
   });
 }
 
+/* A pipe must never paint over the connector at its own end: the port caps the tube, so
+   nothing of that tube can be in front of it. Rather than promote the port in the draw
+   order - which was tried and was wrong, because a port lifted above its own pipe then sat
+   above every OTHER part's pipe as well, including ones genuinely passing in front of it -
+   the pipe simply stops at the edge of its own port circle instead of running to the centre.
+   Nothing is reordered and no pipe is cut into pieces, so the drawing is unchanged wherever
+   it was already right: a port circle is wider than the pipe, so where the port sits in
+   front it was covering this stretch anyway. Only the broken case looks different, where
+   the pipe used to plough through a port behind it.
+   Trimmed by exactly the circle's radius, so the pipe ends in the middle of that circle's
+   own outline and no hairline can open up between the two. */
+function trimStreamStart(pts, r){
+  var out=pts.slice();
+  // >=2, not >2: a straight stream arrives as a bare pair of points, and an earlier version
+  // of this loop skipped those entirely - which left every riser and every straight run
+  // still ploughing through its own end port while the elbows came out clean.
+  while(out.length>=2){
+    var d=Math.hypot(out[1].x-out[0].x, out[1].y-out[0].y);
+    if(d>r){
+      var t=r/d;
+      out[0]={x:out[0].x+(out[1].x-out[0].x)*t,
+              y:out[0].y+(out[1].y-out[0].y)*t,
+              depth:out[0].depth+(out[1].depth-out[0].depth)*t};
+      return out;
+    }
+    if(out.length===2) return out;   // one segment left and it is shorter than the port
+    r-=d; out.shift();               // this whole sample lies inside the port; carry on
+  }
+  return out;
+}
+function trimStreamToPorts(pts, r){
+  if(pts.length<2) return pts;
+  var total=0;
+  for(var i=0;i<pts.length-1;i++) total+=Math.hypot(pts[i+1].x-pts[i].x, pts[i+1].y-pts[i].y);
+  // A stream seen close to end-on projects to almost nothing; trimming it would erase it,
+  // and it is covered by its own port circles at that angle anyway. Leave it whole.
+  if(total < r*2.2) return pts;
+  return trimStreamStart(trimStreamStart(pts, r).reverse(), r).reverse();
+}
+
 /* ---------- isometric panel: the whole layer at the settled angle ---------- */
 function drawIsoPanel(svg,x,y,w,h,label,layerParts){
   panelFrame(svg,x,y,w,h,label);
@@ -1692,8 +1732,11 @@ function drawIsoPanel(svg,x,y,w,h,label,layerParts){
       var pts=streamLocal(part,st,14)
         .map(function(p){ var wv=matApply(pose,p); return [wv[0]+off[0],wv[1]+off[1],wv[2]+off[2]]; })
         .map(place);
+      // Depth stays measured on the WHOLE stream, so the draw order is exactly what it was
+      // before the trim - only what gets painted changes, never where it lands in the order.
       items.push({cellIdx:partIdx, faded:faded,
-        depth:pts.reduce(function(acc,p){return acc+p.depth;},0)/pts.length, kind:"chan", pts:pts});
+        depth:pts.reduce(function(acc,p){return acc+p.depth;},0)/pts.length, kind:"chan",
+        pts:trimStreamToPorts(pts, portR)});
     });
     part.ports.forEach(function(p){
       var wv=matApply(pose,portLocal(part,p));
