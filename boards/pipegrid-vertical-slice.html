@@ -1628,8 +1628,17 @@ function drawPlanPanel(svg,x,y,w,h,label,layerParts){
    it was already right: a port circle is wider than the pipe, so where the port sits in
    front it was covering this stretch anyway. Only the broken case looks different, where
    the pipe used to plough through a port behind it.
-   Trimmed by exactly the circle's radius, so the pipe ends in the middle of that circle's
-   own outline and no hairline can open up between the two. */
+   Trimmed to a fraction of the circle's radius rather than the whole of it. Two reasons.
+   A hairline can never open between pipe and circle, since the pipe ends inside the disc
+   rather than on its edge. And where the pipe is drawn OVER its port - the near end, where
+   it should be - the ink that carries on past the trim point is what makes the pipe read as
+   entering the port at the right angle instead of stopping dead at its rim. The stroke's
+   round cap already gave some of that for free, carrying the ink half a pipe-width back
+   past the endpoint; the owner looked at it and asked for a little more, which is what the
+   fraction below buys. Raise it toward 1 for less bite, lower it for more; it must stay
+   well clear of 0, where the pipe would cross the port centre and look like the fault this
+   whole thing was built to fix. */
+var PORT_BITE=0.90;
 function trimStreamStart(pts, r){
   var out=pts.slice();
   // >=2, not >2: a straight stream arrives as a bare pair of points, and an earlier version
@@ -1736,7 +1745,7 @@ function drawIsoPanel(svg,x,y,w,h,label,layerParts){
       // before the trim - only what gets painted changes, never where it lands in the order.
       items.push({cellIdx:partIdx, faded:faded,
         depth:pts.reduce(function(acc,p){return acc+p.depth;},0)/pts.length, kind:"chan",
-        pts:trimStreamToPorts(pts, portR)});
+        pts:trimStreamToPorts(pts, portR*PORT_BITE)});
     });
     part.ports.forEach(function(p){
       var wv=matApply(pose,portLocal(part,p));
