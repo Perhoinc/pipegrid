@@ -289,7 +289,7 @@
   that are still waiting on a decision from you.</p>
   <div class="meta">
     <span><b>Updated</b> 24 Sep 2026</span>
-    <span><b>Build</b> vertical slice &middot; 3,337 lines</span>
+    <span><b>Build</b> vertical slice &middot; 3,462 lines</span>
     <span><b>Catalogue</b> 39 of 39 parts</span>
     <span><b>Live</b> perhoinc.github.io/pipegrid</span>
   </div>
@@ -348,22 +348,9 @@
 
   <ol class="road">
     <li>
-      <span class="num">01<span class="when">added<br>7 Sep</span></span>
+      <span class="num">01<span class="when">added<br>24 Sep</span></span>
       <div class="item">
-        <h3>Copy and paste<span class="tag next">recommended next</span></h3>
-        <p>Repeat an assembly you have already worked out instead of rebuilding it cell by
-        cell. For modular pieces this is probably the biggest single saving on the list.</p>
-        <p>The real question is <b>where a paste lands</b>: offset a cell from the original,
-        onto the layer you are currently on, or dropped where you next tap. And <b>what
-        happens when it does not fit</b> — refuse the whole paste, or place what fits and
-        say what it left out. Refusing wholesale is safer; partial pasting is friendlier
-        right up until it quietly drops something.</p>
-      </div>
-    </li>
-    <li>
-      <span class="num">02<span class="when">added<br>24 Sep</span></span>
-      <div class="item">
-        <h3>Moving and rotating a group</h3>
+        <h3>Moving and rotating a group<span class="tag next">recommended next</span></h3>
         <p>Selecting several parts now deletes them together. Moving and turning them
         together is the other half, and it was deliberately left out of that first step so
         you could use the selection sooner.</p>
@@ -375,7 +362,7 @@
       </div>
     </li>
     <li>
-      <span class="num">03<span class="when">added<br>31 Aug</span></span>
+      <span class="num">02<span class="when">added<br>31 Aug</span></span>
       <div class="item">
         <h3>Trace mode</h3>
         <p>Follow the flow through a finished layout and see where it actually goes. Your
@@ -384,16 +371,16 @@
       </div>
     </li>
     <li>
-      <span class="num">04<span class="when">added<br>21 Aug</span></span>
+      <span class="num">03<span class="when">added<br>21 Aug</span></span>
       <div class="item">
-        <h3>Valves, and what flow does at a junction<span class="tag blocked">needs 03</span></h3>
+        <h3>Valves, and what flow does at a junction<span class="tag blocked">needs 02</span></h3>
         <p>A valve part, and the logic that goes with it — a merge behaves like an
         <em>or</em>, a valve like a <em>not</em> or an <em>and</em>. Parked since before
         the catalogue work, and it needs trace mode underneath it.</p>
       </div>
     </li>
     <li>
-      <span class="num">05<span class="when">added<br>21 Aug</span></span>
+      <span class="num">04<span class="when">added<br>21 Aug</span></span>
       <div class="item">
         <h3>Exploded stack view<span class="tag parked">parked</span></h3>
         <p>The whole stack pulled apart along its vertical axis, so you can see every floor
@@ -401,7 +388,7 @@
       </div>
     </li>
     <li>
-      <span class="num">06<span class="when">added<br>25 Aug</span></span>
+      <span class="num">05<span class="when">added<br>25 Aug</span></span>
       <div class="item">
         <h3>Pipe treatment in 3D<span class="tag parked">after mechanics</span></h3>
         <p>See the open question above. Deliberately behind the mechanics work, per your
@@ -418,6 +405,24 @@
   </div>
 
   <div class="resolved">
+    <h3>Copy and paste</h3>
+    <span class="when"><b>settled</b> 24 Sep</span>
+    <p><b>A copy lands where you next tap.</b> COPY takes the selection, PASTE arms it, and
+    the next tap on a cell drops the group with its corner there. One extra tap, and in
+    exchange it goes anywhere &mdash; same floor, a floor up, the far side of the board.
+    Landing at the same coordinates would have been a tap quicker but would collide with the
+    original every time you pasted on the same floor.</p>
+    <p><b>A taken cell refuses the whole paste</b> and names the cell. These parts glue to
+    one another, so half an assembly is worse than none: it looks finished until you find
+    the gap.</p>
+    <p><b>Running off the grid does not refuse</b> &mdash; your call, and it matches what the
+    app already does when a board built larger is loaded: the grid grows to take it. Only
+    the grid&rsquo;s own maximum of 12 can stop a paste that way, and it says so. One undo
+    puts back both the parts and the grid.</p>
+    <p>The clipboard survives leaving SELECT, so you can copy, change layer and drop it
+    there, and paste the same group as many times as you like.</p>
+  </div>
+  <div class="resolved" style="margin-top:14px;">
     <h3>Selecting several parts at once</h3>
     <span class="when"><b>settled</b> 24 Sep</span>
     <p><b>You gather parts by tapping them</b>, not by dragging a box. Dragging on empty
@@ -590,6 +595,8 @@
   <p class="sblurb">All live on the iPad build.</p>
 
   <ul class="shipped">
+    <li><span class="dot"></span><div>Copy and paste<span class="when">24 Sep</span>
+      <small>Tap where it goes; refuses a taken cell, grows the grid for a tight fit</small></div></li>
     <li><span class="dot"></span><div>Selecting several parts at once<span class="when">24 Sep</span>
       <small>Tap to gather, across layers; DELETE acts on the lot in one undoable step</small></div></li>
     <li><span class="dot"></span><div>Deeper bite where a pipe meets its port<span class="when">23 Sep</span>

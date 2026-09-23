@@ -339,6 +339,8 @@
   <button class="dockbtn" id="undobtn"><span class="ic">↶</span>UNDO</button>
   <button class="dockbtn" id="redobtn"><span class="ic">↷</span>REDO</button>
   <button class="dockbtn" id="selectbtn"><span class="ic">⧉</span>SELECT</button>
+  <button class="dockbtn" id="copybtn" style="display:none;"><span class="ic">⎘</span>COPY</button>
+  <button class="dockbtn" id="pastebtn" style="display:none;"><span class="ic">⤓</span>PASTE</button>
   <button class="dockbtn danger" id="deletebtn" disabled><span class="ic">✕</span>DELETE</button>
   <button class="dockbtn" id="dockCut"><span class="ic">☰</span>CUT LIST</button>
   <button class="dockbtn" id="dockBoard"><span class="ic">⤓</span>BOARD</button>
@@ -645,6 +647,82 @@ function toggleSelected(i){
   if(k>=0) selection.splice(k,1); else selection.push(i);
 }
 function clearSelection(){ selection.length=0; }
+
+/* Copy and paste. The clipboard holds parts by RECIPE - shape, pose, span - rather than by
+   reference, with each one's cell stored relative to the corner of the group's own
+   footprint. Relative, because the whole point is dropping the group somewhere else; the
+   footprint corner rather than any one part's anchor, because a multi-cell straight reaches
+   past its anchor and the corner is what lines up with the cell you tap.
+   Deliberately not saved with the board: a clipboard is something you are holding, not part
+   of the drawing. */
+var clipboard=[];
+var pasteArmed=false;     // waiting for the tap that says where to drop them
+var actionMsg="";         // what just happened, shown in the readout until the next action
+
+function copySelection(){
+  if(!selection.length) return 0;
+  var picked=selection.map(function(i){ return parts[i]; });
+  var lo={x:Infinity, y:Infinity, z:Infinity};
+  picked.forEach(function(p){ cellsOf(p).forEach(function(c){
+    if(c.x<lo.x) lo.x=c.x;
+    if(c.y<lo.y) lo.y=c.y;
+    if(c.z<lo.z) lo.z=c.z;
+  }); });
+  clipboard=picked.map(function(p){
+    return {shape:p.shapeKey, poseIdx:p.poseIdx, span:spanOf(p),
+            dx:p.cell.x-lo.x, dy:p.cell.y-lo.y, dz:p.cell.z-lo.z};
+  });
+  return clipboard.length;
+}
+
+/* Drops the clipboard with its footprint corner on the given cell. Returns null when it
+   landed, or
+   the reason it did not. Two obstacles, and the owner ruled on them separately: an occupied
+   cell REFUSES the whole paste, because these parts glue to one another and half an
+   assembly looks finished until you find the gap; running off the grid does NOT - the grid
+   grows to take it, which is what it already does when a board built larger is loaded. The
+   grid's own maximum is the one thing growing cannot get past. */
+function pasteAt(cell){
+  if(!clipboard.length) return "Nothing copied yet.";
+  var made=clipboard.map(function(rec){
+    var def=SHAPES[rec.shape], ports=P(def.spec);
+    return {shape:def.label, shapeKey:rec.shape, ports:ports, streams:streamsFor(ports),
+            cell:{x:cell.x+rec.dx, y:cell.y+rec.dy, z:cell.z+rec.dz},
+            poseIdx:rec.poseIdx, span:rec.span};
+  });
+  var cells=[];
+  made.forEach(function(p){ cells=cells.concat(cellsOf(p)); });
+  var taken=null;
+  cells.forEach(function(c){ if(!taken && isOccupied(c.x,c.y,c.z)) taken=c; });
+  if(taken) return "Cell "+taken.x+", "+taken.y+" on Z"+taken.z+" is taken - nothing pasted.";
+  var need={};
+  AXIS_KEYS.forEach(function(a){ need[a]={lo:GRID[a].lo, hi:GRID[a].hi}; });
+  cells.forEach(function(c){ AXIS_KEYS.forEach(function(a){
+    if(c[a]<need[a].lo) need[a].lo=c[a];
+    if(c[a]>need[a].hi) need[a].hi=c[a];
+  }); });
+  var over=null;
+  AXIS_KEYS.forEach(function(a){
+    if(!over && need[a].hi-need[a].lo+1>GRID_MAX)
+      over="That would need "+(need[a].hi-need[a].lo+1)+" "+AXIS_NOUN[a]+"s - the maximum is "+GRID_MAX+".";
+  });
+  if(over) return over;
+  var pre=snapshot();   // taken before the grid moves, so one undo puts both back
+  AXIS_KEYS.forEach(function(a){ GRID[a]={lo:need[a].lo, hi:need[a].hi}; });
+  var first=parts.length;
+  made.forEach(function(p){ parts.push(p); });
+  // The copy becomes the selection: it shows what landed, and it is what you would act on
+  // next in any case.
+  clearSelection();
+  for(var i=first;i<parts.length;i++) selection.push(i);
+  gizmoPartIdx=null; gizmoDrag=null; lastPlacement=null; mode="none";
+  pasteArmed=false;
+  clampActiveLayer();
+  syncGridNumbers();
+  pushHistory(pre);
+  render(); runValidation();
+  return null;
+}
 var gizmoDrag=null;      // {type:'rot'|'move', axis, basePose, prev, live} | {type:'move', axis, base:[x,y,z]}
 var connectDrag=null;    // {prep, prevAngle, live, liveIdx} while mode==="connect"
 // >1 means a full 90-degree pose step commits with LESS than 90 degrees of actual
@@ -1285,6 +1363,12 @@ function render(){
   } else if(mode==="connect" && connectDrag){
     document.getElementById("gizmostat").textContent =
       "placing · pose "+(connectDrag.liveIdx+1)+" of 4 valid for this connection · release to commit";
+  } else if(actionMsg){
+    document.getElementById("gizmostat").textContent = actionMsg;
+  } else if(pasteArmed){
+    document.getElementById("gizmostat").textContent =
+      "tap a cell to drop "+clipboard.length+" part"+(clipboard.length===1?"":"s")+
+      " · PASTE again to cancel";
   } else if(selection.length){
     document.getElementById("gizmostat").textContent =
       selection.length+" part"+(selection.length===1?"":"s")+" selected · tap another to add it, "+
@@ -1337,6 +1421,18 @@ function syncDeleteButton(){
   document.getElementById("deletebtn").disabled = (gizmoPartIdx==null && !selection.length);
   var selEl=document.getElementById("selectbtn");
   if(selEl) selEl.classList.toggle("on", selectMode);
+  // COPY appears while you are gathering; PASTE stays as long as you are holding a copy,
+  // so you can leave SELECT, move to another layer and drop it there.
+  var copyEl=document.getElementById("copybtn"), pasteEl=document.getElementById("pastebtn");
+  if(copyEl){
+    copyEl.style.display = selectMode ? "" : "none";
+    copyEl.disabled = !selection.length;
+  }
+  if(pasteEl){
+    pasteEl.style.display = (selectMode || clipboard.length) ? "" : "none";
+    pasteEl.disabled = !clipboard.length;
+    pasteEl.classList.toggle("on", pasteArmed);
+  }
   var clearEl=document.getElementById("clearbtn");
   if(clearEl) clearEl.disabled = !parts.length;
 }
@@ -2520,6 +2616,19 @@ svg.addEventListener("pointerdown", function(e){
       // body hit win by a hair there, silently turning a port tap into a reselect
       // instead of a placement. Fixed by giving any port inside its own capture radius
       // absolute priority; the body hit-test only gets a say when no port claims the tap.
+      if(pasteArmed){
+        var dropCell=cellAtPoint(p);
+        if(!dropCell){
+          actionMsg="That is off the board - tap a cell.";
+          render();
+        } else {
+          var why=pasteAt(dropCell);
+          actionMsg = why || (clipboard.length+" part"+(clipboard.length===1?"":"s")+" pasted");
+          render();
+        }
+        e.preventDefault();
+        return;
+      }
       var portHit=nearestPortWithin(p.x,p.y,CAPTURE_R);
       var bodyHit=portHit ? null : hitPartBody(p);
       // In SELECT mode a tap anywhere on a part gathers it or drops it again. A port is
@@ -2550,6 +2659,7 @@ svg.addEventListener("pointerdown", function(e){
       if(portHit || bodyHit) selectedCell=null;
       if(selectTap){
         toggleSelected(portHit ? portHit.partIdx : bodyHit.partIdx);
+        actionMsg="";
         gizmoPartIdx=null; gizmoDrag=null; mode="none";
         render();
       } else if(portHit){
@@ -2986,11 +3096,23 @@ function setPopover(name){
   document.getElementById("dockBoard").classList.toggle("on", name==="board");
   document.getElementById("dockCut").classList.toggle("on", name==="cut");
 }
+document.getElementById("copybtn").addEventListener("click", function(){
+  var got=copySelection();
+  actionMsg = got ? got+" part"+(got===1?"":"s")+" copied · PASTE, then tap where it goes" : "";
+  render();
+});
+document.getElementById("pastebtn").addEventListener("click", function(){
+  if(!clipboard.length) return;
+  pasteArmed=!pasteArmed;
+  actionMsg="";
+  render();
+});
 document.getElementById("selectbtn").addEventListener("click", function(){
   selectMode=!selectMode;
   // Leaving drops the selection rather than leaving an invisible one behind for the next
   // DELETE to act on. Parts are tapped in the 3D view, so entering also brings you there.
   if(!selectMode) clearSelection(); else setViewMode("3d");
+  pasteArmed=false; actionMsg="";
   gizmoPartIdx=null; gizmoDrag=null; mode="none";
   setPopover(null);
   render();
@@ -3201,7 +3323,10 @@ window.__pgSlice={get parts(){return parts;}, get gizmoPartIdx(){return gizmoPar
   get selectMode(){return selectMode;}, get selection(){return selection;},
   setSelectMode:function(on){ selectMode=!!on; if(!selectMode) clearSelection(); render(); },
   toggleSelected:function(i){ toggleSelected(i); render(); },
-  deletePart:deletePart};
+  deletePart:deletePart,
+  get clipboard(){return clipboard;}, get pasteArmed(){return pasteArmed;},
+  copySelection:copySelection, pasteAt:pasteAt,
+  armPaste:function(on){ pasteArmed=!!on; render(); }};
 
 /* ================= validation ================= */
 function badge(ok){ return '<span class="badge '+(ok?"pass":"fail")+'">'+(ok?"PASS":"FAIL")+'</span>'; }
