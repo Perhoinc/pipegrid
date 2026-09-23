@@ -1638,7 +1638,7 @@ function drawPlanPanel(svg,x,y,w,h,label,layerParts){
    fraction below buys. Raise it toward 1 for less bite, lower it for more; it must stay
    well clear of 0, where the pipe would cross the port centre and look like the fault this
    whole thing was built to fix. */
-var PORT_BITE=0.90;
+var PORT_BITE=0.80;
 function trimStreamStart(pts, r){
   var out=pts.slice();
   // >=2, not >2: a straight stream arrives as a bare pair of points, and an earlier version
