@@ -338,6 +338,7 @@
   <button class="dockbtn on" id="dockShapes"><span class="ic">◧</span>SHAPES</button>
   <button class="dockbtn" id="undobtn"><span class="ic">↶</span>UNDO</button>
   <button class="dockbtn" id="redobtn"><span class="ic">↷</span>REDO</button>
+  <button class="dockbtn" id="selectbtn"><span class="ic">⧉</span>SELECT</button>
   <button class="dockbtn danger" id="deletebtn" disabled><span class="ic">✕</span>DELETE</button>
   <button class="dockbtn" id="dockCut"><span class="ic">☰</span>CUT LIST</button>
   <button class="dockbtn" id="dockBoard"><span class="ic">⤓</span>BOARD</button>
@@ -626,6 +627,24 @@ function ringAngleAt(axis, cellArr, pt){
 function snapQuarter(t){ return Math.round(t/(Math.PI/2)); }
 
 var gizmoPartIdx=null;   // which part currently shows the gizmo, or null
+
+/* Multi-select, kept deliberately apart from gizmoPartIdx. The gizmo is a control attached
+   to ONE part, and tapping a part to move that control is the most frequent thing anyone
+   does here - so rather than overload that tap, gathering several parts is its own mode,
+   reached from the dock. While it is off, nothing below changes any existing behaviour.
+   A selection may span layers (owner's call). It is the only thing that makes copying an
+   assembly that climbs possible, and parts already cross layers on their own - a 3-cell
+   riser stands in three floors by itself.
+   Indices rather than references, matching what the rest of the app uses. They are only
+   meaningful against the current parts array, so anything that rebuilds it clears them. */
+var selectMode=false;
+var selection=[];
+function isSelected(i){ return selection.indexOf(i)>=0; }
+function toggleSelected(i){
+  var k=selection.indexOf(i);
+  if(k>=0) selection.splice(k,1); else selection.push(i);
+}
+function clearSelection(){ selection.length=0; }
 var gizmoDrag=null;      // {type:'rot'|'move', axis, basePose, prev, live} | {type:'move', axis, base:[x,y,z]}
 var connectDrag=null;    // {prep, prevAngle, live, liveIdx} while mode==="connect"
 // >1 means a full 90-degree pose step commits with LESS than 90 degrees of actual
@@ -813,8 +832,10 @@ function clampActiveLayer(){
 }
 function setActiveLayer(z){
   activeLayer=z; clampActiveLayer();
-  gizmoPartIdx=null; gizmoDrag=null;   // a selection on the layer you just left is confusing
+  gizmoPartIdx=null; gizmoDrag=null;   // a gizmo on the layer you just left is confusing
   selectedCell=null;                   // ...and so is a target cell sitting on it
+  // The multi-selection deliberately survives. Gathering parts from several floors is the
+  // whole reason it is allowed to cross layers, and changing layer is how you reach them.
   render();
 }
 // Grows the grid to contain everything on the board. Called after any load so a
@@ -993,7 +1014,7 @@ function render(){
       var pts3=streamLocal(part,st,14)
         .map(function(p){ var w=matApply(pose,p); return [w[0]+part.cell.x, w[1]+part.cell.y, w[2]+part.cell.z]; });
       var view=pts3.map(function(p){ return viewPt(p[0],p[1],p[2],cam.az,cam.el); });
-      items.push({cellDepth:cellDepth, cellIdx:partIdx, onActive:onActive,
+      items.push({cellDepth:cellDepth, cellIdx:partIdx, onActive:onActive, selected:isSelected(partIdx),
         depth:view.reduce(function(a,p){return a+p.y;},0)/view.length, kind:"chan", pts:view});
     });
     part.ports.forEach(function(p){
@@ -1032,8 +1053,26 @@ function render(){
       });
     } else if(it.kind==="chan"){
       var pts2=it.pts.map(proj);
+      var dStr="M "+pts2.map(function(p){return p.sx.toFixed(1)+" "+p.sy.toFixed(1);}).join(" L ");
+      // A gathered part wears a wider accent stroke under its own pipe, so the highlight
+      // reads as belonging to that pipe rather than as a second pipe running beside it.
+      // Appended immediately before the pipe itself, so it keeps that part's place in the
+      // depth order rather than floating above the whole scene. Dimmed along with its part
+      // when that part is off the active layer - a selection crosses layers, but it should
+      // not make an off-layer part shout louder than the one you are working on.
+      if(it.selected){
+        var halo=svgNS("path");
+        halo.setAttribute("d",dStr);
+        halo.setAttribute("fill","none");
+        halo.setAttribute("stroke","var(--acc)");
+        halo.setAttribute("stroke-width",(wpx(W_CHANNEL)*2.2).toFixed(2));
+        halo.setAttribute("stroke-linecap","round");
+        halo.setAttribute("stroke-linejoin","round");
+        halo.setAttribute("opacity", it.onActive ? "0.55" : "0.25");
+        sceneG.appendChild(halo);
+      }
       var path=svgNS("path");
-      path.setAttribute("d","M "+pts2.map(function(p){return p.sx.toFixed(1)+" "+p.sy.toFixed(1);}).join(" L "));
+      path.setAttribute("d",dStr);
       path.setAttribute("fill","none"); path.setAttribute("stroke","var(--text)");
       path.setAttribute("stroke-width", wpx(W_CHANNEL).toFixed(2)); path.setAttribute("stroke-linecap","round");
       // Owner's fix for the sharp spike artifact at acute viewing angles: an elbow arc's
@@ -1246,6 +1285,13 @@ function render(){
   } else if(mode==="connect" && connectDrag){
     document.getElementById("gizmostat").textContent =
       "placing · pose "+(connectDrag.liveIdx+1)+" of 4 valid for this connection · release to commit";
+  } else if(selection.length){
+    document.getElementById("gizmostat").textContent =
+      selection.length+" part"+(selection.length===1?"":"s")+" selected · tap another to add it, "+
+      "tap a selected one to drop it";
+  } else if(selectMode){
+    document.getElementById("gizmostat").textContent =
+      "select · tap parts to gather them, across layers if you like";
   } else if(selectedCell){
     // The one place the free-placement flow can stall is between picking a cell and
     // realising a shape is what comes next, so the readout says so outright.
@@ -1288,7 +1334,9 @@ function renderLayerBar(){
 // Mirrors deletePart()'s own guards exactly, so the button is never offering something
 // the action would then refuse: nothing selected, or the last part left on the board.
 function syncDeleteButton(){
-  document.getElementById("deletebtn").disabled = (gizmoPartIdx==null);
+  document.getElementById("deletebtn").disabled = (gizmoPartIdx==null && !selection.length);
+  var selEl=document.getElementById("selectbtn");
+  if(selEl) selEl.classList.toggle("on", selectMode);
   var clearEl=document.getElementById("clearbtn");
   if(clearEl) clearEl.disabled = !parts.length;
 }
@@ -2112,6 +2160,7 @@ function loadBoard(data, opts){
   });
   parts=newParts;
   gizmoPartIdx=null; gizmoDrag=null; lastPlacement=null; mode="none"; pts.clear();
+  clearSelection();   // indices are only meaningful against the parts array they came from
   selectedCell=null;   // a target cell from the previous board means nothing on this one
   // Undo/redo pass restoreCamera:false - stepping back through history shouldn't
   // yank the camera to wherever it happened to be sitting when that step was taken;
@@ -2201,9 +2250,14 @@ function deletePart(){
   // No floor of one part any more. It was there because an empty board could not be
   // loaded or validated; now that it can, refusing to delete the last part would just be
   // an arbitrary stop, and inconsistent with Clear all emptying the board in one tap.
-  if(gizmoPartIdx==null) return;
+  // The whole selection when there is one, otherwise whichever part holds the gizmo.
+  var victims = selection.length ? selection.slice()
+                                 : (gizmoPartIdx==null ? [] : [gizmoPartIdx]);
+  if(!victims.length) return;
   var pre=snapshot();
-  parts.splice(gizmoPartIdx,1);
+  // Highest index first: splicing from the front would shift every index still to come.
+  victims.sort(function(a,b){ return b-a; }).forEach(function(i){ parts.splice(i,1); });
+  clearSelection();
   gizmoPartIdx=null; gizmoDrag=null; lastPlacement=null; mode="none";
   pushHistory(pre);
   render(); runValidation();
@@ -2218,6 +2272,7 @@ function clearAll(){
   var pre=snapshot(), n=parts.length;
   parts=[];
   gizmoPartIdx=null; gizmoDrag=null; lastPlacement=null; mode="none"; pts.clear();
+  clearSelection();   // indices are only meaningful against the parts array they came from
   selectedCell=null;
   pushHistory(pre);
   render(); runValidation();
@@ -2467,6 +2522,9 @@ svg.addEventListener("pointerdown", function(e){
       // absolute priority; the body hit-test only gets a say when no port claims the tap.
       var portHit=nearestPortWithin(p.x,p.y,CAPTURE_R);
       var bodyHit=portHit ? null : hitPartBody(p);
+      // In SELECT mode a tap anywhere on a part gathers it or drops it again. A port is
+      // just part of the thing you are pointing at here, so it does not start a placement.
+      var selectTap = selectMode && (portHit || bodyHit);
       // In an isometric view every layer projects to the same screen area, just offset,
       // so a part sitting on a DIFFERENT layer routinely lands on top of an empty cell of
       // the one you're working on - measured 12.4px between a layer-0 port and the centre
@@ -2477,7 +2535,11 @@ svg.addEventListener("pointerdown", function(e){
       // lands on a genuinely empty cell, so parts on the active layer keep absolute
       // priority, single-layer boards are untouched, and an off-layer part is still
       // tappable everywhere it isn't covering an empty cell you could build in.
-      var claimIdx = portHit ? portHit.partIdx : (bodyHit ? bodyHit.partIdx : null);
+      // Skipped while gathering: this rule exists so an off-layer part cannot steal a tap
+      // meant for an empty cell you are about to build in, and a selection has no such
+      // cell to protect. Applying it here would make off-layer parts unselectable exactly
+      // where they cover empty ground, which is most of the time.
+      var claimIdx = selectTap ? null : (portHit ? portHit.partIdx : (bodyHit ? bodyHit.partIdx : null));
       if(claimIdx!=null && parts[claimIdx].cell.z!==activeLayer){
         var underCell=cellAtPoint(p);
         if(underCell && !isOccupied(underCell.x,underCell.y,underCell.z)){ portHit=null; bodyHit=null; }
@@ -2486,7 +2548,11 @@ svg.addEventListener("pointerdown", function(e){
       // empty cell you'd picked, so the target clears rather than lingering as a stale
       // highlight that would place the NEXT shape somewhere you'd stopped looking at.
       if(portHit || bodyHit) selectedCell=null;
-      if(portHit){
+      if(selectTap){
+        toggleSelected(portHit ? portHit.partIdx : bodyHit.partIdx);
+        gizmoPartIdx=null; gizmoDrag=null; mode="none";
+        render();
+      } else if(portHit){
         if(portCanConnect(portHit)){
           // Placing IS a side effect, so if a different part's gizmo is up, this tap
           // still only dismisses it first - unchanged from the owner's original fix.
@@ -2674,8 +2740,13 @@ function up(e){
         // an occupied cell or off the grid clears the target instead, so there's always
         // a way to back out without having to place something.
         if(orbitHadGizmo) gizmoPartIdx=null;
+        // In SELECT mode the same stationary tap drops the whole selection - the only way
+        // back to nothing without leaving the mode. No build target is picked either:
+        // choosing a cell to build in and gathering parts are different jobs, and doing
+        // both from one tap would leave a stale target sitting on the board.
+        if(selectMode) clearSelection();
         var tapCell=cellAtPoint(svgPointFromClient(e.clientX,e.clientY));
-        selectedCell=(tapCell && !isOccupied(tapCell.x,tapCell.y,tapCell.z)) ? tapCell : null;
+        selectedCell=(!selectMode && tapCell && !isOccupied(tapCell.x,tapCell.y,tapCell.z)) ? tapCell : null;
         render();
       }
       orbitHadGizmo=false;
@@ -2915,6 +2986,15 @@ function setPopover(name){
   document.getElementById("dockBoard").classList.toggle("on", name==="board");
   document.getElementById("dockCut").classList.toggle("on", name==="cut");
 }
+document.getElementById("selectbtn").addEventListener("click", function(){
+  selectMode=!selectMode;
+  // Leaving drops the selection rather than leaving an invisible one behind for the next
+  // DELETE to act on. Parts are tapped in the 3D view, so entering also brings you there.
+  if(!selectMode) clearSelection(); else setViewMode("3d");
+  gizmoPartIdx=null; gizmoDrag=null; mode="none";
+  setPopover(null);
+  render();
+});
 document.getElementById("dockShapes").addEventListener("click", function(){
   setViewMode("3d");
   setPopover(activePopover==="shapes" ? null : "shapes");
@@ -3117,7 +3197,11 @@ window.__pgSlice={get parts(){return parts;}, get gizmoPartIdx(){return gizmoPar
   pc:pc,   // world point -> screen point, so cellAtPoint's inverse can be checked against it
   render:function(){ render(); },
   svgPointFromClient:svgPointFromClient, serializeBoard:serializeBoard, loadBoard:loadBoard,
-  doUndo:doUndo, doRedo:doRedo, snapshot:snapshot, clearAll:clearAll, LS_KEY:LS_KEY};
+  doUndo:doUndo, doRedo:doRedo, snapshot:snapshot, clearAll:clearAll, LS_KEY:LS_KEY,
+  get selectMode(){return selectMode;}, get selection(){return selection;},
+  setSelectMode:function(on){ selectMode=!!on; if(!selectMode) clearSelection(); render(); },
+  toggleSelected:function(i){ toggleSelected(i); render(); },
+  deletePart:deletePart};
 
 /* ================= validation ================= */
 function badge(ok){ return '<span class="badge '+(ok?"pass":"fail")+'">'+(ok?"PASS":"FAIL")+'</span>'; }

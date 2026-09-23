@@ -289,7 +289,7 @@
   that are still waiting on a decision from you.</p>
   <div class="meta">
     <span><b>Updated</b> 24 Sep 2026</span>
-    <span><b>Build</b> vertical slice &middot; 3,253 lines</span>
+    <span><b>Build</b> vertical slice &middot; 3,337 lines</span>
     <span><b>Catalogue</b> 39 of 39 parts</span>
     <span><b>Live</b> perhoinc.github.io/pipegrid</span>
   </div>
@@ -350,21 +350,7 @@
     <li>
       <span class="num">01<span class="when">added<br>7 Sep</span></span>
       <div class="item">
-        <h3>Selecting more than one thing at a time<span class="tag next">recommended next</span></h3>
-        <p>Everything today acts on exactly one part: the gizmo, delete, the length grips.
-        Selecting several would make delete, move and rotate work on a group — and it is
-        what copy and paste needs underneath it.</p>
-        <p>Two things worth deciding before it is built. <b>How you select</b> — drag a box
-        across the grid, or tap parts one after another to add them? A box is quicker for a
-        block; tapping is more precise in a dense layout, and works better with a thumb.
-        <b>Whether a selection can cross layers</b>, or is confined to the one you are
-        working on, the way placement already is.</p>
-      </div>
-    </li>
-    <li>
-      <span class="num">02<span class="when">added<br>7 Sep</span></span>
-      <div class="item">
-        <h3>Copy and paste<span class="tag blocked">needs 01</span></h3>
+        <h3>Copy and paste<span class="tag next">recommended next</span></h3>
         <p>Repeat an assembly you have already worked out instead of rebuilding it cell by
         cell. For modular pieces this is probably the biggest single saving on the list.</p>
         <p>The real question is <b>where a paste lands</b>: offset a cell from the original,
@@ -372,6 +358,20 @@
         happens when it does not fit</b> — refuse the whole paste, or place what fits and
         say what it left out. Refusing wholesale is safer; partial pasting is friendlier
         right up until it quietly drops something.</p>
+      </div>
+    </li>
+    <li>
+      <span class="num">02<span class="when">added<br>24 Sep</span></span>
+      <div class="item">
+        <h3>Moving and rotating a group</h3>
+        <p>Selecting several parts now deletes them together. Moving and turning them
+        together is the other half, and it was deliberately left out of that first step so
+        you could use the selection sooner.</p>
+        <p>Moving is straightforward &mdash; shift everything by the same number of cells and
+        refuse the move if any part would land outside the grid or on top of something.
+        <b>Rotating needs a decision:</b> what the group turns around. Its own middle, the
+        first part you picked, or a cell you tap. They give noticeably different results for
+        anything that is not square.</p>
       </div>
     </li>
     <li>
@@ -418,6 +418,24 @@
   </div>
 
   <div class="resolved">
+    <h3>Selecting several parts at once</h3>
+    <span class="when"><b>settled</b> 24 Sep</span>
+    <p><b>You gather parts by tapping them</b>, not by dragging a box. Dragging on empty
+    space already orbits the camera, and on an iPad there is no modifier key to tell the two
+    apart &mdash; a box would have needed its own mode button before every selection.</p>
+    <p><b>A selection can cross layers.</b> Change floor and it survives, so you can gather
+    parts from several. Parts already cross layers on their own: a 3-cell riser stands in
+    three floors at once.</p>
+    <p><b>It lives behind a SELECT button in the dock.</b> That was my call, not yours, and
+    the reason is that tapping a part to move the gizmo onto it is the most frequent thing
+    you do &mdash; making taps additive everywhere would have changed it. With SELECT off
+    nothing behaves differently at all. Leaving the mode drops the selection rather than
+    leaving an invisible one behind for the next DELETE to act on.</p>
+    <p>DELETE removes the whole selection in one undoable step. <b>Moving and rotating a
+    group are not in yet</b> &mdash; they are item 02, and rotating needs a decision from
+    you about what the group turns around.</p>
+  </div>
+  <div class="resolved" style="margin-top:14px;">
     <h3>The isometric reads correctly</h3>
     <span class="when"><b>settled</b> 23 Sep</span>
     <p>Your verdict, on a zoomed-in grab: pipes tuck under a port where they should, and
@@ -572,6 +590,8 @@
   <p class="sblurb">All live on the iPad build.</p>
 
   <ul class="shipped">
+    <li><span class="dot"></span><div>Selecting several parts at once<span class="when">24 Sep</span>
+      <small>Tap to gather, across layers; DELETE acts on the lot in one undoable step</small></div></li>
     <li><span class="dot"></span><div>Deeper bite where a pipe meets its port<span class="when">23 Sep</span>
       <small>38% of the port radius to 58%, so the join reads as a connection</small></div></li>
     <li><span class="dot"></span><div>Pipes stop at their own port<span class="when">20 Sep</span>
