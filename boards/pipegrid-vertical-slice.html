@@ -106,10 +106,6 @@
        background:var(--panel);border-top:1px solid var(--edge);padding:6px 8px;}
   .recents.show{display:flex;}
   .recents .tile{width:40px;height:40px;aspect-ratio:auto;flex:none;padding:0;}
-  .recents .grouptile{width:auto;min-width:44px;padding:0 12px;color:var(--text);
-       font-family:inherit;font-size:10px;letter-spacing:.6px;}
-  .recents .turntile{min-width:40px;padding:0;font-size:17px;letter-spacing:0;}
-  .recents .grouptile:disabled{opacity:.35;}
   .recents .tile svg{width:66%;height:66%;}
 
   .dock{flex:none;display:flex;background:var(--panel);border-top:1px solid var(--edge);
@@ -678,114 +674,6 @@ var clipboard=[];
    The cell is chosen first now - the same layer, cell, then shape order that placing a
    single part already follows - so a wrong cell is a different tap, not an undo. */
 var actionMsg="";         // what just happened, shown in the readout until the next action
-
-/* Moving and turning a gathered group.
-
-   Both end up as the same thing - a list of parts with a new cell and a new pose - so they
-   share one validator and one commit. The rules match paste, because they are the same
-   question asked twice: a cell already occupied refuses the whole change, and running off
-   the grid grows it instead. What a move or a turn adds is that the group's OWN cells do
-   not count as occupied: it is vacating them in the same breath.
-
-   A turn rotates each part's offset from the pivot by exactly the matrix that rotates its
-   pose, which is what keeps a part's geometry and its position in step. That also settles
-   multi-cell parts for free: cellsOf() runs from the anchor along the direction of the
-   first port, and rotating the pose rotates that direction by the same matrix, so the
-   rotated anchor is still the right end to start from. */
-function groupCorner(idxs){
-  var lo={x:Infinity, y:Infinity, z:Infinity};
-  idxs.forEach(function(i){ cellsOf(parts[i]).forEach(function(c){
-    if(c.x<lo.x) lo.x=c.x;
-    if(c.y<lo.y) lo.y=c.y;
-    if(c.z<lo.z) lo.z=c.z;
-  }); });
-  return lo;
-}
-// changes: [{idx, cell, poseIdx}] - where each selected part would end up.
-function planGroupChange(changes){
-  if(!changes || !changes.length) return null;
-  var moving={};
-  changes.forEach(function(c){ moving[c.idx]=1; });
-  var probes=changes.map(function(c){
-    var p=parts[c.idx];
-    return {idx:c.idx, cell:c.cell, poseIdx:c.poseIdx, ports:p.ports, span:spanOf(p)};
-  });
-  var cells=[];
-  probes.forEach(function(p){ cells=cells.concat(cellsOf(p)); });
-  // Two parts of the group landing on one cell - a turn can fold a shape onto itself.
-  var seen={}, taken=null;
-  cells.forEach(function(c){
-    var k=c.x+","+c.y+","+c.z;
-    if(!taken && seen[k]) taken=c;
-    seen[k]=1;
-  });
-  // Anything standing there that is NOT part of the group.
-  if(!taken) parts.forEach(function(p,i){
-    if(taken || moving[i]) return;
-    cellsOf(p).forEach(function(q){
-      if(!taken && seen[q.x+","+q.y+","+q.z]) taken=q;
-    });
-  });
-  var need={};
-  AXIS_KEYS.forEach(function(a){ need[a]={lo:GRID[a].lo, hi:GRID[a].hi}; });
-  cells.forEach(function(c){ AXIS_KEYS.forEach(function(a){
-    if(c[a]<need[a].lo) need[a].lo=c[a];
-    if(c[a]>need[a].hi) need[a].hi=c[a];
-  }); });
-  var over=null;
-  AXIS_KEYS.forEach(function(a){
-    if(!over && need[a].hi-need[a].lo+1>GRID_MAX)
-      over="That would need "+(need[a].hi-need[a].lo+1)+" "+AXIS_NOUN[a]+"s - the maximum is "+GRID_MAX+".";
-  });
-  return {probes:probes, taken:taken, over:over, need:need};
-}
-function groupRefusal(plan){
-  if(!plan) return "Nothing selected.";
-  if(plan.taken) return "Cell "+plan.taken.x+", "+plan.taken.y+" on Z"+plan.taken.z+
-                        " is in the way - nothing moved.";
-  return plan.over || null;
-}
-function commitGroupChange(plan){
-  var pre=snapshot();   // before the grid moves, so one undo puts both back
-  AXIS_KEYS.forEach(function(a){ GRID[a]={lo:plan.need[a].lo, hi:plan.need[a].hi}; });
-  plan.probes.forEach(function(p){
-    parts[p.idx].cell={x:p.cell.x, y:p.cell.y, z:p.cell.z};
-    parts[p.idx].poseIdx=p.poseIdx;
-  });
-  gizmoPartIdx=null; gizmoDrag=null; lastPlacement=null; mode="none";
-  clampActiveLayer();
-  syncGridNumbers();
-  pushHistory(pre);
-  render(); runValidation();
-}
-// The group's footprint corner goes to this cell, the same corner-to-cell rule paste uses.
-function moveChanges(cell){
-  if(!selection.length || !cell) return null;
-  var lo=groupCorner(selection);
-  var d={x:cell.x-lo.x, y:cell.y-lo.y, z:cell.z-lo.z};
-  return selection.map(function(i){
-    var p=parts[i];
-    return {idx:i, poseIdx:p.poseIdx,
-            cell:{x:p.cell.x+d.x, y:p.cell.y+d.y, z:p.cell.z+d.z}};
-  });
-}
-// A quarter turn about the tapped cell, around one of the three axes the gizmo already
-// uses - so a group turns by exactly the rule a single part turns by.
-function turnChanges(axisId, pivot){
-  if(!selection.length || !pivot) return null;
-  var axis=null;
-  GIZMO_AXES.forEach(function(a){ if(a.id===axisId) axis=a; });
-  if(!axis) return null;
-  return selection.map(function(i){
-    var p=parts[i];
-    var off=matApply(axis.M, [p.cell.x-pivot.x, p.cell.y-pivot.y, p.cell.z-pivot.z]);
-    var M=matMul(axis.M, ROTS[p.poseIdx]);
-    var key=matKey(M), found=-1;
-    ROTS.forEach(function(R,ri){ if(found<0 && matKey(R)===key) found=ri; });
-    return {idx:i, poseIdx:found<0 ? p.poseIdx : found,
-            cell:{x:pivot.x+off[0], y:pivot.y+off[1], z:pivot.z+off[2]}};
-  });
-}
 
 function copySelection(){
   if(!selection.length) return 0;
@@ -1509,14 +1397,11 @@ function render(){
       "placing · pose "+(connectDrag.liveIdx+1)+" of 4 valid for this connection · release to commit";
   } else if(actionMsg){
     document.getElementById("gizmostat").textContent = actionMsg;
-  } else if(selection.length && !selectedCell){
-    // Only while no cell is chosen: once there is one, what that cell would DO is the more
-    // useful thing to say, and the branch below says it.
+  } else if(selection.length){
     document.getElementById("gizmostat").textContent =
-      selection.length+" part"+(selection.length===1?"":"s")+" selected · tap a cell to move or "+
-      "turn them, tap a selected part to drop it";
-  } else if(selectMode && !selectedCell){
-    // Same reason as the branch above: a chosen cell has something specific to say.
+      selection.length+" part"+(selection.length===1?"":"s")+" selected · tap another to add it, "+
+      "tap a selected one to drop it";
+  } else if(selectMode){
     document.getElementById("gizmostat").textContent =
       "select · tap parts to gather them, across layers if you like";
   } else if(selectedCell){
@@ -1524,12 +1409,10 @@ function render(){
     // realising a shape is what comes next, so the readout says so outright.
     document.getElementById("gizmostat").textContent =
       "cell "+selectedCell.x+", "+selectedCell.y+" on Z"+selectedCell.z+
-      (selection.length
-        ? " · MOVE brings the group here, ↻ turns it around this cell"
-        : clipboard.length
-          ? " · PASTE drops "+clipboard.length+" part"+(clipboard.length===1?"":"s")+
-            " here, or pick a shape"
-          : " · pick a shape to place it here");
+      (clipboard.length
+        ? " · PASTE drops "+clipboard.length+" part"+(clipboard.length===1?"":"s")+
+          " here, or pick a shape"
+        : " · pick a shape to place it here");
   } else if(clipboard.length){
     document.getElementById("gizmostat").textContent =
       "holding "+clipboard.length+" part"+(clipboard.length===1?"":"s")+
@@ -1547,19 +1430,9 @@ function render(){
      something that is not there yet, and it is no use if a real part hides it. Dashed for
      the same reason. Danger colour when something is in the way, so a refusal is visible
      before the press rather than as a message after it. */
-  var ghostPlan=null;
-  if(selection.length && selectedCell){
-    var mv=planGroupChange(moveChanges(selectedCell));
-    if(mv) ghostPlan={made:mv.probes.map(function(pr){
-      var src=parts[pr.idx];
-      return {cell:pr.cell, poseIdx:pr.poseIdx, streams:src.streams, ports:src.ports, span:pr.span};
-    }), taken:mv.taken, over:mv.over};
-  } else if(clipboard.length && selectedCell){
-    ghostPlan=planPaste(selectedCell);
-  }
-  if(ghostPlan){
-    var ghost=ghostPlan;
-    {
+  if(clipboard.length && selectedCell){
+    var ghost=planPaste(selectedCell);
+    if(ghost){
       var ghostBad=!!(ghost.taken || ghost.over);
       var ghostW=wpx(W_CHANNEL);
       ghost.made.forEach(function(gpart){
@@ -2528,15 +2401,7 @@ function syncHistoryButtons(){
 function stepHistory(fromStack, toStack){
   if(!fromStack.length) return;
   toStack.push(snapshot());
-  // Keep the gathered group across a step that did not change how many parts there are.
-  // loadBoard clears the selection because indices mean nothing against a rebuilt array -
-  // true in general, but a move, a turn or a grid change rebuilds the same parts in the
-  // same order, so the indices survive and undoing a group move you did not like should
-  // hand the group straight back rather than making you gather it again. Anything that
-  // added or removed parts fails the count test and clears, as before.
-  var heldSelection=selection.slice(), heldCount=parts.length;
   loadBoard(JSON.parse(fromStack.pop()), {restoreCamera:false});
-  if(parts.length===heldCount) heldSelection.forEach(function(i){ if(i<parts.length) selection.push(i); });
   autosave(); syncHistoryButtons();
   render(); runValidation();
 }
@@ -3045,15 +2910,17 @@ function up(e){
         // an occupied cell or off the grid clears the target instead, so there's always
         // a way to back out without having to place something.
         if(orbitHadGizmo) gizmoPartIdx=null;
-        // One rule everywhere: a stationary tap on an empty cell chooses that cell. It used
-        // to clear the selection instead while gathering, which was right until a group
-        // needed a selection AND a cell at the same time - to move to, or to turn around.
-        // Dropping a selection is now done by tapping the parts again, or by leaving SELECT.
-        // Choosing a cell is a new action, so whatever the last one reported stops being the
-        // most useful thing to say.
+        // In SELECT mode the same stationary tap drops the whole selection - the only way
+        // back to nothing without leaving the mode. No build target is picked either:
+        // choosing a cell to build in and gathering parts are different jobs, and doing
+        // both from one tap would leave a stale target sitting on the board.
+        if(selectMode) clearSelection();
+        // Choosing a cell is a new action, so whatever the last one reported stops being
+        // the most useful thing to say - the readout goes back to describing the cell, and
+        // what PASTE would do with it.
         actionMsg="";
         var tapCell=cellAtPoint(svgPointFromClient(e.clientX,e.clientY));
-        selectedCell=(tapCell && !isOccupied(tapCell.x,tapCell.y,tapCell.z)) ? tapCell : null;
+        selectedCell=(!selectMode && tapCell && !isOccupied(tapCell.x,tapCell.y,tapCell.z)) ? tapCell : null;
         render();
       }
       orbitHadGizmo=false;
@@ -3182,56 +3049,9 @@ function noteRecentShape(key){
   recentShapes.unshift(key);
   if(recentShapes.length>RECENT_MAX) recentShapes.length=RECENT_MAX;
 }
-/* The row above the dock does double duty: while a group is gathered it carries what you
-   can do to that group, and otherwise the parts you have been reaching for. One row, and
-   whichever is useful at the time. The three turn buttons take the axis colours the corner
-   compass and the single-part gizmo already use, so the mapping is taught once. */
-function renderGroupBar(host){
-  host.innerHTML="";
-  var cell=selectedCell;
-  var mv=document.createElement("button");
-  mv.className="tile grouptile";
-  mv.textContent="MOVE";
-  mv.title = cell ? "Move the group so its corner sits in the chosen cell"
-                  : "Tap a cell first, then MOVE";
-  mv.disabled=!cell;
-  mv.addEventListener("click", function(){
-    var plan=planGroupChange(moveChanges(selectedCell));
-    var why=groupRefusal(plan);
-    if(why){ actionMsg=why; render(); return; }
-    commitGroupChange(plan);
-    actionMsg=selection.length+" part"+(selection.length===1?"":"s")+" moved";
-    render();
-  });
-  host.appendChild(mv);
-  GIZMO_AXES.forEach(function(a){
-    var b=document.createElement("button");
-    b.className="tile grouptile turntile";
-    b.textContent="↻";
-    b.style.color=a.col;
-    b.style.borderColor=cell ? a.col : "";
-    b.title = cell ? "Turn the group a quarter turn about the "+a.name+" axis, around the chosen cell"
-                   : "Tap a cell to turn around first";
-    b.disabled=!cell;
-    b.addEventListener("click", function(){
-      var plan=planGroupChange(turnChanges(a.id, selectedCell));
-      var why=groupRefusal(plan);
-      if(why){ actionMsg=why; render(); return; }
-      commitGroupChange(plan);
-      actionMsg="turned about "+a.name;
-      render();
-    });
-    host.appendChild(b);
-  });
-}
 function renderRecents(){
   var host=document.getElementById("recents");
   if(!host) return;
-  if(viewMode==="3d" && selection.length){
-    host.classList.add("show");
-    renderGroupBar(host);
-    return;
-  }
   var show = viewMode==="3d" && recentShapes.length>0;
   host.classList.toggle("show", show);
   if(!show){ host.innerHTML=""; return; }
@@ -3606,9 +3426,6 @@ window.__pgSlice={get parts(){return parts;}, get gizmoPartIdx(){return gizmoPar
   deletePart:deletePart,
   get clipboard(){return clipboard;},
   get recentShapes(){return recentShapes;},
-  moveChanges:moveChanges, turnChanges:turnChanges,
-  planGroupChange:planGroupChange, commitGroupChange:commitGroupChange,
-  groupRefusal:groupRefusal, groupCorner:groupCorner,
   copySelection:copySelection, pasteAt:pasteAt, planPaste:planPaste,
   setSelectedCell:function(c){ selectedCell=c; render(); }};
 
