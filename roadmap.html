@@ -289,7 +289,7 @@
   that are still waiting on a decision from you.</p>
   <div class="meta">
     <span><b>Updated</b> 27 Sep 2026</span>
-    <span><b>Build</b> vertical slice &middot; 3,462 lines</span>
+    <span><b>Build</b> vertical slice &middot; 3,563 lines</span>
     <span><b>Catalogue</b> 39 of 39 parts</span>
     <span><b>Live</b> perhoinc.github.io/pipegrid</span>
   </div>
@@ -348,37 +348,9 @@
 
   <ol class="road">
     <li>
-      <span class="num">01<span class="when">added<br>27 Sep</span></span>
+      <span class="num">01<span class="when">added<br>24 Sep</span></span>
       <div class="item">
-        <h3>Paste into a cell you have already chosen<span class="tag next">recommended next</span></h3>
-        <p>Paste arms itself and the next tap both aims and fires, so there is no way to
-        see where a copy will land before it lands. When it goes wrong the only way back is
-        undo, then guess again. Your call: choose the cell first, the way placing a single
-        part already works, then press PASTE. A wrong cell is then just a different tap.</p>
-        <p><b>The anchor needs answering too.</b> Orientation is the easy half &mdash; a copy
-        is never rotated, it lands exactly as it was. Which corner sits in the chosen cell is
-        the west-most, south-most, lowest cell of the group, but that is invisible, which is
-        the real complaint. A ghost of the copy sitting in the chosen cell before you commit
-        would answer both at once.</p>
-      </div>
-    </li>
-    <li>
-      <span class="num">02<span class="when">added<br>27 Sep</span></span>
-      <div class="item">
-        <h3>Placing parts with fewer taps</h3>
-        <p>Laying a run that alternates between two parts costs a menu open, a part tap and
-        a placement every single time. The parts menu closes itself after every placement
-        &mdash; that is one line of behaviour, not a law, and keeping it open may remove most
-        of the annoyance on its own.</p>
-        <p>Beyond that, a strip of the last five parts used, sitting where you are already
-        looking. Worth deciding which to try first: the cheap fix may be enough, and a
-        recents strip costs dock or stage space that is not free.</p>
-      </div>
-    </li>
-    <li>
-      <span class="num">03<span class="when">added<br>24 Sep</span></span>
-      <div class="item">
-        <h3>Moving and rotating a group</h3>
+        <h3>Moving and rotating a group<span class="tag next">recommended next</span></h3>
         <p>Selecting several parts now deletes them together. Moving and turning them
         together is the other half, and it was deliberately left out of that first step so
         you could use the selection sooner.</p>
@@ -390,7 +362,22 @@
       </div>
     </li>
     <li>
-      <span class="num">04<span class="when">added<br>31 Aug</span></span>
+      <span class="num">02<span class="when">added<br>27 Sep</span></span>
+      <div class="item">
+        <h3>Exact viewing angles</h3>
+        <p>Azimuth and elevation by slider or by typing the degrees, so a view can be dialled
+        in rather than nudged there by a gesture that has to be exactly right. Not on screen
+        all the time: the az/el readout is already sitting in the corner, so tapping it
+        should open the control and tapping away should put it back.</p>
+        <p>Wanted in the 3D view and for the isometric panel on the 2D sheet, and in the
+        render view once that exists. <b>Worth knowing:</b> the sheet's isometric angle is a
+        settled decision &mdash; 50&deg; and 20&deg;, chosen off a mockup board and marked
+        not to be changed without asking &mdash; so making it adjustable reopens that, even
+        if the default stays put.</p>
+      </div>
+    </li>
+    <li>
+      <span class="num">03<span class="when">added<br>31 Aug</span></span>
       <div class="item">
         <h3>Trace mode</h3>
         <p>Follow the flow through a finished layout and see where it actually goes. Your
@@ -399,16 +386,16 @@
       </div>
     </li>
     <li>
-      <span class="num">05<span class="when">added<br>21 Aug</span></span>
+      <span class="num">04<span class="when">added<br>21 Aug</span></span>
       <div class="item">
-        <h3>Valves, and what flow does at a junction<span class="tag blocked">needs 04</span></h3>
+        <h3>Valves, and what flow does at a junction<span class="tag blocked">needs 03</span></h3>
         <p>A valve part, and the logic that goes with it — a merge behaves like an
         <em>or</em>, a valve like a <em>not</em> or an <em>and</em>. Parked since before
         the catalogue work, and it needs trace mode underneath it.</p>
       </div>
     </li>
     <li>
-      <span class="num">06<span class="when">added<br>27 Sep</span></span>
+      <span class="num">05<span class="when">added<br>27 Sep</span></span>
       <div class="item">
         <h3>Colour for runs and sections</h3>
         <p>Two separate things wearing one word. <b>Colouring a run</b>, or a section of
@@ -424,7 +411,7 @@
       </div>
     </li>
     <li>
-      <span class="num">07<span class="when">added<br>27 Sep</span></span>
+      <span class="num">06<span class="when">added<br>27 Sep</span></span>
       <div class="item">
         <h3>A render view</h3>
         <p>A third worksurface alongside the 3D rig and the 2D sheet: the whole build at
@@ -437,7 +424,7 @@
       </div>
     </li>
     <li>
-      <span class="num">08<span class="when">added<br>21 Aug</span></span>
+      <span class="num">07<span class="when">added<br>21 Aug</span></span>
       <div class="item">
         <h3>Exploded stack view<span class="tag parked">parked</span></h3>
         <p>The whole stack pulled apart along its vertical axis, so you can see every floor
@@ -445,7 +432,7 @@
       </div>
     </li>
     <li>
-      <span class="num">09<span class="when">added<br>25 Aug</span></span>
+      <span class="num">08<span class="when">added<br>25 Aug</span></span>
       <div class="item">
         <h3>Pipe treatment in 3D<span class="tag parked">after mechanics</span></h3>
         <p>See the open question above. Deliberately behind the mechanics work, per your
@@ -462,6 +449,24 @@
   </div>
 
   <div class="resolved">
+    <h3>Paste where you can see it, and parts within reach</h3>
+    <span class="when"><b>settled</b> 27 Sep</span>
+    <p><b>Paste is cell-first now.</b> COPY takes what you gathered and steps out of SELECT,
+    so the next tap can choose a cell; PASTE then drops the copy into it. A wrong cell is a
+    different tap rather than an undo. Arming and firing with one tap was the fault: it gave
+    you no way to see where a copy would land until it had landed.</p>
+    <p><b>A ghost answers the anchor question.</b> The copy is drawn dashed in the chosen
+    cell before you commit, so which corner lands there needs no explaining &mdash; you can
+    see it &mdash; and neither does the orientation, which was never changed in the first
+    place. It turns red when something is in the way, so a refusal shows before the press
+    rather than as a message after it.</p>
+    <p><b>A strip of the last five parts</b> sits above the dock. The cheap fix for the same
+    problem was to stop the parts menu closing after every placement, but that menu is a
+    420px panel anchored to the bottom of the screen &mdash; leaving it open would have
+    covered the board you are placing into. The strip costs one tap where the menu costs
+    three, and hides itself until you have placed something.</p>
+  </div>
+  <div class="resolved" style="margin-top:14px;">
     <h3>Copy and paste</h3>
     <span class="when"><b>settled</b> 24 Sep</span>
     <p><b>A copy lands where you next tap.</b> COPY takes the selection, PASTE arms it, and
@@ -652,6 +657,10 @@
   <p class="sblurb">All live on the iPad build.</p>
 
   <ul class="shipped">
+    <li><span class="dot"></span><div>Recent parts strip<span class="when">27 Sep</span>
+      <small>The last five shapes you used, one tap away above the dock</small></div></li>
+    <li><span class="dot"></span><div>Paste into a chosen cell, with a ghost<span class="when">27 Sep</span>
+      <small>See what lands and where before you commit; red when it will not fit</small></div></li>
     <li><span class="dot"></span><div>Copy and paste<span class="when">24 Sep</span>
       <small>Tap where it goes; refuses a taken cell, grows the grid for a tight fit</small></div></li>
     <li><span class="dot"></span><div>Selecting several parts at once<span class="when">24 Sep</span>
