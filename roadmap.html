@@ -289,7 +289,7 @@
   that are still waiting on a decision from you.</p>
   <div class="meta">
     <span><b>Updated</b> 27 Sep 2026</span>
-    <span><b>Build</b> vertical slice &middot; 3,563 lines</span>
+    <span><b>Build</b> vertical slice &middot; 3,746 lines</span>
     <span><b>Catalogue</b> 39 of 39 parts</span>
     <span><b>Live</b> perhoinc.github.io/pipegrid</span>
   </div>
@@ -348,23 +348,9 @@
 
   <ol class="road">
     <li>
-      <span class="num">01<span class="when">added<br>24 Sep</span></span>
+      <span class="num">01<span class="when">added<br>27 Sep</span></span>
       <div class="item">
-        <h3>Moving and rotating a group<span class="tag next">recommended next</span></h3>
-        <p>Selecting several parts now deletes them together. Moving and turning them
-        together is the other half, and it was deliberately left out of that first step so
-        you could use the selection sooner.</p>
-        <p>Moving is straightforward &mdash; shift everything by the same number of cells and
-        refuse the move if any part would land outside the grid or on top of something.
-        <b>Rotating needs a decision:</b> what the group turns around. Its own middle, the
-        first part you picked, or a cell you tap. They give noticeably different results for
-        anything that is not square.</p>
-      </div>
-    </li>
-    <li>
-      <span class="num">02<span class="when">added<br>27 Sep</span></span>
-      <div class="item">
-        <h3>Exact viewing angles</h3>
+        <h3>Exact viewing angles<span class="tag next">recommended next</span></h3>
         <p>Azimuth and elevation by slider or by typing the degrees, so a view can be dialled
         in rather than nudged there by a gesture that has to be exactly right. Not on screen
         all the time: the az/el readout is already sitting in the corner, so tapping it
@@ -377,7 +363,7 @@
       </div>
     </li>
     <li>
-      <span class="num">03<span class="when">added<br>31 Aug</span></span>
+      <span class="num">02<span class="when">added<br>31 Aug</span></span>
       <div class="item">
         <h3>Trace mode</h3>
         <p>Follow the flow through a finished layout and see where it actually goes. Your
@@ -386,16 +372,16 @@
       </div>
     </li>
     <li>
-      <span class="num">04<span class="when">added<br>21 Aug</span></span>
+      <span class="num">03<span class="when">added<br>21 Aug</span></span>
       <div class="item">
-        <h3>Valves, and what flow does at a junction<span class="tag blocked">needs 03</span></h3>
+        <h3>Valves, and what flow does at a junction<span class="tag blocked">needs 02</span></h3>
         <p>A valve part, and the logic that goes with it — a merge behaves like an
         <em>or</em>, a valve like a <em>not</em> or an <em>and</em>. Parked since before
         the catalogue work, and it needs trace mode underneath it.</p>
       </div>
     </li>
     <li>
-      <span class="num">05<span class="when">added<br>27 Sep</span></span>
+      <span class="num">04<span class="when">added<br>27 Sep</span></span>
       <div class="item">
         <h3>Colour for runs and sections</h3>
         <p>Two separate things wearing one word. <b>Colouring a run</b>, or a section of
@@ -411,7 +397,7 @@
       </div>
     </li>
     <li>
-      <span class="num">06<span class="when">added<br>27 Sep</span></span>
+      <span class="num">05<span class="when">added<br>27 Sep</span></span>
       <div class="item">
         <h3>A render view</h3>
         <p>A third worksurface alongside the 3D rig and the 2D sheet: the whole build at
@@ -424,7 +410,7 @@
       </div>
     </li>
     <li>
-      <span class="num">07<span class="when">added<br>21 Aug</span></span>
+      <span class="num">06<span class="when">added<br>21 Aug</span></span>
       <div class="item">
         <h3>Exploded stack view<span class="tag parked">parked</span></h3>
         <p>The whole stack pulled apart along its vertical axis, so you can see every floor
@@ -432,7 +418,7 @@
       </div>
     </li>
     <li>
-      <span class="num">08<span class="when">added<br>25 Aug</span></span>
+      <span class="num">07<span class="when">added<br>25 Aug</span></span>
       <div class="item">
         <h3>Pipe treatment in 3D<span class="tag parked">after mechanics</span></h3>
         <p>See the open question above. Deliberately behind the mechanics work, per your
@@ -449,6 +435,31 @@
   </div>
 
   <div class="resolved">
+    <h3>Moving and turning a group</h3>
+    <span class="when"><b>settled</b> 27 Sep</span>
+    <p><b>A group turns around a cell you tap</b>, and <b>all three directions</b> are
+    available &mdash; flat, or tipped either way &mdash; using the same axis colours the
+    corner compass and the single-part gizmo already use. Tapping the pivot costs a tap, and
+    buys a pivot anywhere, including outside the assembly, so a run can be swung around a
+    corner of the board rather than only spun in place.</p>
+    <p>The alternative, turning about the group&rsquo;s own middle, had a flaw worth
+    recording: the middle of an assembly is not always a cell &mdash; on a 3&times;2 footprint
+    it falls on a boundary &mdash; so the whole group would have had to settle half a cell
+    sideways to land back on the grid. A tapped cell is always a cell, so a turn is always
+    exact. Four quarter turns about each axis return a group to precisely where it started,
+    cells and poses both.</p>
+    <p><b>MOVE</b> brings the group&rsquo;s corner to the chosen cell, the same corner-to-cell
+    rule paste uses, with the same ghost showing where it would land before you commit.</p>
+    <p><b>Both follow paste&rsquo;s rules on what will not fit:</b> a cell already occupied
+    refuses the whole change, running off the grid grows it. The group&rsquo;s own cells do
+    not count as occupied &mdash; it is leaving them in the same breath.</p>
+    <p><b>One rule changed underneath.</b> A tap on an empty cell used to clear the selection
+    while gathering; now it chooses that cell, everywhere, because a group needs a selection
+    and a cell at the same time. Drop a selection by tapping the parts again or leaving
+    SELECT. Undo also hands the group back when the step did not change how many parts there
+    are, so a move you did not like can be tried again without gathering afresh.</p>
+  </div>
+  <div class="resolved" style="margin-top:14px;">
     <h3>Paste where you can see it, and parts within reach</h3>
     <span class="when"><b>settled</b> 27 Sep</span>
     <p><b>Paste is cell-first now.</b> COPY takes what you gathered and steps out of SELECT,
@@ -657,6 +668,8 @@
   <p class="sblurb">All live on the iPad build.</p>
 
   <ul class="shipped">
+    <li><span class="dot"></span><div>Moving and turning a group<span class="when">27 Sep</span>
+      <small>Around a cell you tap, all three axes, with the same ghost and fit rules</small></div></li>
     <li><span class="dot"></span><div>Recent parts strip<span class="when">27 Sep</span>
       <small>The last five shapes you used, one tap away above the dock</small></div></li>
     <li><span class="dot"></span><div>Paste into a chosen cell, with a ghost<span class="when">27 Sep</span>
