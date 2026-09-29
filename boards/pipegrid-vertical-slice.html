@@ -2917,8 +2917,14 @@ svg.addEventListener("pointerdown", function(e){
       // instead of a placement. Fixed by giving any port inside its own capture radius
       // absolute priority; the body hit-test only gets a say when no port claims the tap.
       if(transformMode && selection.length){
-        var gc=cellAtPoint(p);
-        if(gc){ gimbalCell=gc; actionMsg=""; render(); }
+        // While transforming, the parts are inert - this press is either a camera move or
+        // a tap that plants the gimbal, and which one it was is only known at release.
+        // The first version decided it here instead, planting on every pointerdown: that
+        // killed orbit outright, since no press ever became one, and made a two-finger
+        // zoom drop the gimbal wherever the first finger happened to land. Owner caught it
+        // wanting to zoom out mid-transform to finish somewhere off screen.
+        mode="orbit"; orbitLast={x:e.clientX,y:e.clientY};
+        orbitHadGizmo=false; orbitMoveDist=0;
         e.preventDefault();
         return;
       }
@@ -3177,6 +3183,16 @@ function up(e){
         // an occupied cell or off the grid clears the target instead, so there's always
         // a way to back out without having to place something.
         if(orbitHadGizmo) gizmoPartIdx=null;
+        // Transforming: this tap re-plants the gimbal, and nothing else. Deciding it here
+        // rather than at pointerdown is what leaves a one-finger drag free to orbit and a
+        // pinch free to zoom, so a transform can be finished somewhere off the current view.
+        if(transformMode && selection.length){
+          var gtap=cellAtPoint(svgPointFromClient(e.clientX,e.clientY));
+          if(gtap){ gimbalCell=gtap; actionMsg=""; }
+          render();
+          orbitHadGizmo=false;
+          return;
+        }
         // In SELECT mode the same stationary tap drops the whole selection - the only way
         // back to nothing without leaving the mode. No build target is picked either:
         // choosing a cell to build in and gathering parts are different jobs, and doing
