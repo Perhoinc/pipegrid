@@ -288,8 +288,8 @@
   <p class="standfirst">Where the build stands, what comes next, and the two things
   that are still waiting on a decision from you.</p>
   <div class="meta">
-    <span><b>Updated</b> 28 Sep 2026</span>
-    <span><b>Build</b> vertical slice &middot; 3,862 lines</span>
+    <span><b>Updated</b> 29 Sep 2026</span>
+    <span><b>Build</b> vertical slice &middot; 3,877 lines</span>
     <span><b>Catalogue</b> 39 of 39 parts</span>
     <span><b>Live</b> perhoinc.github.io/pipegrid</span>
   </div>
@@ -451,6 +451,13 @@
     the grid grows it. A group&rsquo;s own cells do not count as occupied, since it is
     vacating them in the same breath. A move that is blocked part way simply stops short
     rather than jumping past the obstruction.</p>
+    <p><b>Growth is judged by where a drag lands</b>, not by everywhere it passed. Reaching
+    past an edge mid-drag grows the grid so you can see yourself pulling out there, and
+    coming back before you let go leaves it exactly as it was &mdash; you caught it doing
+    the opposite. A drag that genuinely ends outside still grows the grid, to exactly the
+    reach of the part that went furthest. Note the grid still never shrinks by itself: if
+    one drag takes a group out and a separate drag brings it back, the extra room stays,
+    the same as after a paste.</p>
     <p>Undo hands the gathering back when the step did not change how many parts there are,
     so a nudge you did not like is one undo and another try. The gimbal itself is put down
     rather than carried over, because a move drag takes it along with the group &mdash; after
@@ -665,6 +672,8 @@
   <p class="sblurb">All live on the iPad build.</p>
 
   <ul class="shipped">
+    <li><span class="dot"></span><div>Transform stops stretching the grid<span class="when">29 Sep</span>
+      <small>Growth judged by where a drag lands, not by everywhere it passed</small></div></li>
     <li><span class="dot"></span><div>A gimbal for the group<span class="when">28 Sep</span>
       <small>TRANSFORM, tap a cell, then drag arrows and rings as on a single part</small></div></li>
     <li><span class="dot"></span><div>Recent parts strip<span class="when">27 Sep</span>

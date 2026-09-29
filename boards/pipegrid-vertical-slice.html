@@ -2873,6 +2873,12 @@ svg.addEventListener("pointerdown", function(e){
       if(gArrow && (!gRing || gArrow.dist<gRing.dist)){
         mode="groupMove";
         groupDrag={type:"move", axis:gArrow.axis, start:p, pre:snapshot(),
+                   // The bounds this drag began with. Growth has to be judged by where the
+                   // group LANDS, not by everywhere it passed: the live preview grows the
+                   // grid so you can see yourself pulling past the edge, but a drag that
+                   // goes out and comes back should leave the grid exactly as it found it.
+                   preGrid:{x:{lo:GRID.x.lo,hi:GRID.x.hi}, y:{lo:GRID.y.lo,hi:GRID.y.hi},
+                            z:{lo:GRID.z.lo,hi:GRID.z.hi}},
                    baseCells:selection.map(function(i){ return {x:parts[i].cell.x, y:parts[i].cell.y, z:parts[i].cell.z}; }),
                    baseGimbal:{x:gimbalCell.x, y:gimbalCell.y, z:gimbalCell.z}};
         e.preventDefault();
@@ -3191,6 +3197,15 @@ function up(e){
   if(mode==="groupMove"){
     if(pts.size===0){
       mode="none";
+      // Back to the bounds the drag started from, then grow to contain what is actually on
+      // the board now. Without this, reaching past an edge mid-drag left the grid stretched
+      // even when the group came back inside - the owner caught exactly that. growGridToFit
+      // only ever grows, so a board that was already bigger than its parts keeps its size.
+      AXIS_KEYS.forEach(function(a){
+        GRID[a]={lo:groupDrag.preGrid[a].lo, hi:groupDrag.preGrid[a].hi};
+      });
+      growGridToFit();
+      syncGridNumbers();
       var preM=groupDrag.pre; groupDrag=null;
       pushHistory(preM);   // one undo step for the whole drag
       render(); runValidation();
