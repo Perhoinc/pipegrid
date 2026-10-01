@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PIPEGRID — how should the app ask for something?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@300;400;500;700&display=swap">
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12151b; --panel2:#0e1116; --edge:#2c313d;
+    --text:#c7d3e2; --dim:#5f6775; --acc:#e0a14e; --out:#3a4150; --wire:#8ea6bf;
+    --ax:#d8534f; --ay:#5aa469; --az:#4a7fb5; --indbg:rgba(18,21,27,0.65);
+    --danger:#e06c60;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  body{background:var(--bg);color:var(--text);
+       font-family:"Roboto Slab",Rockwell,Georgia,serif;-webkit-text-size-adjust:100%;
+       padding:16px;padding-bottom:70px;}
+  .hdr{margin-bottom:14px;}
+  .title{font-size:16px;font-weight:700;letter-spacing:1.5px;}
+  .sub{font-size:10px;letter-spacing:1px;color:var(--dim);margin-top:4px;}
+  .panel{border:1px solid var(--edge);border-radius:8px;background:var(--panel);
+         padding:14px;margin-bottom:14px;max-width:1140px;}
+  .plabel{font-size:11px;font-weight:700;letter-spacing:1.5px;margin-bottom:8px;}
+  .note{font-size:12.5px;color:var(--dim);line-height:1.7;margin:0 0 8px;max-width:80ch;}
+  .note:last-child{margin-bottom:0;}
+  .note b{color:var(--text);font-weight:500;}
+  .note .warn{color:var(--acc);}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px;}
+  .opt{border:1px solid var(--edge);border-radius:6px;background:var(--panel2);padding:10px;}
+  .opthead{display:flex;align-items:baseline;gap:8px;margin-bottom:9px;}
+  .optname{font-size:12px;font-weight:700;letter-spacing:.6px;}
+  .opttag{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);
+          border:1px solid var(--edge);border-radius:3px;padding:1px 5px;}
+  .opttag.now{color:var(--acc);border-color:var(--acc);}
+  .optnote{font-size:11px;color:var(--dim);line-height:1.6;margin-top:9px;}
+  .optnote b{color:var(--text);font-weight:500;}
+
+  /* ---- a mock of the app's stage: dark, a faint floor, the two corner furnishings ---- */
+  .stage{position:relative;height:132px;border-radius:5px;overflow:hidden;
+         background:#0b0d10;border:1px solid #1b2027;margin-bottom:9px;}
+  .floor{position:absolute;inset:0;opacity:.5;}
+  .camchip{position:absolute;top:8px;left:8px;z-index:3;
+           background:var(--indbg);border-radius:6px;padding:3px 7px;
+           font-size:8px;letter-spacing:.4px;color:var(--dim);white-space:nowrap;}
+  .compass{position:absolute;top:6px;right:6px;width:34px;height:34px;border-radius:50%;
+           background:var(--indbg);border:1px solid var(--edge);z-index:3;}
+  .compass i{position:absolute;left:50%;top:50%;width:11px;height:1.5px;transform-origin:0 50%;display:block;}
+  /* today's prompt: small grey text under the camera readout */
+  .oldline{position:absolute;top:26px;left:8px;z-index:3;
+           background:var(--indbg);border-radius:6px;padding:3px 7px;
+           font-size:8px;letter-spacing:.3px;color:var(--dim);
+           max-width:calc(100% - 100px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  /* the proposal: a tile across the top centre */
+  /* The tile has to live between the camera chip on the left and the compass on the right,
+     so it is capped to the space that leaves. A prompt longer than that gets cut, which is a
+     real constraint on how these sentences are written, not a mockup artefact. */
+  .tile{position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:4;
+        display:flex;align-items:center;gap:8px;
+        max-width:calc(100% - 104px);overflow:hidden;
+        border-radius:7px;padding:6px 12px;white-space:nowrap;
+        font-size:9.5px;letter-spacing:.4px;font-weight:500;
+        box-shadow:0 2px 10px rgba(0,0,0,.45);}
+  .tile .verb{font-size:8px;letter-spacing:1.3px;text-transform:uppercase;opacity:.85;flex:none;}
+  .tile .msg{overflow:hidden;text-overflow:ellipsis;}
+  .tile .x{font-size:11px;line-height:1;opacity:.75;
+           border-left:1px solid rgba(255,255,255,.28);padding-left:8px;margin-left:1px;}
+  .tile.ask{background:var(--acc);color:#1b1206;}
+  .tile.busy{background:#1b2230;color:var(--text);border:1px solid var(--az);}
+  .tile.no{background:var(--danger);color:#2a0705;}
+  .tile.sel{background:var(--wire);color:#0e1a24;}
+  .tile.xf{background:var(--ay);color:#071a0d;}
+  .tile.paste{background:var(--acc);color:#1b1206;}
+  .statelabel{font-size:9px;letter-spacing:1.1px;text-transform:uppercase;color:var(--dim);
+              margin:0 0 5px;}
+  .swatchrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;}
+  .sw{display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--dim);
+      border:1px solid var(--edge);border-radius:5px;padding:4px 8px;}
+  .sw i{width:12px;height:12px;border-radius:3px;display:block;}
+  table.cmp{border-collapse:collapse;font-size:11.5px;margin-top:6px;width:100%;max-width:760px;}
+  table.cmp td,table.cmp th{border-bottom:1px solid var(--edge);padding:6px 8px;text-align:left;
+       vertical-align:top;}
+  table.cmp th{color:var(--text);font-weight:500;font-size:10px;letter-spacing:1px;
+       text-transform:uppercase;}
+  table.cmp td{color:var(--dim);}
+  table.cmp td b{color:var(--text);font-weight:500;}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="title">HOW SHOULD THE APP ASK FOR SOMETHING?</div>
+  <div class="sub">prompt treatments &middot; three alternatives, the same three moments in each &middot; 1 Oct</div>
+</div>
+
+<div class="panel">
+  <div class="plabel">WHAT THIS IS DECIDING</div>
+  <p class="note">The app asks for things in <b>small grey text in the top-left corner</b>, on the
+  line under the camera readout. That is a status line &mdash; it carries az, el and zoom &mdash;
+  and an instruction put in the same place reads as more status. Which is why
+  <span class="warn">&ldquo;tap a cell, then PASTE&rdquo; gets missed.</span></p>
+  <p class="note">Every string below is one the app really produces. The three moments are the
+  three kinds of thing it ever says: <b>it wants something from you</b>, <b>it is in the middle
+  of something</b>, and <b>it refused</b>. Treatment A is exactly what ships today.</p>
+  <p class="note">Three questions to settle, and they are independent &mdash; you can take the
+  placement from one and the colours from another: <b>what the colours mean</b>, <b>whether the
+  tile carries the way out</b>, and <b>what happens to the corner readout</b>. The last two
+  panels take those separately.</p>
+</div>
+
+<div class="panel">
+  <div class="plabel">PLACEMENT AND COLOUR</div>
+  <div class="grid">
+
+    <!-- ===== A: today ===== -->
+    <div class="opt">
+      <div class="opthead"><span class="optname">A &middot; What ships today</span>
+        <span class="opttag now">current</span></div>
+
+      <p class="statelabel">It wants something</p>
+      <div class="stage">
+        <svg class="floor" viewBox="0 0 340 132" preserveAspectRatio="none">
+          <g stroke="#2a3139" stroke-width="1" fill="none">
+            <path d="M40 104 L170 52 L300 104 L170 156 Z"/>
+            <path d="M75 91 L205 39"/><path d="M105 78 L235 26"/>
+            <path d="M105 130 L235 78"/><path d="M75 117 L205 65"/>
+          </g>
+        </svg>
+        <div class="camchip">az 35&deg; &middot; el 25&deg; &middot; zoom 100%</div>
+        <div class="oldline">transform &middot; tap the cell to move and turn 2 parts from</div>
+        <div class="compass"><i style="background:var(--ax);transform:rotate(25deg)"></i>
+          <i style="background:var(--ay);transform:rotate(200deg)"></i>
+          <i style="background:var(--az);transform:rotate(-90deg)"></i></div>
+      </div>
+
+      <p class="statelabel">It is mid-action</p>
+      <div class="stage">
+        <svg class="floor" viewBox="0 0 340 132" preserveAspectRatio="none">
+          <g stroke="#2a3139" stroke-width="1" fill="none">
+            <path d="M40 104 L170 52 L300 104 L170 156 Z"/>
+            <path d="M75 91 L205 39"/><path d="M105 78 L235 26"/>
+          </g>
+        </svg>
+        <div class="camchip">az 35&deg; &middot; el 25&deg; &middot; zoom 100%</div>
+        <div class="oldline">gimbal on 0, 0 on Z0 &middot; drag an arrow to move, a ring to turn</div>
+        <div class="compass"><i style="background:var(--ax);transform:rotate(25deg)"></i>
+          <i style="background:var(--ay);transform:rotate(200deg)"></i>
+          <i style="background:var(--az);transform:rotate(-90deg)"></i></div>
+      </div>
+
+      <p class="statelabel">It refused</p>
+      <div class="stage">
+        <svg class="floor" viewBox="0 0 340 132" preserveAspectRatio="none">
+          <g stroke="#2a3139" stroke-width="1" fill="none">
+            <path d="M40 104 L170 52 L300 104 L170 156 Z"/>
+            <path d="M75 91 L205 39"/><path d="M105 78 L235 26"/>
+          </g>
+        </svg>
+        <div class="camchip">az 35&deg; &middot; el 25&deg; &middot; zoom 100%</div>
+        <div class="oldline">Cell 1, 0 on Z0 is taken &mdash; nothing pasted.</div>
+        <div class="compass"><i style="background:var(--ax);transform:rotate(25deg)"></i>
+          <i style="background:var(--ay);transform:rotate(200deg)"></i>
+          <i style="background:var(--az);transform:rotate(-90deg)"></i></div>
+      </div>
+
+      <p class="optnote">All three look the same, sit where your eye is not, and are the same
+      grey as the camera readout above them. <b>A refusal looks exactly like a status.</b></p>
+    </div>
+
+    <!-- ===== B: two-colour tile ===== -->
+    <div class="opt">
+      <div class="opthead"><span class="optname">B &middot; Tile, two colours</span>
+        <span class="opttag">waiting / refused</span></div>
+
+      <p class="statelabel">It wants something</p>
+      <div class="stage">
+        <svg class="floor" viewBox="0 0 340 132" preserveAspectRatio="none">
+          <g stroke="#2a3139" stroke-width="1" fill="none">
+            <path d="M40 104 L170 52 L300 104 L170 156 Z"/>
+            <path d="M75 91 L205 39"/><path d="M105 78 L235 26"/>
+            <path d="M105 130 L235 78"/><path d="M75 117 L205 65"/>
+          </g>
+        </svg>
+        <div class="camchip">az 35&deg; &middot; el 25&deg;</div>
+        <div class="tile ask"><span class="verb">transform</span><span class="msg">tap the cell to turn 2 parts from</span></div>
+        <div class="compass"><i style="background:var(--ax);transform:rotate(25deg)"></i>
+          <i style="background:var(--ay);transform:rotate(200deg)"></i>
+          <i style="background:var(--az);transform:rotate(-90deg)"></i></div>
+      </div>
+
+      <p class="statelabel">It is mid-action</p>
+      <div class="stage">
+        <svg class="floor" viewBox="0 0 340 132" preserveAspectRatio="none">
+          <g stroke="#2a3139" stroke-width="1" fill="none">
+            <path d="M40 104 L170 52 L300 104 L170 156 Z"/>
+            <path d="M75 91 L205 39"/><path d="M105 78 L235 26"/>
+          </g>
+        </svg>
+        <div class="camchip">az 35&deg; &middot; el 25&deg;</div>
+        <div class="tile busy"><span class="verb">gimbal 0,0 Z0</span><span class="msg">drag an arrow or a ring</span></div>
+        <div class="compass"><i style="background:var(--ax);transform:rotate(25deg)"></i>
+          <i style="background:var(--ay);transform:rotate(200deg)"></i>
+          <i style="background:var(--az);transform:rotate(-90deg)"></i></div>
+      </div>
+
+      <p class="statelabel">It refused</p>
+      <div class="stage">
+        <svg class="floor" viewBox="0 0 340 132" preserveAspectRatio="none">
+          <g stroke="#2a3139" stroke-width="1" fill="none">
+            <path d="M40 104 L170 52 L300 104 L170 156 Z"/>
+            <path d="M75 91 L205 39"/><path d="M105 78 L235 26"/>
+          </g>
+        </svg>
+        <div class="camchip">az 35&deg; &middot; el 25&deg;</div>
+        <div class="tile no"><span class="verb">no</span><span class="msg">cell 1, 0 on Z0 is taken</span></div>
+        <div class="compass"><i style="background:var(--ax);transform:rotate(25deg)"></i>
+          <i style="background:var(--ay);transform:rotate(200deg)"></i>
+          <i style="background:var(--az);transform:rotate(-90deg)"></i></div>
+      </div>
+
+      <p class="optnote">Two meanings, two colours, both already in the app&rsquo;s vocabulary:
+      <b>amber is the active thing</b> (inlets, the gathered group, the chosen cell) and
+      <b>red is a refusal</b>. Mid-action is quiet &mdash; dark with a blue edge &mdash; because
+      by then you know what you are doing and the tile is only confirming it.</p>
+    </div>
+
+    <!-- ===== C: colour per action ===== -->
+    <div class="opt">
+      <div class="opthead"><span class="optname">C &middot; Tile, a colour per action</span>
+        <span class="opttag">select / paste / transform</span></div>
+
+      <p class="statelabel">It wants something &mdash; gathering</p>
+      <div class="stage">
+        <svg class="floor" viewBox="0 0 340 132" preserveAspectRatio="none">
+          <g stroke="#2a3139" stroke-width="1" fill="none">
+            <path d="M40 104 L170 52 L300 104 L170 156 Z"/>
+            <path d="M75 91 L205 39"/><path d="M105 78 L235 26"/>
+            <path d="M105 130 L235 78"/><path d="M75 117 L205 65"/>
+          </g>
+        </svg>
+        <div class="camchip">az 35&deg; &middot; el 25&deg;</div>
+        <div class="tile sel"><span class="verb">select</span><span class="msg">tap parts to gather them</span></div>
+        <div class="compass"><i style="background:var(--ax);transform:rotate(25deg)"></i>
+          <i style="background:var(--ay);transform:rotate(200deg)"></i>
+          <i style="background:var(--az);transform:rotate(-90deg)"></i></div>
+      </div>
+
+      <p class="statelabel">It wants something &mdash; pasting</p>
+      <div class="stage">
+        <svg class="floor" viewBox="0 0 340 132" preserveAspectRatio="none">
+          <g stroke="#2a3139" stroke-width="1" fill="none">
+            <path d="M40 104 L170 52 L300 104 L170 156 Z"/>
+            <path d="M75 91 L205 39"/><path d="M105 78 L235 26"/>
+          </g>
+        </svg>
+        <div class="camchip">az 35&deg; &middot; el 25&deg;</div>
+        <div class="tile paste"><span class="verb">paste</span><span class="msg">tap a cell, then PASTE</span></div>
+        <div class="compass"><i style="background:var(--ax);transform:rotate(25deg)"></i>
+          <i style="background:var(--ay);transform:rotate(200deg)"></i>
+          <i style="background:var(--az);transform:rotate(-90deg)"></i></div>
+      </div>
+
+      <p class="statelabel">It wants something &mdash; transforming</p>
+      <div class="stage">
+        <svg class="floor" viewBox="0 0 340 132" preserveAspectRatio="none">
+          <g stroke="#2a3139" stroke-width="1" fill="none">
+            <path d="M40 104 L170 52 L300 104 L170 156 Z"/>
+            <path d="M75 91 L205 39"/><path d="M105 78 L235 26"/>
+          </g>
+        </svg>
+        <div class="camchip">az 35&deg; &middot; el 25&deg;</div>
+        <div class="tile xf"><span class="verb">transform</span><span class="msg">tap the cell to turn from</span></div>
+        <div class="compass"><i style="background:var(--ax);transform:rotate(25deg)"></i>
+          <i style="background:var(--ay);transform:rotate(200deg)"></i>
+          <i style="background:var(--az);transform:rotate(-90deg)"></i></div>
+      </div>
+
+      <p class="optnote"><span class="warn">The trouble is that the colours are spoken for.</span>
+      Green and blue are the N&ndash;S and U&ndash;D axes, on the compass in the same corner and
+      on every gimbal ring. The blue-grey is the wireframe. A tile in axis green, beside a
+      compass with axis green in it, teaches the wrong thing. It also asks you to learn five
+      colours to be told something a word already says.</p>
+    </div>
+
+  </div>
+</div>
+
+<div class="panel">
+  <div class="plabel">DOES THE TILE CARRY THE WAY OUT?</div>
+  <div class="grid">
+    <div class="opt">
+      <div class="opthead"><span class="optname">Without</span></div>
+      <div class="stage">
+        <svg class="floor" viewBox="0 0 340 132" preserveAspectRatio="none">
+          <g stroke="#2a3139" stroke-width="1" fill="none">
+            <path d="M40 104 L170 52 L300 104 L170 156 Z"/><path d="M75 91 L205 39"/>
+          </g>
+        </svg>
+        <div class="camchip">az 35&deg; &middot; el 25&deg;</div>
+        <div class="tile ask"><span class="verb">transform</span><span class="msg">tap the cell to turn 2 parts from</span></div>
+      </div>
+      <p class="optnote">You leave the way you came in &mdash; tap TRANSFORM again in the dock.
+      Nothing new to learn, but the exit is at the bottom of the screen while the instruction
+      is at the top.</p>
+    </div>
+    <div class="opt">
+      <div class="opthead"><span class="optname">With</span></div>
+      <div class="stage">
+        <svg class="floor" viewBox="0 0 340 132" preserveAspectRatio="none">
+          <g stroke="#2a3139" stroke-width="1" fill="none">
+            <path d="M40 104 L170 52 L300 104 L170 156 Z"/><path d="M75 91 L205 39"/>
+          </g>
+        </svg>
+        <div class="camchip">az 35&deg; &middot; el 25&deg;</div>
+        <div class="tile ask"><span class="verb">transform</span><span class="msg">tap the cell to turn 2 parts from</span><span class="x">&times;</span></div>
+      </div>
+      <p class="optnote">The thing that says what is happening also ends it. One more touch
+      target up there, and it has to be big enough for a thumb without crowding the words.</p>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="plabel">AND THE CORNER READOUT?</div>
+  <div class="grid">
+    <div class="opt">
+      <div class="opthead"><span class="optname">Keep it, trimmed</span></div>
+      <div class="stage">
+        <svg class="floor" viewBox="0 0 340 132" preserveAspectRatio="none">
+          <g stroke="#2a3139" stroke-width="1" fill="none">
+            <path d="M40 104 L170 52 L300 104 L170 156 Z"/><path d="M75 91 L205 39"/>
+          </g>
+        </svg>
+        <div class="camchip">az 35&deg; &middot; el 25&deg; &middot; zoom 100%</div>
+        <div class="tile ask"><span class="verb">paste</span><span class="msg">tap a cell, then PASTE</span></div>
+      </div>
+      <p class="optnote">The corner goes back to being only what it is good at: where the camera
+      is. Everything the app wants from you moves to the tile. <b>This is the one I would
+      take</b> &mdash; and it is the one that makes the az/el control on the roadmap land
+      somewhere sensible, since that readout becomes the thing you tap for it.</p>
+    </div>
+    <div class="opt">
+      <div class="opthead"><span class="optname">Replace it</span></div>
+      <div class="stage">
+        <svg class="floor" viewBox="0 0 340 132" preserveAspectRatio="none">
+          <g stroke="#2a3139" stroke-width="1" fill="none">
+            <path d="M40 104 L170 52 L300 104 L170 156 Z"/><path d="M75 91 L205 39"/>
+          </g>
+        </svg>
+        <div class="tile ask"><span class="verb">paste</span><span class="msg">tap a cell, then PASTE</span></div>
+      </div>
+      <p class="optnote">Cleanest stage, but the camera numbers go with it &mdash; and you asked
+      for a control to type exact angles into, which needs somewhere to live.</p>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="plabel">WHERE THE COLOURS ALREADY POINT</div>
+  <div class="swatchrow">
+    <span class="sw"><i style="background:var(--acc)"></i>amber &mdash; inlets, gathered parts, chosen cell</span>
+    <span class="sw"><i style="background:var(--danger)"></i>red &mdash; delete, refusals</span>
+    <span class="sw"><i style="background:var(--ax)"></i>axis E&ndash;W</span>
+    <span class="sw"><i style="background:var(--ay)"></i>axis N&ndash;S</span>
+    <span class="sw"><i style="background:var(--az)"></i>axis U&ndash;D</span>
+    <span class="sw"><i style="background:var(--wire)"></i>wireframe</span>
+  </div>
+  <p class="note" style="margin-top:10px;">Six colours, five already carrying a meaning. That is
+  the whole argument between B and C: <b>B spends nothing new</b>, C spends three.</p>
+</div>
+
+<div class="panel">
+  <div class="plabel">SIDE BY SIDE</div>
+  <table class="cmp">
+    <tr><th>&nbsp;</th><th>A &mdash; today</th><th>B &mdash; two colours</th><th>C &mdash; per action</th></tr>
+    <tr><td><b>Where you look</b></td><td>corner, with the status</td><td>top centre, over the board</td><td>top centre, over the board</td></tr>
+    <tr><td><b>New colours</b></td><td>none</td><td>none</td><td>three</td></tr>
+    <tr><td><b>A refusal reads as</b></td><td>more status</td><td>a refusal</td><td>a refusal</td></tr>
+    <tr><td><b>Tells you which action</b></td><td>in the words</td><td>in the words</td><td>in the colour and the words</td></tr>
+    <tr><td><b>Risk</b></td><td>missed, which is why we are here</td><td>a tile sitting over the board</td><td>axis colours stop meaning axes</td></tr>
+  </table>
+  <p class="note" style="margin-top:10px;">Both tiles sit over the top of the scene. On a tall
+  iPad that is empty sky; on a short landscape window it is not, so whichever wins should be
+  checked there &mdash; and in the light theme, where amber on pale paper needs more care than
+  amber on black.</p>
+  <p class="note"><b>One constraint the board found on its own:</b> the tile has to fit between
+  the camera chip and the compass, and in the narrow panels above it does not &mdash; the
+  transform sentence runs straight into the compass until it is capped. So whichever treatment
+  wins, <b>the prompts have to be written short</b>. &ldquo;tap the cell to move and turn 2
+  parts from&rdquo; is already too long for a phone in landscape; &ldquo;tap a cell to turn
+  from&rdquo; is not. Worth deciding on this board, because it changes the words, not just the
+  box they sit in.</p>
+</div>
+
+</body>
+</html>
