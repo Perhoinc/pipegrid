@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PIPEGRID — every prompt, in the chosen style</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@300;400;500;700&display=swap">
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12151b; --panel2:#0e1116; --edge:#2c313d;
+    --text:#c7d3e2; --dim:#5f6775; --acc:#e0a14e; --out:#3a4150; --wire:#8ea6bf;
+    --ax:#d8534f; --ay:#5aa469; --az:#4a7fb5; --indbg:rgba(18,21,27,0.65);
+    --danger:#e06c60;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  body{background:var(--bg);color:var(--text);
+       font-family:"Roboto Slab",Rockwell,Georgia,serif;-webkit-text-size-adjust:100%;
+       padding:16px;padding-bottom:70px;}
+  .hdr{margin-bottom:14px;}
+  .title{font-size:16px;font-weight:700;letter-spacing:1.5px;}
+  .sub{font-size:10px;letter-spacing:1px;color:var(--dim);margin-top:4px;}
+  .panel{border:1px solid var(--edge);border-radius:8px;background:var(--panel);
+         padding:14px;margin-bottom:14px;max-width:1180px;}
+  .plabel{font-size:11px;font-weight:700;letter-spacing:1.5px;margin-bottom:4px;}
+  .pcount{font-size:9px;letter-spacing:1px;color:var(--dim);margin-bottom:10px;}
+  .note{font-size:12.5px;color:var(--dim);line-height:1.7;margin:0 0 8px;max-width:80ch;}
+  .note:last-child{margin-bottom:0;}
+  .note b{color:var(--text);font-weight:500;}
+  .note .warn{color:var(--acc);}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(430px,1fr));gap:16px;}
+
+  .shot{min-width:0;}
+  .when{font-size:9px;letter-spacing:1.1px;text-transform:uppercase;color:var(--dim);margin-bottom:5px;}
+  .stage{position:relative;border-radius:6px;overflow:hidden;background:#0b0d10;
+         border:1px solid #1b2027;}
+  .stage svg.scene{display:block;width:100%;height:auto;}
+  .camchip{position:absolute;top:9px;left:9px;z-index:3;background:var(--indbg);
+           border-radius:6px;padding:3px 8px;font-size:8.5px;letter-spacing:.4px;
+           color:var(--dim);white-space:nowrap;}
+  .compass{position:absolute;top:7px;right:7px;width:38px;height:38px;border-radius:50%;
+           background:var(--indbg);border:1px solid var(--edge);z-index:3;}
+  .compass i{position:absolute;left:50%;top:50%;width:12px;height:1.6px;
+             transform-origin:0 50%;display:block;border-radius:1px;}
+  /* The tile. Not capped and free to sit over the chip or the compass: these are prompts
+     that want attention and then go away, and the static readouts can wait their turn. */
+  .tile{position:absolute;top:9px;left:50%;transform:translateX(-50%);z-index:5;
+        display:flex;align-items:center;gap:9px;border-radius:7px;padding:7px 13px;
+        white-space:nowrap;font-size:10.5px;letter-spacing:.3px;font-weight:500;
+        box-shadow:0 3px 14px rgba(0,0,0,.5);}
+  .tile .verb{font-size:8.5px;letter-spacing:1.4px;text-transform:uppercase;opacity:.82;flex:none;}
+  .tile.ask{background:var(--acc);color:#1b1206;}
+  .tile.busy{background:#161c27;color:var(--text);border:1px solid var(--az);}
+  .tile.no{background:var(--danger);color:#2a0705;}
+  .tile.done{background:#17221a;color:#9ecfab;border:1px solid var(--ay);}
+  .cap{font-size:11px;color:var(--dim);line-height:1.6;margin-top:7px;}
+  .cap b{color:var(--text);font-weight:500;}
+  .cap .was{color:var(--out);}
+  .cap .was em{font-style:normal;color:var(--dim);}
+  .q{border-left:2px solid var(--acc);padding-left:9px;margin-top:7px;
+     font-size:11px;color:var(--text);line-height:1.6;}
+  .swatchrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
+  .sw{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--dim);
+      border:1px solid var(--edge);border-radius:5px;padding:5px 9px;}
+  .sw i{width:13px;height:13px;border-radius:3px;display:block;}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="title">EVERY PROMPT, IN THE CHOSEN STYLE</div>
+  <div class="sub">treatment B &middot; no cancel &middot; corner readout kept &middot; overlap allowed &middot; 1 Oct</div>
+</div>
+
+<div class="panel">
+  <div class="plabel">WHAT IS LOCKED</div>
+  <p class="note">A tile across the top centre. <b>Amber when the app wants something from
+  you</b>, <b>red when it refused</b>, <b>quiet with a blue edge while you are in the middle of
+  something</b>. No cancel on the tile &mdash; you leave an action the way you came in. The
+  corner readout stays, carrying the camera and nothing else.</p>
+  <p class="note">The tile is <b>not capped</b> and will sit over the camera chip or the compass
+  when a sentence is long &mdash; your call, on the grounds that a prompt wants attention and
+  then goes away, while those two can wait their turn. Measured on this page: at a comfortable
+  width <b>none of the seventeen overlap anything</b>; narrow the window to a phone in landscape
+  and <b>fifteen cover the camera chip and one reaches the compass</b>. None run off the edge of
+  the stage. So the overlap is a narrow-window event, not the normal case &mdash; make the
+  window small and judge whether it bothers you there.</p>
+  <p class="note">Every tile below is a real state the app can be in. Where I have shortened the
+  wording, <b>today&rsquo;s version is printed underneath</b> so you can say which reads better.
+  Nothing here is in the app yet.</p>
+  <div class="swatchrow">
+    <span class="sw"><i style="background:var(--acc)"></i>wants something &mdash; 7 of them</span>
+    <span class="sw"><i style="background:#161c27;border:1px solid var(--az)"></i>mid-action &mdash; 4</span>
+    <span class="sw"><i style="background:var(--danger)"></i>refused &mdash; 5</span>
+    <span class="sw"><i style="background:#17221a;border:1px solid var(--ay)"></i>finished &mdash; 1, and a question</span>
+  </div>
+</div>
+
+<div id="panels"></div>
+
+<div class="panel">
+  <div class="plabel">NOT IN THE VIEWPORT TODAY</div>
+  <div class="pcount">three more refusals, which currently appear inside the BOARD menu</div>
+  <p class="note">The grid controls answer in small text at the bottom of the Board popover:
+  <b>&ldquo;The grid needs at least one layer.&rdquo;</b>,
+  <b>&ldquo;Maximum is 12 columns.&rdquo;</b> and
+  <b>&ldquo;Can&rsquo;t remove the east column &mdash; parts are sitting there. Delete them
+  first.&rdquo;</b> You are looking straight at that panel when you press the buttons, so they
+  are probably fine where they are.</p>
+  <p class="q">Should a refusal always use the red tile, wherever it came from &mdash; one place
+  for &ldquo;no&rdquo;, always &mdash; or do messages that answer a button you just pressed stay
+  next to that button?</p>
+</div>
+
+<div class="panel">
+  <div class="plabel">ONE GAP THIS TURNED UP</div>
+  <p class="note">Dragging a group into something solid just <b>stops</b>. Nothing is said,
+  because the drag refuses silently and the group stays where it last fitted. In a crowded
+  stack that is indistinguishable from the drag having gone wrong.</p>
+  <p class="q">Should a blocked drag say so &mdash; a red tile naming the cell in the way, the
+  moment the group stops following your finger?</p>
+</div>
+
+<script>
+/* Data rather than seventeen copies of the same markup: a prompt is a kind, a verb, the
+   proposed sentence, and what the app says today when the two differ. */
+var SCENE = '<svg class="scene" viewBox="0 0 440 190" preserveAspectRatio="xMidYMid meet">' +
+  '<g stroke="#232a33" stroke-width="1" fill="none">' +
+    '<path d="M60 130 L220 66 L380 130 L220 194 Z"/>' +
+    '<path d="M100 114 L260 50"/><path d="M140 98 L300 34"/><path d="M180 82 L340 18"/>' +
+    '<path d="M100 146 L260 82"/><path d="M140 162 L300 98"/><path d="M180 178 L340 114"/>' +
+  '</g>' +
+  /* a 3-cell run */
+  '<path d="M150 120 L250 80" stroke="#c7d3e2" stroke-width="5" stroke-linecap="round" fill="none"/>' +
+  '<circle cx="150" cy="120" r="6" fill="#e0a14e" stroke="#0b0d10" stroke-width="1.4"/>' +
+  '<circle cx="250" cy="80" r="6" fill="#3a4150" stroke="#0b0d10" stroke-width="1.4"/>' +
+  /* an elbow */
+  '<path d="M250 80 Q286 66 300 96" stroke="#c7d3e2" stroke-width="5" stroke-linecap="round" fill="none"/>' +
+  '<circle cx="300" cy="96" r="6" fill="#3a4150" stroke="#0b0d10" stroke-width="1.4"/>' +
+  /* a riser */
+  '<path d="M300 96 L300 54" stroke="#c7d3e2" stroke-width="5" stroke-linecap="round" fill="none"/>' +
+  '<circle cx="300" cy="54" r="6" fill="#e0a14e" stroke="#0b0d10" stroke-width="1.4"/>' +
+  /* a second elbow, lower left */
+  '<path d="M118 134 Q140 150 170 142" stroke="#c7d3e2" stroke-width="5" stroke-linecap="round" fill="none"/>' +
+  '<circle cx="118" cy="134" r="6" fill="#e0a14e" stroke="#0b0d10" stroke-width="1.4"/>' +
+  '<circle cx="170" cy="142" r="6" fill="#3a4150" stroke="#0b0d10" stroke-width="1.4"/>' +
+  '</svg>';
+
+var COMPASS = '<div class="compass">' +
+  '<i style="background:var(--ax);transform:rotate(26deg)"></i>' +
+  '<i style="background:var(--ay);transform:rotate(199deg)"></i>' +
+  '<i style="background:var(--az);transform:rotate(-90deg)"></i></div>';
+
+var GROUPS = [
+  { label:"WHEN THE APP WANTS SOMETHING", count:"amber &middot; seven of these",
+    intro:"These are the ones being missed today. Each is a sentence that ends in something " +
+          "for you to do.",
+    items:[
+      { kind:"ask", verb:"select", msg:"tap parts to gather them · any layer",
+        today:"select · tap parts to gather them, across layers if you like" },
+      { kind:"ask", verb:"2 gathered", msg:"tap more to add · tap a gathered one to drop it",
+        today:"2 parts selected · tap another to add it, tap a selected one to drop it" },
+      { kind:"ask", verb:"transform", msg:"tap the cell to move and turn from",
+        today:"transform · tap the cell to move and turn 2 parts from" },
+      { kind:"ask", verb:"holding 2", msg:"tap a cell, then PASTE",
+        today:"holding 2 parts · tap a cell, then PASTE" },
+      { kind:"ask", verb:"2 copied", msg:"tap a cell, then PASTE",
+        today:"2 parts copied · tap a cell, then PASTE" },
+      { kind:"ask", verb:"cell 1, 2 · Z0", msg:"pick a shape to put here",
+        today:"cell 1, 2 on Z0 · pick a shape to place it here" },
+      { kind:"ask", verb:"cell 1, 2 · Z0", msg:"PASTE drops 2 parts here, or pick a shape",
+        today:"cell 1, 2 on Z0 · PASTE drops 2 parts here, or pick a shape" }
+    ] },
+  { label:"WHILE YOU ARE IN THE MIDDLE OF SOMETHING", count:"quiet, blue edge &middot; four of these",
+    intro:"You already know what you are doing here, so the tile only confirms it and gets out " +
+          "of the way. Two of these update continuously while your finger is down.",
+    items:[
+      { kind:"busy", verb:"gimbal 0, 0 · Z0", msg:"drag an arrow to move, a ring to turn",
+        today:"gimbal on 0, 0 on Z0 · drag an arrow to move, a ring to turn · tap elsewhere to re-place it" },
+      { kind:"busy", verb:"turning N–S", msg:"47° → snaps to 90°",
+        today:"turning N–S 47° → snaps to 90°" },
+      { kind:"busy", verb:"placing", msg:"pose 2 of 4 · let go to commit",
+        today:"placing · pose 2 of 4 valid for this connection · release to commit" },
+      { kind:"busy", verb:"new part", msg:"pose 7 of 24 · cell 0,0,0",
+        today:"gizmo on new part · pose 7 of 24 · cell 0,0,0" }
+    ] },
+  { label:"WHEN IT REFUSES", count:"red &middot; five of these",
+    intro:"The ones that most need to stop looking like status. Each says what is wrong and, " +
+          "where it can, exactly which cell is the problem.",
+    items:[
+      { kind:"no", verb:"no", msg:"cell 1, 0 on Z0 is taken — nothing pasted",
+        today:"Cell 1, 0 on Z0 is taken - nothing pasted." },
+      { kind:"no", verb:"no", msg:"cell 1, 0 on Z0 is in the way",
+        today:"Cell 1, 0 on Z0 is in the way." },
+      { kind:"no", verb:"no", msg:"that needs 14 columns — 12 is the most",
+        today:"That would need 14 columns - the maximum is 12." },
+      { kind:"no", verb:"no", msg:"nothing copied yet",
+        today:"Nothing copied yet." },
+      { kind:"no", verb:"no", msg:"nothing gathered",
+        today:"Nothing gathered." }
+    ] },
+  { label:"WHEN SOMETHING LANDED", count:"one of these, and a question",
+    intro:"A result rather than a request. It is the only message that reports a success, and " +
+          "it is not obvious it should be a tile at all.",
+    items:[
+      { kind:"done", verb:"done", msg:"2 parts pasted", today:"2 parts pasted" }
+    ],
+    question:"Green for a result, as drawn here — a fourth colour, against a vocabulary we " +
+             "just agreed to keep at two? Or amber like everything else, or nothing at all, on " +
+             "the grounds that you can see the parts land and do not need telling?" }
+];
+
+var host=document.getElementById("panels");
+GROUPS.forEach(function(g){
+  var p=document.createElement("div"); p.className="panel";
+  var h='<div class="plabel">'+g.label+'</div><div class="pcount">'+g.count+'</div>';
+  h+='<p class="note">'+g.intro+'</p><div class="grid">';
+  g.items.forEach(function(it){
+    var changed = it.today && it.today!==it.msg && it.today!==(it.verb+" · "+it.msg);
+    h+='<div class="shot">'
+      + '<div class="stage">'+SCENE
+      + '<div class="camchip">az 35° · el 25° · zoom 100%</div>'
+      + COMPASS
+      + '<div class="tile '+it.kind+'"><span class="verb">'+it.verb+'</span>'+it.msg+'</div>'
+      + '</div>'
+      + (changed ? '<div class="cap"><span class="was">today: <em>'+it.today+'</em></span></div>' : '')
+      + '</div>';
+  });
+  h+='</div>';
+  if(g.question) h+='<p class="q">'+g.question+'</p>';
+  p.innerHTML=h;
+  host.appendChild(p);
+});
+</script>
+
+</body>
+</html>
