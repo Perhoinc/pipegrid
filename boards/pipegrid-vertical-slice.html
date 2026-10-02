@@ -66,6 +66,35 @@
      a prompt wants attention and then goes away while those two can wait. Capped only
      against running off the stage. Measured on the copy board: at a comfortable width it
      overlaps nothing, at phone-landscape width it covers the chip. */
+  /* The angle control. Not on screen all the time - it opens from the readout that already
+     shows the numbers, which is the owner's own proposal and the reason the prompt tile moving
+     out of that corner mattered: the chip now says one thing, so it can be the handle for it. */
+  .angletrigger{cursor:pointer;}
+  .angletrigger:hover,.angletrigger:focus-visible{color:var(--text);}
+  .anglepop{position:absolute;z-index:30;display:none;
+       background:var(--panel);border:1px solid var(--edge);border-radius:10px;
+       padding:10px 12px;box-shadow:0 10px 28px rgba(0,0,0,.5);min-width:224px;}
+  .anglepop.open{display:block;}
+  .angrow{display:grid;grid-template-columns:20px 1fr 46px 8px;align-items:center;
+       gap:8px;margin-bottom:7px;}
+  .angrow:last-of-type{margin-bottom:9px;}
+  .anglbl{font-size:9px;letter-spacing:1.2px;color:var(--dim);}
+  .angdeg{font-size:10px;color:var(--dim);}
+  .anglepop input[type=range]{width:100%;accent-color:var(--acc);height:18px;}
+  .anglepop input[type=number]{width:100%;font-family:inherit;font-size:11px;text-align:right;
+       background:var(--panel2);color:var(--text);border:1px solid var(--edge);
+       border-radius:5px;padding:3px 5px;}
+  .angfoot{display:flex;align-items:center;justify-content:space-between;gap:10px;
+       border-top:1px solid var(--edge);padding-top:8px;}
+  .angwhat{font-size:9px;letter-spacing:.8px;color:var(--dim);}
+  .angfoot button{font-family:inherit;font-size:9px;letter-spacing:.8px;text-transform:uppercase;
+       padding:5px 9px;border:1px solid var(--edge);border-radius:6px;
+       background:var(--panel2);color:var(--text);}
+  /* The sheet has no camera readout, so its angle gets a chip of its own in the toolbar,
+     showing the numbers for the same reason the 3D one does. */
+  .sbAngle{font-family:inherit;font-size:10px;letter-spacing:.4px;
+       background:var(--panel2);color:var(--text);border:1px solid var(--edge);
+       border-radius:7px;padding:5px 9px;cursor:pointer;white-space:nowrap;}
   .prompt{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:20;
        display:none;align-items:center;gap:9px;border-radius:7px;padding:7px 13px;
        white-space:nowrap;font-size:11px;letter-spacing:.3px;font-weight:500;
@@ -281,11 +310,21 @@
 <div class="stage">
   <div class="rig" id="rig">
     <div class="hud">
-      <span class="stat" id="stat">az 35&deg; &middot; el 25&deg; &middot; zoom 100%</span>
+      <span class="stat angletrigger" id="stat" title="Tap to set the angle exactly">az 35&deg; &middot; el 25&deg; &middot; zoom 100%</span>
     </div>
   </div>
   <!-- Lives on the stage rather than inside the 3D rig, so it can speak over either
        worksurface - and over the render view when that exists. -->
+  <div class="anglepop" id="anglepop">
+    <div class="angrow"><span class="anglbl">AZ</span>
+      <input type="range" id="azRange" min="0" max="359" step="1" />
+      <input type="number" id="azNum" min="0" max="359" step="1" /><span class="angdeg">°</span></div>
+    <div class="angrow"><span class="anglbl">EL</span>
+      <input type="range" id="elRange" min="-74" max="74" step="1" />
+      <input type="number" id="elNum" min="-74" max="74" step="1" /><span class="angdeg">°</span></div>
+    <div class="angfoot"><span class="angwhat" id="angwhat"></span>
+      <button id="angReset">Default</button></div>
+  </div>
   <div class="prompt" id="prompt"><span class="verb" id="promptVerb"></span><span class="msg" id="promptMsg"></span></div>
   <div class="layerbar" id="layerbar"></div>
   <div class="viewbtns">
@@ -304,6 +343,7 @@
         <button id="sheetZoomPct" title="Fit the whole sheet">100%</button>
         <button id="sheetZoomIn" title="Zoom in">+</button>
       </span>
+      <button class="sbAngle" id="sheetAngleBtn" title="Set the isometric angle exactly">50° / 20°</button>
       <span class="sbActs">
         <button class="sbBtn" id="printbtn">Print</button>
         <button class="sbBtn primary" id="pngbtn">Export PNG</button>
@@ -761,6 +801,63 @@ function currentPrompt(){
     return {kind:"ask", verb:"holding "+clipboard.length,
             msg:"tap a cell, then PASTE"};
   return null;   // nothing to say, so nothing on screen
+}
+/* Exact viewing angles. Azimuth wraps, so it is kept in 0-359; elevation is clamped to the
+   same 1.3 radians the orbit drag clamps to, which is what stops the view going over the top.
+   One panel serves both targets - the 3D camera and the sheet's isometric - because they are
+   the same two numbers and it would be odd to learn the control twice. */
+var EL_LIMIT_DEG=74;           // 1.3 rad, matching the orbit clamp
+var anglePopFor=null;          // "cam", "sheet", or null when closed
+var anglePopAnchor=null;       // the readout it opened from, so it can follow it
+function wrapDeg(d){ return ((Math.round(d)%360)+360)%360; }
+function angleNow(){
+  return anglePopFor==="sheet"
+    ? {az:wrapDeg(REF_AZ_DEG), el:Math.round(REF_EL_DEG)}
+    : {az:wrapDeg(cam.az*180/Math.PI), el:Math.round(cam.el*180/Math.PI)};
+}
+function applyAngle(az, el){
+  el=Math.max(-EL_LIMIT_DEG, Math.min(EL_LIMIT_DEG, el));
+  az=wrapDeg(az);
+  if(anglePopFor==="sheet"){ REF_AZ_DEG=az; REF_EL_DEG=el; autosave(); }
+  else { cam.az=az*Math.PI/180; cam.el=el*Math.PI/180; }
+  render();
+}
+/* Re-measured on every render rather than once on opening. The stage changes size - rotate
+   the iPad, split the window, switch worksurface - and a panel pinned to numbers taken at
+   open time ends up somewhere it was never meant to be; one got 248px off the left edge
+   during testing. If the readout it belongs to is no longer on screen there is nothing left
+   to point at, so it closes itself. */
+function positionAnglePop(){
+  if(!anglePopFor || !anglePopAnchor) return;
+  var pop=document.getElementById("anglepop");
+  var a=anglePopAnchor.getBoundingClientRect();
+  if(!(a.width>0 && a.height>0)){ closeAnglePop(); return; }
+  var stage=document.querySelector(".stage").getBoundingClientRect();
+  var w=pop.offsetWidth;
+  pop.style.left=Math.min(Math.max(8, a.left-stage.left), Math.max(8, stage.width-w-8)).toFixed(0)+"px";
+  pop.style.top=(a.bottom-stage.top+8).toFixed(0)+"px";
+}
+function syncAnglePop(){
+  if(!anglePopFor) return;
+  positionAnglePop();
+  if(!anglePopFor) return;   // positioning may have closed it, if its readout went away
+  var v=angleNow();
+  document.getElementById("azRange").value=v.az;
+  document.getElementById("azNum").value=v.az;
+  document.getElementById("elRange").value=v.el;
+  document.getElementById("elNum").value=v.el;
+  document.getElementById("angwhat").textContent =
+    anglePopFor==="sheet" ? "sheet isometric" : "3D view";
+}
+function openAnglePop(which, anchor){
+  anglePopFor=which;
+  anglePopAnchor=anchor;
+  document.getElementById("anglepop").classList.add("open");
+  syncAnglePop();   // which also places it, under the readout it came from
+}
+function closeAnglePop(){
+  anglePopFor=null; anglePopAnchor=null;
+  document.getElementById("anglepop").classList.remove("open");
 }
 function renderPrompt(){
   var el=document.getElementById("prompt");
@@ -1625,6 +1722,9 @@ function render(){
 
   drawAxisIndicator();
 
+  var sheetAngleBtn=document.getElementById("sheetAngleBtn");
+  if(sheetAngleBtn) sheetAngleBtn.textContent=Math.round(REF_AZ_DEG)+"° / "+Math.round(REF_EL_DEG)+"°";
+  if(anglePopFor) syncAnglePop();
   document.getElementById("stat").textContent=
     "az "+Math.round(cam.az*180/Math.PI)+"° · el "+Math.round(cam.el*180/Math.PI)+"° · zoom "+Math.round(cam.scale*100)+"%";
 
@@ -1716,7 +1816,13 @@ var INK="#232a35", DIMC="#7a8494", LINE="#8a95a6", ACC_INK="#c2620f",
    scale is derived from the mesh, so halving this changes nothing about how big the drawing
    lands on the sheet - only how big the parts are within it. */
 var ISO_CELL=1.0;
-var REF_AZ_DEG=50, REF_EL_DEG=20;   // settled angle from pipegrid-2d-reference-sheet-mockups.html - do not change without asking
+/* The sheet's isometric angle. 50/20 came off pipegrid-2d-reference-sheet-mockups.html and
+   stood as a fixed decision for a long time; the owner reopened it deliberately when he asked
+   to type exact angles, and chose that the sheet should be adjustable AND remember. So these
+   are defaults now rather than constants, they travel with the board, and a board that has
+   never been touched still draws at exactly the settled angle. */
+var REF_AZ_DEFAULT=50, REF_EL_DEFAULT=20;
+var REF_AZ_DEG=REF_AZ_DEFAULT, REF_EL_DEG=REF_EL_DEFAULT;
 var jobName="";                     // shown in the title block, edited in the Board popover
 
 function refIsoProject(p){
@@ -2459,6 +2565,7 @@ function serializeBoard(){
   return {
     schema: SAVE_SCHEMA,
     camera: {az:cam.az, el:cam.el, scale:cam.scale, panX:cam.panX, panY:cam.panY},
+    sheetAngle: {az:REF_AZ_DEG, el:REF_EL_DEG},
     // Additive since schema 1 shipped: older saves simply have no `grid`, and
     // loadBoard defaults + grows to fit, so they still open correctly.
     grid: {x:{lo:GRID.x.lo, hi:GRID.x.hi},
@@ -2507,6 +2614,13 @@ function loadBoard(data, opts){
   // yank the camera to wherever it happened to be sitting when that step was taken;
   // you'd lose your place in the scene every time you undid a rotation. Loading a
   // saved FILE does restore it, since reopening a board should look like you left it.
+  // The sheet angle is a property of the drawing rather than of the viewer, so it comes back
+  // with the board whichever way it was loaded - including through undo, unlike the camera.
+  if(data.sheetAngle && typeof data.sheetAngle.az==="number" && typeof data.sheetAngle.el==="number"){
+    REF_AZ_DEG=data.sheetAngle.az; REF_EL_DEG=data.sheetAngle.el;
+  } else {
+    REF_AZ_DEG=REF_AZ_DEFAULT; REF_EL_DEG=REF_EL_DEFAULT;
+  }
   if(data.camera && opts.restoreCamera!==false){
     cam.az=data.camera.az; cam.el=data.camera.el; cam.scale=data.camera.scale;
     cam.panX=data.camera.panX; cam.panY=data.camera.panY;
@@ -3570,6 +3684,50 @@ function setPopover(name){
   document.getElementById("dockBoard").classList.toggle("on", name==="board");
   document.getElementById("dockCut").classList.toggle("on", name==="cut");
 }
+document.getElementById("stat").addEventListener("click", function(e){
+  e.stopPropagation();
+  if(anglePopFor==="cam") closeAnglePop(); else openAnglePop("cam", this);
+});
+document.getElementById("sheetAngleBtn").addEventListener("click", function(e){
+  e.stopPropagation();
+  if(anglePopFor==="sheet") closeAnglePop(); else openAnglePop("sheet", this);
+});
+(function(){
+  var pop=document.getElementById("anglepop");
+  // pointerdown as well as click: the close-on-tap-away listener below is a pointerdown, and
+  // grabbing a slider starts with one - without this the panel shut the instant you took hold
+  // of the thing you came to drag.
+  pop.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
+  pop.addEventListener("click", function(e){ e.stopPropagation(); });
+  // Same for the two triggers, so tapping an open one closes it rather than closing and
+  // immediately reopening.
+  ["stat","sheetAngleBtn"].forEach(function(id){
+    document.getElementById(id).addEventListener("pointerdown", function(e){ e.stopPropagation(); });
+  });
+  function fromInputs(){
+    applyAngle(parseFloat(document.getElementById("azNum").value)||0,
+               parseFloat(document.getElementById("elNum").value)||0);
+    syncAnglePop();
+  }
+  ["azRange","elRange"].forEach(function(id){
+    document.getElementById(id).addEventListener("input", function(){
+      applyAngle(parseFloat(document.getElementById("azRange").value),
+                 parseFloat(document.getElementById("elRange").value));
+      syncAnglePop();
+    });
+  });
+  ["azNum","elNum"].forEach(function(id){
+    document.getElementById(id).addEventListener("input", fromInputs);
+    document.getElementById(id).addEventListener("change", fromInputs);
+  });
+  document.getElementById("angReset").addEventListener("click", function(){
+    if(anglePopFor==="sheet") applyAngle(REF_AZ_DEFAULT, REF_EL_DEFAULT);
+    else applyAngle(DEFAULT_CAM.az*180/Math.PI, DEFAULT_CAM.el*180/Math.PI);
+    syncAnglePop();
+  });
+  // Tapping away puts it back, which is the whole point of it not being on screen always.
+  document.addEventListener("pointerdown", function(){ if(anglePopFor) closeAnglePop(); });
+})();
 document.getElementById("transformbtn").addEventListener("click", function(){
   if(!selection.length) return;
   transformMode=!transformMode;
