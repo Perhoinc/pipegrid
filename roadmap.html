@@ -288,8 +288,8 @@
   <p class="standfirst">Where the build stands, what comes next, and the two things
   that are still waiting on a decision from you.</p>
   <div class="meta">
-    <span><b>Updated</b> 1 Oct 2026</span>
-    <span><b>Build</b> vertical slice &middot; 3,893 lines</span>
+    <span><b>Updated</b> 2 Oct 2026</span>
+    <span><b>Build</b> vertical slice &middot; 3,957 lines</span>
     <span><b>Catalogue</b> 39 of 39 parts</span>
     <span><b>Live</b> perhoinc.github.io/pipegrid</span>
   </div>
@@ -348,33 +348,9 @@
 
   <ol class="road">
     <li>
-      <span class="num">01<span class="when">added<br>29 Sep</span></span>
+      <span class="num">01<span class="when">added<br>27 Sep</span></span>
       <div class="item">
-        <h3>Prompts you can actually see<span class="tag next">recommended next</span></h3>
-        <p>When the app is waiting for something &mdash; tap a cell to paste into, tap the
-        cell to transform from, pick a shape &mdash; it says so in small grey text in the
-        top-left corner, next to the camera readout. That is where a status line goes, not
-        where an instruction goes, and instructions are being missed.</p>
-        <p>Your proposal: a coloured tile across the top centre of the viewport, coloured for
-        what is being asked of you. In both worksurfaces, and the render view when it
-        exists.</p>
-        <p><b>The board is up:</b> <a href="boards/pipegrid-prompt-mockups.html"
-        style="color:var(--acc);">how should the app ask for something?</a> &mdash; three
-        treatments across the same three moments, every string one the app really produces.
-        A is what ships today, B is a tile in two colours (waiting, refused), C is a colour
-        per action.</p>
-        <p>Four things to settle there. <b>What the colours mean</b> &mdash; B spends no new
-        colour, C spends three, and five of the app&rsquo;s six are already carrying a meaning.
-        <b>Whether the tile carries the way out</b> of the action. <b>What happens to the
-        corner readout.</b> And one the board turned up on its own: <b>how long a prompt may
-        be</b>, since the tile has to fit between the camera chip and the compass &mdash; at
-        phone width the transform sentence does not, and gets cut.</p>
-      </div>
-    </li>
-    <li>
-      <span class="num">02<span class="when">added<br>27 Sep</span></span>
-      <div class="item">
-        <h3>Exact viewing angles</h3>
+        <h3>Exact viewing angles<span class="tag next">recommended next</span></h3>
         <p>Azimuth and elevation by slider or by typing the degrees, so a view can be dialled
         in rather than nudged there by a gesture that has to be exactly right. Not on screen
         all the time: the az/el readout is already sitting in the corner, so tapping it
@@ -387,7 +363,7 @@
       </div>
     </li>
     <li>
-      <span class="num">03<span class="when">added<br>31 Aug</span></span>
+      <span class="num">02<span class="when">added<br>31 Aug</span></span>
       <div class="item">
         <h3>Trace mode</h3>
         <p>Follow the flow through a finished layout and see where it actually goes. Your
@@ -396,16 +372,16 @@
       </div>
     </li>
     <li>
-      <span class="num">04<span class="when">added<br>21 Aug</span></span>
+      <span class="num">03<span class="when">added<br>21 Aug</span></span>
       <div class="item">
-        <h3>Valves, and what flow does at a junction<span class="tag blocked">needs 03</span></h3>
+        <h3>Valves, and what flow does at a junction<span class="tag blocked">needs 02</span></h3>
         <p>A valve part, and the logic that goes with it — a merge behaves like an
         <em>or</em>, a valve like a <em>not</em> or an <em>and</em>. Parked since before
         the catalogue work, and it needs trace mode underneath it.</p>
       </div>
     </li>
     <li>
-      <span class="num">05<span class="when">added<br>27 Sep</span></span>
+      <span class="num">04<span class="when">added<br>27 Sep</span></span>
       <div class="item">
         <h3>Colour for runs and sections</h3>
         <p>Two separate things wearing one word. <b>Colouring a run</b>, or a section of
@@ -421,7 +397,7 @@
       </div>
     </li>
     <li>
-      <span class="num">06<span class="when">added<br>27 Sep</span></span>
+      <span class="num">05<span class="when">added<br>27 Sep</span></span>
       <div class="item">
         <h3>A render view</h3>
         <p>A third worksurface alongside the 3D rig and the 2D sheet: the whole build at
@@ -434,7 +410,7 @@
       </div>
     </li>
     <li>
-      <span class="num">07<span class="when">added<br>21 Aug</span></span>
+      <span class="num">06<span class="when">added<br>21 Aug</span></span>
       <div class="item">
         <h3>Exploded stack view<span class="tag parked">parked</span></h3>
         <p>The whole stack pulled apart along its vertical axis, so you can see every floor
@@ -442,7 +418,7 @@
       </div>
     </li>
     <li>
-      <span class="num">08<span class="when">added<br>25 Aug</span></span>
+      <span class="num">07<span class="when">added<br>25 Aug</span></span>
       <div class="item">
         <h3>Pipe treatment in 3D<span class="tag parked">after mechanics</span></h3>
         <p>See the open question above. Deliberately behind the mechanics work, per your
@@ -459,6 +435,33 @@
   </div>
 
   <div class="resolved">
+    <h3>The app speaks up</h3>
+    <span class="when"><b>settled</b> 2 Oct</span>
+    <p>Everything the app wants from you, or refused you, now says so on <b>a tile across the
+    top centre</b>. Amber when it wants something, red when it refused, quiet with a blue edge
+    while you are mid-action, green when something landed. The corner readout keeps the camera
+    and nothing else, which is what it was always good at &mdash; and is now the obvious place
+    to tap for the angle control further down this list.</p>
+    <p>Settled on two boards: <a href="boards/pipegrid-prompt-mockups.html"
+    style="color:var(--acc);">three treatments</a>, then <a href="boards/pipegrid-prompt-copy.html"
+    style="color:var(--acc);">all seventeen prompts in the chosen one</a>. You took the
+    two-colour vocabulary over a colour per action, because five of the app&rsquo;s six colours
+    already mean something &mdash; green and blue are the N&ndash;S and U&ndash;D axes, shown on
+    the compass in that same corner. Green for a result was the one colour added.</p>
+    <p><b>No cancel on the tile</b>: you leave an action the way you came in. <b>No width
+    cap</b> either &mdash; your call, that a prompt wants attention and then goes away while the
+    camera chip and the compass can wait their turn. At a comfortable width it overlaps nothing;
+    at phone width it covers the chip.</p>
+    <p>Two things follow from &ldquo;all refusals in the same place&rdquo;. The grid controls
+    used to answer in small text inside the BOARD menu; those refusals come to the tile now, and
+    the note under the controls went back to reporting the size. And a group drag into something
+    solid used to stop dead and say nothing &mdash; indistinguishable from the drag going wrong
+    &mdash; so it now names what is in the way.</p>
+    <p><b>News clears itself after about four seconds</b>; a request does not. A result or a
+    refusal is news, and unlike a request it does not describe a state you are still in. On the
+    2D sheet only news appears, since every request is about tapping something on the 3D stage.</p>
+  </div>
+  <div class="resolved" style="margin-top:14px;">
     <h3>A gimbal for the group</h3>
     <span class="when"><b>settled</b> 28 Sep</span>
     <p><b>TRANSFORM asks for a cell, and a gimbal appears there</b> &mdash; the same three
@@ -702,6 +705,8 @@
   <p class="sblurb">All live on the iPad build.</p>
 
   <ul class="shipped">
+    <li><span class="dot"></span><div>The app speaks up<span class="when">2 Oct</span>
+      <small>A coloured tile across the top centre for every prompt and every refusal</small></div></li>
     <li><span class="dot"></span><div>Camera free while transforming<span class="when">29 Sep</span>
       <small>Orbit, zoom and pan again; the gimbal is planted on a tap, not on every press</small></div></li>
     <li><span class="dot"></span><div>Transform stops stretching the grid<span class="when">29 Sep</span>

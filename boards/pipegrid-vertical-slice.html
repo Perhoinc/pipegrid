@@ -59,6 +59,29 @@
      units are CSS px 1:1, so ~86px clears it with margin at any viewport size). */
   .hud{position:absolute;top:10px;left:10px;right:10px;display:flex;flex-direction:column;
        align-items:flex-start;gap:6px;pointer-events:none;z-index:15;padding-right:86px;}
+  /* The prompt tile. Everything the app wants from you, or refused you, says so here -
+     across the top centre, in the colour of what kind of thing it is. The corner readout
+     keeps the camera and nothing else, which is what it was always good at.
+     Free to sit over the camera chip and the compass: the owner's call, on the grounds that
+     a prompt wants attention and then goes away while those two can wait. Capped only
+     against running off the stage. Measured on the copy board: at a comfortable width it
+     overlaps nothing, at phone-landscape width it covers the chip. */
+  .prompt{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:20;
+       display:none;align-items:center;gap:9px;border-radius:7px;padding:7px 13px;
+       white-space:nowrap;font-size:11px;letter-spacing:.3px;font-weight:500;
+       max-width:calc(100% - 16px);pointer-events:none;
+       box-shadow:0 3px 14px rgba(0,0,0,.5);}
+  .prompt.show{display:flex;}
+  .prompt .verb{font-size:8.5px;letter-spacing:1.4px;text-transform:uppercase;opacity:.82;flex:none;}
+  .prompt .msg{overflow:hidden;text-overflow:ellipsis;}
+  /* Two colours carry meaning, both already in the app's vocabulary: amber is the active
+     thing, red is a refusal. Mid-action is deliberately quiet - by then you know what you
+     are doing. Green reports a result, the one colour this added, on the owner's call.
+     The quiet two take --indbg rather than a fixed dark, so the light theme follows. */
+  .prompt.ask{background:var(--acc);color:#1b1206;}
+  .prompt.no{background:var(--danger);color:#2a0705;}
+  .prompt.busy{background:var(--indbg);border:1px solid var(--az);color:var(--text);}
+  .prompt.done{background:var(--indbg);border:1px solid var(--ay);color:var(--ay);}
   .hud .stat{font-size:9.5px;letter-spacing:.4px;color:var(--dim);
        background:var(--indbg);padding:4px 8px;border-radius:7px;pointer-events:auto;
        max-width:100%;}
@@ -258,10 +281,12 @@
 <div class="stage">
   <div class="rig" id="rig">
     <div class="hud">
-      <span class="stat" id="stat">az 35° · el 25° · zoom 100%</span>
-      <span class="stat" id="gizmostat">no part selected</span>
+      <span class="stat" id="stat">az 35&deg; &middot; el 25&deg; &middot; zoom 100%</span>
     </div>
   </div>
+  <!-- Lives on the stage rather than inside the 3D rig, so it can speak over either
+       worksurface - and over the render view when that exists. -->
+  <div class="prompt" id="prompt"><span class="verb" id="promptVerb"></span><span class="msg" id="promptMsg"></span></div>
   <div class="layerbar" id="layerbar"></div>
   <div class="viewbtns">
     <button class="minibtn" id="wirebtn" title="Show the whole stack's grid">▤</button>
@@ -677,7 +702,74 @@ var clipboard=[];
    gave no way to see where a copy would land before it landed and no way back but undo.
    The cell is chosen first now - the same layer, cell, then shape order that placing a
    single part already follows - so a wrong cell is a different tap, not an undo. */
-var actionMsg="";         // what just happened, shown in the readout until the next action
+/* What just happened, as against what the app is waiting for. A result or a refusal is
+   news: it earns the tile for a few seconds and then gets out of the way, because unlike a
+   request it does not describe a state you are still in. Requests need no timer - they last
+   exactly as long as the state that produces them. */
+var actionPrompt=null, actionPromptTimer=null, ACTION_PROMPT_MS=4200;
+function say(kind, verb, msg){
+  actionPrompt={kind:kind, verb:verb, msg:msg};
+  if(actionPromptTimer) clearTimeout(actionPromptTimer);
+  actionPromptTimer=setTimeout(function(){ actionPrompt=null; actionPromptTimer=null; render(); },
+                               ACTION_PROMPT_MS);
+}
+function hush(){
+  actionPrompt=null;
+  if(actionPromptTimer){ clearTimeout(actionPromptTimer); actionPromptTimer=null; }
+}
+
+/* The one place that decides what the app is saying. Returns a kind, a short label and a
+   sentence, or null when there is nothing to say - the four kinds are the ones settled on
+   the copy board: ask (amber), busy (quiet), no (red), done (green).
+   Reading the same state the scene is drawn from means the tile can never disagree with
+   what is on screen. */
+function currentPrompt(){
+  // On the 2D sheet, only news. Every request below is about tapping something on the 3D
+  // stage, and an instruction you cannot carry out where you are standing is worse than
+  // silence - but a refusal raised from the dock or the BOARD menu still has to reach you.
+  if(viewMode==="2d") return actionPrompt || null;
+  if(gizmoPartIdx!=null && parts[gizmoPartIdx]){
+    var gp=parts[gizmoPartIdx];
+    if(gizmoDrag && gizmoDrag.type==="rot")
+      return {kind:"busy", verb:"turning "+gizmoDrag.axis.name,
+              msg:(gizmoDrag.live*180/Math.PI).toFixed(0)+"° → snaps to "+
+                  ((((snapQuarter(gizmoDrag.live)%4)+4)%4)*90)+"°"};
+    return {kind:"busy", verb:"new part",
+            msg:"pose "+(gp.poseIdx+1)+" of 24 · cell "+gizmoCellArr(gp).join(",")};
+  }
+  if(mode==="connect" && connectDrag)
+    return {kind:"busy", verb:"placing",
+            msg:"pose "+(connectDrag.liveIdx+1)+" of 4 · let go to commit"};
+  if(actionPrompt) return actionPrompt;
+  if(transformMode && selection.length && !gimbalCell)
+    return {kind:"ask", verb:"transform", msg:"tap the cell to move and turn from"};
+  if(transformMode && selection.length)
+    return {kind:"busy", verb:"gimbal "+gimbalCell.x+", "+gimbalCell.y+" · Z"+gimbalCell.z,
+            msg:"drag an arrow to move, a ring to turn"};
+  if(selectedCell)
+    return {kind:"ask", verb:"cell "+selectedCell.x+", "+selectedCell.y+" · Z"+selectedCell.z,
+            msg:clipboard.length
+              ? "PASTE drops "+clipboard.length+" part"+(clipboard.length===1?"":"s")+
+                " here, or pick a shape"
+              : "pick a shape to put here"};
+  if(selection.length)
+    return {kind:"ask", verb:selection.length+" gathered",
+            msg:"tap more to add · tap a gathered one to drop it"};
+  if(selectMode)
+    return {kind:"ask", verb:"select", msg:"tap parts to gather them · any layer"};
+  if(clipboard.length)
+    return {kind:"ask", verb:"holding "+clipboard.length,
+            msg:"tap a cell, then PASTE"};
+  return null;   // nothing to say, so nothing on screen
+}
+function renderPrompt(){
+  var el=document.getElementById("prompt");
+  if(!el) return;
+  var p=currentPrompt();
+  el.className="prompt"+(p ? " show "+p.kind : "");
+  document.getElementById("promptVerb").textContent = p ? p.verb : "";
+  document.getElementById("promptMsg").textContent = p ? p.msg : "";
+}
 
 /* Moving and turning a gathered group.
 
@@ -737,14 +829,14 @@ function planGroupChange(changes){
   var over=null;
   AXIS_KEYS.forEach(function(a){
     if(!over && need[a].hi-need[a].lo+1>GRID_MAX)
-      over="That would need "+(need[a].hi-need[a].lo+1)+" "+AXIS_NOUN[a]+"s - the maximum is "+GRID_MAX+".";
+      over="that needs "+(need[a].hi-need[a].lo+1)+" "+AXIS_NOUN[a]+"s — "+GRID_MAX+" is the most";
   });
   return {probes:probes, taken:taken, over:over, need:need};
 }
 function groupRefusal(plan){
-  if(!plan) return "Nothing gathered.";
-  if(plan.taken) return "Cell "+plan.taken.x+", "+plan.taken.y+" on Z"+plan.taken.z+
-                        " is in the way.";
+  if(!plan) return "nothing gathered";
+  if(plan.taken) return "cell "+plan.taken.x+", "+plan.taken.y+" on Z"+plan.taken.z+
+                        " is in the way";
   return plan.over || null;
 }
 function applyGroupPlan(plan){
@@ -826,7 +918,7 @@ function planPaste(cell){
   var over=null;
   AXIS_KEYS.forEach(function(a){
     if(!over && need[a].hi-need[a].lo+1>GRID_MAX)
-      over="That would need "+(need[a].hi-need[a].lo+1)+" "+AXIS_NOUN[a]+"s - the maximum is "+GRID_MAX+".";
+      over="that needs "+(need[a].hi-need[a].lo+1)+" "+AXIS_NOUN[a]+"s — "+GRID_MAX+" is the most";
   });
   var grows=AXIS_KEYS.some(function(a){ return need[a].lo<GRID[a].lo || need[a].hi>GRID[a].hi; });
   return {made:made, taken:taken, over:over, need:need, grows:grows};
@@ -834,9 +926,9 @@ function planPaste(cell){
 // Why a plan would be refused, or null when it would land. One sentence, because it goes
 // straight into the readout.
 function pasteRefusal(plan){
-  if(!plan) return "Nothing copied yet.";
-  if(plan.taken) return "Cell "+plan.taken.x+", "+plan.taken.y+" on Z"+plan.taken.z+
-                        " is taken - nothing pasted.";
+  if(!plan) return "nothing copied yet";
+  if(plan.taken) return "cell "+plan.taken.x+", "+plan.taken.y+" on Z"+plan.taken.z+
+                        " is taken — nothing pasted";
   return plan.over || null;
 }
 /* Commits the plan. Same validation as the ghost, because it is literally the same call. */
@@ -1077,11 +1169,11 @@ function nudgeGrid(axis, side, d){
   var lo = side==="lo" ? next : GRID[axis].lo;
   var hi = side==="hi" ? next : GRID[axis].hi;
   var count=hi-lo+1;
-  if(count<GRID_MIN) return "The grid needs at least one "+AXIS_NOUN[axis]+".";
-  if(count>GRID_MAX) return "Maximum is "+GRID_MAX+" "+AXIS_NOUN[axis]+"s.";
+  if(count<GRID_MIN) return "the grid needs at least one "+AXIS_NOUN[axis];
+  if(count>GRID_MAX) return GRID_MAX+" "+AXIS_NOUN[axis]+"s is the most";
   var b=occupiedBounds();
   if(b && (b[axis].lo<lo || b[axis].hi>hi))
-    return "Can't remove the "+END_LABEL[axis][side]+" "+AXIS_NOUN[axis]+" - parts are sitting there. Delete them first.";
+    return "parts are sitting in the "+END_LABEL[axis][side]+" "+AXIS_NOUN[axis]+" — delete them first";
   GRID[axis][side]=next;
   clampActiveLayer();
   if(selectedCell && !inGrid(selectedCell.x,selectedCell.y,selectedCell.z)) selectedCell=null;
@@ -1458,46 +1550,9 @@ function render(){
       gizmoDrag && gizmoDrag.type==="move" ? gizmoDrag.axis.id : null,
       gizmoDrag && gizmoDrag.type==="rot"  ? gizmoDrag.axis.id : null);
 
-    var turning=gizmoDrag && gizmoDrag.type==="rot";
-    document.getElementById("gizmostat").textContent = turning
-      ? "turning "+gizmoDrag.axis.name+" "+(gizmoDrag.live*180/Math.PI).toFixed(0)+"° → snaps to "+((((snapQuarter(gizmoDrag.live)%4)+4)%4)*90)+"°"
-      : "gizmo on new part · pose "+(gp.poseIdx+1)+" of 24 · cell "+cellArr.join(",");
-  } else if(mode==="connect" && connectDrag){
-    document.getElementById("gizmostat").textContent =
-      "placing · pose "+(connectDrag.liveIdx+1)+" of 4 valid for this connection · release to commit";
-  } else if(actionMsg){
-    document.getElementById("gizmostat").textContent = actionMsg;
-  } else if(transformMode && !gimbalCell){
-    document.getElementById("gizmostat").textContent =
-      "transform · tap the cell to move and turn "+selection.length+" part"+
-      (selection.length===1?"":"s")+" from";
-  } else if(transformMode){
-    document.getElementById("gizmostat").textContent =
-      "gimbal on "+gimbalCell.x+", "+gimbalCell.y+" on Z"+gimbalCell.z+
-      " · drag an arrow to move, a ring to turn · tap elsewhere to re-place it";
-  } else if(selection.length){
-    document.getElementById("gizmostat").textContent =
-      selection.length+" part"+(selection.length===1?"":"s")+" selected · tap another to add it, "+
-      "tap a selected one to drop it";
-  } else if(selectMode){
-    document.getElementById("gizmostat").textContent =
-      "select · tap parts to gather them, across layers if you like";
-  } else if(selectedCell){
-    // The one place the free-placement flow can stall is between picking a cell and
-    // realising a shape is what comes next, so the readout says so outright.
-    document.getElementById("gizmostat").textContent =
-      "cell "+selectedCell.x+", "+selectedCell.y+" on Z"+selectedCell.z+
-      (clipboard.length
-        ? " · PASTE drops "+clipboard.length+" part"+(clipboard.length===1?"":"s")+
-          " here, or pick a shape"
-        : " · pick a shape to place it here");
-  } else if(clipboard.length){
-    document.getElementById("gizmostat").textContent =
-      "holding "+clipboard.length+" part"+(clipboard.length===1?"":"s")+
-      " · tap a cell, then PASTE";
-  } else {
-    document.getElementById("gizmostat").textContent = "no part selected";
   }
+
+  renderPrompt();
 
   /* What PASTE would drop into the chosen cell, drawn before you commit to it. The owner
      could not tell which corner of a copy would land where, nor whether it would fit, until
@@ -2958,7 +3013,7 @@ svg.addEventListener("pointerdown", function(e){
       if(portHit || bodyHit) selectedCell=null;
       if(selectTap){
         toggleSelected(portHit ? portHit.partIdx : bodyHit.partIdx);
-        actionMsg="";
+        hush();
         gizmoPartIdx=null; gizmoDrag=null; mode="none";
         render();
       } else if(portHit){
@@ -3091,6 +3146,11 @@ svg.addEventListener("pointermove", function(e){
     if(planM && !planM.taken && !planM.over){
       applyGroupPlan(planM);
       gimbalCell={x:groupDrag.baseGimbal.x+dM[0], y:groupDrag.baseGimbal.y+dM[1], z:groupDrag.baseGimbal.z+dM[2]};
+      hush();
+      render();
+    } else if(planM){
+      // Say why it stopped following your finger, rather than just stopping.
+      say("no","no",groupRefusal(planM));
       render();
     }
     return;
@@ -3188,7 +3248,7 @@ function up(e){
         // pinch free to zoom, so a transform can be finished somewhere off the current view.
         if(transformMode && selection.length){
           var gtap=cellAtPoint(svgPointFromClient(e.clientX,e.clientY));
-          if(gtap){ gimbalCell=gtap; actionMsg=""; }
+          if(gtap){ gimbalCell=gtap; hush(); }
           render();
           orbitHadGizmo=false;
           return;
@@ -3201,7 +3261,7 @@ function up(e){
         // Choosing a cell is a new action, so whatever the last one reported stops being
         // the most useful thing to say - the readout goes back to describing the cell, and
         // what PASTE would do with it.
-        actionMsg="";
+        hush();
         var tapCell=cellAtPoint(svgPointFromClient(e.clientX,e.clientY));
         selectedCell=(!selectMode && tapCell && !isOccupied(tapCell.x,tapCell.y,tapCell.z)) ? tapCell : null;
         render();
@@ -3237,7 +3297,7 @@ function up(e){
       if(qq){
         var planR=planGroupChange(turnChanges(axR, gimbalCell, qq));
         var whyR=groupRefusal(planR);
-        if(whyR){ actionMsg=whyR; }
+        if(whyR){ say("no","no",whyR); }
         else { applyGroupPlan(planR); pushHistory(preR); }
       }
       render(); runValidation();
@@ -3345,8 +3405,10 @@ document.getElementById("exportbtn").addEventListener("click", function(){
   b.addEventListener("click", function(){
     var err=nudgeGrid(b.getAttribute("data-axis"), b.getAttribute("data-side"),
                       parseInt(b.getAttribute("data-d"),10));
+    if(err) say("no","no",err);
     document.getElementById("gridnote").textContent =
-      err || "Grid is "+axisCount("x")+" × "+axisCount("y")+" × "+axisCount("z")+" (columns × rows × layers).";
+      "Grid is "+axisCount("x")+" × "+axisCount("y")+" × "+axisCount("z")+" (columns × rows × layers).";
+    render();
   });
 });
 document.getElementById("importbtn").addEventListener("click", function(){
@@ -3512,7 +3574,7 @@ document.getElementById("transformbtn").addEventListener("click", function(){
   if(!selection.length) return;
   transformMode=!transformMode;
   gimbalCell=null; groupDrag=null;
-  actionMsg="";
+  hush();
   render();
 });
 document.getElementById("copybtn").addEventListener("click", function(){
@@ -3521,14 +3583,16 @@ document.getElementById("copybtn").addEventListener("click", function(){
     // Out of SELECT and into choosing a destination: while gathering, a tap on empty space
     // drops the selection rather than naming a cell, so you could not say where it goes.
     selectMode=false; clearSelection();
-    actionMsg=got+" part"+(got===1?"":"s")+" copied · tap a cell, then PASTE";
+    say("ask", got+" copied", "tap a cell, then PASTE");
   }
   render();
 });
 document.getElementById("pastebtn").addEventListener("click", function(){
   if(!clipboard.length || !selectedCell) return;
+  var held=clipboard.length;
   var why=pasteAt(selectedCell);
-  actionMsg = why || (clipboard.length+" part"+(clipboard.length===1?"":"s")+" pasted");
+  if(why) say("no","no",why);
+  else say("done","done", held+" part"+(held===1?"":"s")+" pasted");
   render();
 });
 document.getElementById("selectbtn").addEventListener("click", function(){
@@ -3537,7 +3601,7 @@ document.getElementById("selectbtn").addEventListener("click", function(){
   // DELETE to act on. Parts are tapped in the 3D view, so entering also brings you there.
   if(!selectMode) clearSelection(); else setViewMode("3d");
   transformMode=false; gimbalCell=null; groupDrag=null;
-  actionMsg="";
+  hush();
   gizmoPartIdx=null; gizmoDrag=null; mode="none";
   setPopover(null);
   render();
