@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PIPEGRID — trace mode: how should flow read?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@300;400;500;700&display=swap">
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12151b; --panel2:#0e1116; --edge:#2c313d;
+    --text:#c7d3e2; --dim:#5f6775; --acc:#e0a14e; --out:#3a4150; --wire:#8ea6bf;
+    --flow:#ffc45e; --danger:#e06c60; --ay:#5aa469;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  body{background:var(--bg);color:var(--text);
+       font-family:"Roboto Slab",Rockwell,Georgia,serif;-webkit-text-size-adjust:100%;
+       padding:16px;padding-bottom:70px;}
+  .hdr{margin-bottom:14px;}
+  .title{font-size:16px;font-weight:700;letter-spacing:1.5px;}
+  .sub{font-size:10px;letter-spacing:1px;color:var(--dim);margin-top:4px;}
+  .panel{border:1px solid var(--edge);border-radius:8px;background:var(--panel);
+         padding:14px;margin-bottom:14px;max-width:1180px;}
+  .plabel{font-size:11px;font-weight:700;letter-spacing:1.5px;margin-bottom:4px;}
+  .pcount{font-size:9px;letter-spacing:1px;color:var(--dim);margin-bottom:10px;}
+  .note{font-size:12.5px;color:var(--dim);line-height:1.7;margin:0 0 8px;max-width:80ch;}
+  .note:last-child{margin-bottom:0;}
+  .note b{color:var(--text);font-weight:500;}
+  .note .warn{color:var(--acc);}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:14px;}
+  .opt{border:1px solid var(--edge);border-radius:6px;background:var(--panel2);padding:10px;}
+  .opthead{display:flex;align-items:baseline;gap:8px;margin-bottom:8px;}
+  .optname{font-size:12px;font-weight:700;letter-spacing:.6px;}
+  .opttag{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);
+          border:1px solid var(--edge);border-radius:3px;padding:1px 5px;}
+  .opttag.was{color:var(--acc);border-color:var(--acc);}
+  .optnote{font-size:11px;color:var(--dim);line-height:1.6;margin-top:8px;}
+  .optnote b{color:var(--text);font-weight:500;}
+  svg.scene{display:block;width:100%;height:auto;background:#0b0d10;border-radius:4px;
+            border:1px solid #1b2027;}
+  .q{border-left:2px solid var(--acc);padding-left:9px;margin-top:9px;
+     font-size:11.5px;color:var(--text);line-height:1.65;}
+  .key{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px;}
+  .k{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--dim);
+     border:1px solid var(--edge);border-radius:5px;padding:5px 9px;}
+  .k i{width:13px;height:13px;border-radius:3px;display:block;}
+
+  /* ---- the four ways flow could read ---- */
+  .pipe{fill:none;stroke:var(--text);stroke-width:7;stroke-linecap:round;stroke-linejoin:round;}
+  .pipe.dead{stroke:#39404b;}
+  /* A: rolling dashes, exactly what the old app did */
+  .flowA{fill:none;stroke:var(--flow);stroke-width:7;stroke-linecap:butt;
+         stroke-dasharray:10 14;animation:roll 1s linear infinite;}
+  @keyframes roll{to{stroke-dashoffset:-24;}}
+  /* B: a bright pulse running the length */
+  .flowB{fill:none;stroke:var(--flow);stroke-width:7;stroke-linecap:round;
+         stroke-dasharray:26 400;animation:pulse 2.6s linear infinite;}
+  @keyframes pulse{from{stroke-dashoffset:426;}to{stroke-dashoffset:0;}}
+  /* C: marching chevrons along the bore */
+  .flowC{fill:none;stroke:var(--flow);stroke-width:3.4;stroke-linecap:round;
+         stroke-dasharray:0 17;animation:march 1.1s linear infinite;}
+  @keyframes march{to{stroke-dashoffset:-17;}}
+  /* D: no motion at all - colour carries it */
+  .flowD{fill:none;stroke:var(--flow);stroke-width:7;stroke-linecap:round;}
+
+  .port-in{fill:var(--acc);stroke:#0b0d10;stroke-width:1.6;}
+  .port-out{fill:var(--out);stroke:#0b0d10;stroke-width:1.6;}
+  .port-live{fill:var(--flow);stroke:#0b0d10;stroke-width:1.6;}
+  .stop-open{fill:none;stroke:var(--flow);stroke-width:2.4;}
+  .stop-fault{fill:none;stroke:var(--danger);stroke-width:2.6;}
+  .lbl{font-family:"Roboto Slab",serif;font-size:9px;fill:var(--dim);letter-spacing:.4px;}
+  .lbl.warn{fill:var(--danger);}
+  .lbl.go{fill:var(--flow);}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="title">TRACE MODE &mdash; HOW SHOULD FLOW READ?</div>
+  <div class="sub">3D view only &middot; no vertical markers &middot; trace never edits &middot; 3 Oct</div>
+</div>
+
+<div class="panel">
+  <div class="plabel">WHAT THIS IS DECIDING</div>
+  <p class="note">The job you set: <b>see whether the whole stack is connected inlet to outlet
+  all the way through</b>, and read what a junction needs. So the model is:</p>
+  <p class="note"><b>Flow starts</b> at every inlet with nothing attached &mdash; that is where it
+  enters the build. <b>It crosses a joint</b> only where an outlet meets an inlet. <b>It ends</b>
+  at every outlet with nothing attached. <b>Anything it never reaches</b> is the thing you are
+  looking for.</p>
+  <p class="note">Every panel below shows the same little build: flow in at the left, a run, an
+  elbow, a split, one branch ending properly in the open, and one branch with <span
+  class="warn">two outlets butted together</span> &mdash; which is not a joint, so everything
+  past it is dead. That dead tail is the case the whole mode exists to find.</p>
+  <p class="note">Not here, by your call: no rising/falling markers (you can see that in 3D),
+  nothing on the 2D sheet, and no tapping to flip a part &mdash; port configuration is the
+  part, so flipping one would quietly change what you have to cast.</p>
+</div>
+
+<div class="panel">
+  <div class="plabel">HOW FLOW READS ALONG A PIPE</div>
+  <div class="pcount">four treatments &middot; the motion is live, watch it rather than read it</div>
+  <div class="grid" id="flowgrid"></div>
+</div>
+
+<div class="panel">
+  <div class="plabel">WHERE FLOW STOPS</div>
+  <div class="pcount">two different things, and they should not look the same</div>
+  <div class="grid" id="stopgrid"></div>
+  <p class="q">An open outlet is a finished end &mdash; it is where the piece pours out, and it
+  should look deliberate. A joint that does not join is a mistake. Do you want the mistake to
+  shout (red, as drawn), or to stay in the same amber vocabulary and simply be marked
+  differently? Red is the app&rsquo;s refusal colour, so it would read as &ldquo;this is
+  wrong&rdquo; rather than &ldquo;this is the end&rdquo;.</p>
+</div>
+
+<div class="panel">
+  <div class="plabel">AND ONE THING I WANT TO CHECK</div>
+  <p class="note">A stack of any size will have a lot of pipe moving at once. On the biggest
+  board you have built, every lit pipe animating together may read as noise rather than as
+  flow &mdash; which would argue for treatment D, or for the motion running only on the run you
+  last touched.</p>
+  <p class="q">Worth deciding on this board: <b>does everything move at once, or only what you
+  point at?</b> I can make the whole stack move and let you tell me if it is too much, but it is
+  cheaper to decide here.</p>
+</div>
+
+<script>
+/* One scene, drawn four ways. The build: in at the left, a straight run, an elbow, a split,
+   one branch open (a proper end) and one branch meeting an outlet head-on (a fault), with
+   everything past the fault dead. */
+var MAIN  = "M 46 152 L 150 110 L 236 76";          // open inlet -> run -> elbow start
+var ELBOW = "M 236 76 Q 268 64 282 96";             // the turn
+var DOWN  = "M 282 96 L 300 136";                   // into the split
+var BR_UP = "M 300 136 L 384 100";                  // branch that ends open
+var BR_DN = "M 300 136 L 338 182";                  // branch into the fault
+var DEAD  = "M 352 190 L 424 158";                  // past the fault: never reached
+
+function scene(flowClass, extra){
+  var live = flowClass
+    ? '<path class="'+flowClass+'" d="'+MAIN+'"/>'
+    + '<path class="'+flowClass+'" d="'+ELBOW+'"/>'
+    + '<path class="'+flowClass+'" d="'+DOWN+'"/>'
+    + '<path class="'+flowClass+'" d="'+BR_UP+'"/>'
+    + '<path class="'+flowClass+'" d="'+BR_DN+'"/>'
+    : '';
+  return '<svg class="scene" viewBox="0 0 440 210" xmlns="http://www.w3.org/2000/svg">'
+    /* floor hint */
+    + '<g stroke="#1d232b" stroke-width="1" fill="none">'
+    +   '<path d="M20 170 L190 100 L420 190 L250 200 Z" opacity=".5"/>'
+    + '</g>'
+    /* structure */
+    + '<path class="pipe" d="'+MAIN+'"/><path class="pipe" d="'+ELBOW+'"/>'
+    + '<path class="pipe" d="'+DOWN+'"/><path class="pipe" d="'+BR_UP+'"/>'
+    + '<path class="pipe" d="'+BR_DN+'"/>'
+    + '<path class="pipe dead" d="'+DEAD+'"/>'
+    /* flow on top of the structure */
+    + live
+    /* ports */
+    + '<circle class="'+(flowClass?'port-live':'port-in')+'" cx="46" cy="152" r="7"/>'
+    + '<circle class="port-out" cx="384" cy="100" r="7"/>'
+    + '<circle class="port-out" cx="338" cy="182" r="7"/>'
+    + '<circle class="port-out" cx="352" cy="190" r="7"/>'
+    + '<circle class="port-in" cx="424" cy="158" r="7"/>'
+    + (extra||'')
+    + '</svg>';
+}
+
+var FLOWS=[
+  { name:"A · Rolling dashes", tag:"what you had", cls:"flowA",
+    note:"Exactly the old app: a dashed amber overlay travelling along the bore, one second a "
+       + "cycle. <b>Direction is unmistakable</b> and it reads at a glance even on a thin pipe. "
+       + "It is also the busiest of the four when a whole stack is lit." },
+  { name:"B · A pulse down the run", tag:"", cls:"flowB",
+    note:"One bright slug runs the length and repeats. Much quieter than A, and it shows you "
+       + "the <b>route</b> rather than just the direction &mdash; your eye follows it to the "
+       + "end. Slower to read on a short part, since you wait for the pulse to arrive." },
+  { name:"C · Marching chevrons", tag:"", cls:"flowC",
+    note:"Dots of flow stepping along inside the pipe, drawn thinner than the bore so the pipe "
+       + "keeps its own weight. <b>Closest to a drawing convention</b> rather than an effect. "
+       + "At this pipe width they are small; on a dense board they may turn to texture." },
+  { name:"D · Colour only, no motion", tag:"", cls:"flowD",
+    note:"Lit pipe is amber, dead pipe is grey, nothing moves. <b>Answers your actual question "
+       + "&mdash; is it all connected &mdash; with no animation at all</b>, and stays legible at "
+       + "any size. It tells you nothing about which way round the flow runs." }
+];
+
+var host=document.getElementById("flowgrid");
+FLOWS.forEach(function(f){
+  var d=document.createElement("div"); d.className="opt";
+  d.innerHTML='<div class="opthead"><span class="optname">'+f.name+'</span>'
+    + (f.tag?'<span class="opttag was">'+f.tag+'</span>':'')+'</div>'
+    + scene(f.cls)
+    + '<p class="optnote">'+f.note+'</p>';
+  host.appendChild(d);
+});
+
+/* the two kinds of stop, drawn differently */
+var STOPS=[
+  { name:"An open outlet — a finished end",
+    extra:'<circle class="stop-open" cx="384" cy="100" r="13"/>'
+        + '<text class="lbl go" x="372" y="86" text-anchor="end">flow leaves here</text>',
+    note:"A ring in the flow colour around the port. It is not a problem &mdash; it is where "
+       + "the piece pours out &mdash; so it stays in the same vocabulary as the flow itself." },
+  { name:"A joint that does not join — a fault",
+    extra:'<path class="stop-fault" d="M 331 175 L 359 197 M 359 175 L 331 197"/>'
+        + '<text class="lbl warn" x="300" y="206">outlet meets outlet</text>',
+    note:"Two outlets butted together, so nothing crosses and the pipe beyond it is dead "
+       + "&mdash; drawn grey in every panel above. A cross in the refusal red, because unlike "
+       + "an open end this one is wrong." }
+];
+var shost=document.getElementById("stopgrid");
+STOPS.forEach(function(s){
+  var d=document.createElement("div"); d.className="opt";
+  d.innerHTML='<div class="opthead"><span class="optname">'+s.name+'</span></div>'
+    + scene("flowA", s.extra)
+    + '<p class="optnote">'+s.note+'</p>';
+  shost.appendChild(d);
+});
+</script>
+
+</body>
+</html>
