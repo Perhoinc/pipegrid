@@ -289,7 +289,7 @@
   that are still waiting on a decision from you.</p>
   <div class="meta">
     <span><b>Updated</b> 3 Oct 2026</span>
-    <span><b>Build</b> vertical slice &middot; 4,318 lines</span>
+    <span><b>Build</b> vertical slice &middot; 4,346 lines</span>
     <span><b>Catalogue</b> 39 of 39 parts</span>
     <span><b>Live</b> perhoinc.github.io/pipegrid</span>
   </div>
@@ -428,6 +428,13 @@
     inside trace; that cannot carry over, because port configuration <b>is</b> the part here,
     so the tap would swap one cast piece for another and change the casting list while you
     were reading the drawing.</p>
+    <p><b>A closed circuit counts as flowing.</b> The first version seeded flow only from
+    inlets open to the world, which meant a finished loop &mdash; where nothing is left open,
+    because that is what finishing it means &mdash; went dark and stopped moving exactly when
+    you had got it right. You caught that within the hour. Loops are found by peeling away
+    everything nothing feeds; what survives is circulating. A ring with one part turned the
+    wrong way round goes <i>completely</i> dark and pulses its four bad ports, which turns out
+    to be a useful thing to see.</p>
     <p>One thing to watch in use: the rule you chose marks <b>every</b> unjoined port, so the
     source and the drain pulse red along with the mistakes. On a finished piece those should be
     the only two, which is the point &mdash; but on a board mid-build it is a lot of red.</p>
@@ -737,6 +744,8 @@
   <p class="sblurb">All live on the iPad build.</p>
 
   <ul class="shipped">
+    <li><span class="dot"></span><div>Closed circuits flow too<span class="when">3 Oct</span>
+      <small>A finished loop has no open end, so the first model called it dead</small></div></li>
     <li><span class="dot"></span><div>Trace mode<span class="when">3 Oct</span>
       <small>Flow through the build, dark where nothing moves, red where it is not joined</small></div></li>
     <li><span class="dot"></span><div>Connectors hide the pipe only when they face you<span class="when">3 Oct</span>

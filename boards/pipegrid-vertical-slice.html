@@ -1051,31 +1051,59 @@ function flowOf(){
   var live={};      // "partIdx:from>to" for every stream carrying flow
   var livePart={};
   var faults=[];    // ports that are loose, or butted against the same role
-  var seen={};
-  var queue=[];
-  // Sources: every inlet with nothing across it. Also records every fault as it goes.
+  var feeds={}, fedBy={}, openInlet={};
+  parts.forEach(function(p,i){ feeds[i]=[]; fedBy[i]=[]; });
+  // One pass over every port: record the faults, and build the graph of real joints.
   parts.forEach(function(p,i){
     p.ports.forEach(function(pt){
       var m=across(i, pt.dir);
-      if(!m){ faults.push({part:i, dir:pt.dir, why:"loose"}); if(pt.role==="in") queue.push({part:i, dir:pt.dir}); }
-      else if(m.port.role===pt.role) faults.push({part:i, dir:pt.dir, why:"same"});
+      if(!m){
+        faults.push({part:i, dir:pt.dir, why:"loose"});
+        if(pt.role==="in") openInlet[i]=1;
+        return;
+      }
+      if(m.port.role===pt.role){ faults.push({part:i, dir:pt.dir, why:"same"}); return; }
+      if(pt.role==="out"){ feeds[i].push(m.part); fedBy[m.part].push(i); }
     });
   });
+  // Everything fed from somewhere a pipe actually opens into the world.
+  var queue=[];
+  Object.keys(openInlet).forEach(function(i){ i=+i; livePart[i]=1; queue.push(i); });
   while(queue.length){
-    var at=queue.shift();
-    var key=at.part+":"+at.dir;
-    if(seen[key]) continue;
-    seen[key]=1;
-    var p=parts[at.part];
-    livePart[at.part]=1;
-    // Through the part: an inlet feeds every stream that starts at it.
-    p.streams.forEach(function(st){
-      if(st.from!==at.dir) return;
-      live[at.part+":"+st.from+">"+st.to]=1;
-      var m=across(at.part, st.to);
-      if(m && m.port.role==="in") queue.push({part:m.part, dir:m.port.dir});
+    var i=queue.shift();
+    feeds[i].forEach(function(j){ if(!livePart[j]){ livePart[j]=1; queue.push(j); } });
+  }
+  /* And a closed circuit, which the above can never reach. A loop has no inlet left open
+     anywhere - that is what finishing it means - so a model seeded only from open inlets
+     calls the whole thing dead and stops moving exactly when the owner has got it right.
+     Owner caught that.
+
+     What survives peeling is the answer: from the parts not yet lit, repeatedly drop any that
+     nothing in that set feeds. A part fed by nothing cannot be circulating. What is left is on
+     a loop, or downstream of one, and is carrying flow. */
+  var rest={};
+  parts.forEach(function(p,i){ if(!livePart[i]) rest[i]=1; });
+  for(var peeling=true; peeling; ){
+    peeling=false;
+    Object.keys(rest).forEach(function(i){
+      if(!fedBy[i].some(function(j){ return rest[j]; })){ delete rest[i]; peeling=true; }
     });
   }
+  Object.keys(rest).forEach(function(i){ livePart[+i]=1; });
+  // Streams: within a live part, an inlet carries flow if it is open to the world or fed by
+  // another live part. Written once, after the parts are settled, so a loop and a run are
+  // marked by exactly the same rule.
+  parts.forEach(function(p,i){
+    if(!livePart[i]) return;
+    p.ports.forEach(function(pt){
+      if(pt.role!=="in") return;
+      var m=across(i, pt.dir);
+      if(m && !(m.port.role==="out" && livePart[m.part])) return;
+      p.streams.forEach(function(st){
+        if(st.from===pt.dir) live[i+":"+st.from+">"+st.to]=1;
+      });
+    });
+  });
   return {live:live, livePart:livePart, faults:faults,
           partsLit:Object.keys(livePart).length, partCount:parts.length};
 }
