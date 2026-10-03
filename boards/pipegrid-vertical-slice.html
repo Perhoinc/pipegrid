@@ -18,12 +18,17 @@
     --ax:#d8534f; --ay:#5aa469; --az:#4a7fb5; --indbg:rgba(18,21,27,0.65);
     /* Deliberately not --ax: the axis reds mean "this is the X axis" everywhere else
        in the scene, and a destructive control borrowing that colour would read as one. */
+    /* Flow, for trace mode. Brighter than --acc on purpose: amber already means "the active
+       thing" all over the app, and flow has to read as a different kind of statement while
+       sitting next to inlet ports that are amber themselves. Carried over from the old app. */
+    --flow:#ffc45e;
     --danger:#e06c60;
   }
   body[data-theme="light"]{
     --bg:#eef1f5; --panel:#ffffff; --panel2:#f4f6f9; --edge:#d3d9e2;
     --text:#232a35; --dim:#7a8494; --acc:#c97a1f; --out:#9aa4b3; --wire:#5b6b80;
     --ax:#c0392b; --ay:#3f8f52; --az:#2f6ea8; --indbg:rgba(244,246,249,0.72);
+    --flow:#b3700a;
     --danger:#b83227;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
@@ -416,6 +421,7 @@
   <button class="dockbtn on" id="dockShapes"><span class="ic">◧</span>SHAPES</button>
   <button class="dockbtn" id="undobtn"><span class="ic">↶</span>UNDO</button>
   <button class="dockbtn" id="redobtn"><span class="ic">↷</span>REDO</button>
+  <button class="dockbtn" id="tracebtn"><span class="ic">⤳</span>TRACE</button>
   <button class="dockbtn" id="selectbtn"><span class="ic">⧉</span>SELECT</button>
   <button class="dockbtn" id="copybtn" style="display:none;"><span class="ic">⎘</span>COPY</button>
   <button class="dockbtn" id="pastebtn" style="display:none;"><span class="ic">⤓</span>PASTE</button>
@@ -734,6 +740,8 @@ function clearSelection(){ selection.length=0; }
    past its anchor and the corner is what lines up with the cell you tap.
    Deliberately not saved with the board: a clipboard is something you are holding, not part
    of the drawing. */
+var traceMode=false;      // the flow view: 3D only, read-only
+var lastFlow=null;        // what the last render found, for the readout
 var transformMode=false;  // TRANSFORM is asking for, or driving from, a gimbal cell
 var gimbalCell=null;      // where the gimbal stands; the group turns about this
 var groupDrag=null;       // an arrow or ring drag in progress
@@ -764,6 +772,13 @@ function hush(){
    Reading the same state the scene is drawn from means the tile can never disagree with
    what is on screen. */
 function currentPrompt(){
+  // Trace says what it found, which is the question the mode exists to answer.
+  if(traceMode && viewMode==="3d" && lastFlow){
+    var loose=lastFlow.faults.length;
+    return {kind: loose ? "no" : "busy", verb:"trace",
+      msg: lastFlow.partsLit+" of "+lastFlow.partCount+" parts carrying flow"+
+           (loose ? " · "+loose+" port"+(loose===1?"":"s")+" not joined" : " · all joined")};
+  }
   // On the 2D sheet, only news. Every request below is about tapping something on the 3D
   // stage, and an instruction you cannot carry out where you are standing is worse than
   // silence - but a refusal raised from the dock or the BOARD menu still has to reach you.
@@ -858,6 +873,32 @@ function openAnglePop(which, anchor){
 function closeAnglePop(){
   anglePopFor=null; anglePopAnchor=null;
   document.getElementById("anglepop").classList.remove("open");
+}
+/* Flow is stepped from one clock rather than from CSS, so a rebuilt scene picks up exactly
+   where the last one left off. Runs only while the mode is on. */
+var traceDots=[], tracePulses=[], traceRAF=null;
+function traceStep(ts){
+  var t=ts/1000;
+  traceDots.forEach(function(d){
+    d.el.setAttribute("stroke-dashoffset", (-((t*d.period/0.9) % d.period)).toFixed(2));
+  });
+  var k=0.22+0.78*(0.5+0.5*Math.sin(t*Math.PI*2/1.9));   // slow, per the owner
+  tracePulses.forEach(function(p){ p.setAttribute("opacity", k.toFixed(3)); });
+}
+function traceTick(ts){
+  traceStep(ts);
+  traceRAF=requestAnimationFrame(traceTick);
+}
+function setTrace(on){
+  traceMode=!!on;
+  if(traceMode){
+    setViewMode("3d");
+    if(!traceRAF) traceRAF=requestAnimationFrame(traceTick);
+  } else if(traceRAF){
+    cancelAnimationFrame(traceRAF); traceRAF=null;
+    traceDots.length=0; tracePulses.length=0;
+  }
+  render();
 }
 function renderPrompt(){
   var el=document.getElementById("prompt");
@@ -969,6 +1010,74 @@ function turnChanges(axis, pivot, quarters){
     return {idx:i, poseIdx:found<0 ? p.poseIdx : found,
             cell:{x:pivot.x+off[0], y:pivot.y+off[1], z:pivot.z+off[2]}};
   });
+}
+
+/* ================= trace: does flow get all the way through? =================
+
+   The owner's question, exactly: is the whole stack connected inlet to outlet. So the model
+   is about joints, not about routes:
+
+     flow STARTS at every inlet with nothing attached - that is where it enters the build
+     it CROSSES a joint only where an outlet meets an inlet, face to face
+     it ENDS at every outlet with nothing attached
+     whatever it never reaches is the thing you are looking for
+
+   Two outlets butted together is not a joint. It looks like one on the board, which is why
+   it is worth drawing: everything past it is dead and you would never know.
+
+   Deliberately not here: no rising/falling markers, because in the 3D view you can see which
+   way a pipe goes; nothing on the 2D sheet; and no tapping to flip a part. The old app let
+   you flip direction from inside trace, but port configuration IS the part here, so that tap
+   would swap one cast piece for another and change the casting list while you were reading
+   the drawing. */
+function flowOf(){
+  var occ={};
+  parts.forEach(function(p,i){ cellsOf(p).forEach(function(c){ occ[c.x+","+c.y+","+c.z]=i; }); });
+  // What lies across a port's face: the part there, and its port looking back at this one.
+  function across(i, dir){
+    var p=parts[i], wd=DMAPS[p.poseIdx][dir], c=portCell(p,dir);
+    var nx=c.x+DIRVEC[wd][0], ny=c.y+DIRVEC[wd][1], nz=c.z+DIRVEC[wd][2];
+    var j=occ[nx+","+ny+","+nz];
+    if(j===undefined || j===i) return null;
+    var q=parts[j], back=OPP[wd], hit=null;
+    q.ports.forEach(function(qp){
+      if(hit) return;
+      if(DMAPS[q.poseIdx][qp.dir]!==back) return;
+      var qc=portCell(q,qp.dir);
+      if(qc.x===nx && qc.y===ny && qc.z===nz) hit=qp;
+    });
+    return hit ? {part:j, port:hit} : null;
+  }
+  var live={};      // "partIdx:from>to" for every stream carrying flow
+  var livePart={};
+  var faults=[];    // ports that are loose, or butted against the same role
+  var seen={};
+  var queue=[];
+  // Sources: every inlet with nothing across it. Also records every fault as it goes.
+  parts.forEach(function(p,i){
+    p.ports.forEach(function(pt){
+      var m=across(i, pt.dir);
+      if(!m){ faults.push({part:i, dir:pt.dir, why:"loose"}); if(pt.role==="in") queue.push({part:i, dir:pt.dir}); }
+      else if(m.port.role===pt.role) faults.push({part:i, dir:pt.dir, why:"same"});
+    });
+  });
+  while(queue.length){
+    var at=queue.shift();
+    var key=at.part+":"+at.dir;
+    if(seen[key]) continue;
+    seen[key]=1;
+    var p=parts[at.part];
+    livePart[at.part]=1;
+    // Through the part: an inlet feeds every stream that starts at it.
+    p.streams.forEach(function(st){
+      if(st.from!==at.dir) return;
+      live[at.part+":"+st.from+">"+st.to]=1;
+      var m=across(at.part, st.to);
+      if(m && m.port.role==="in") queue.push({part:m.part, dir:m.port.dir});
+    });
+  }
+  return {live:live, livePart:livePart, faults:faults,
+          partsLit:Object.keys(livePart).length, partCount:parts.length};
 }
 
 function copySelection(){
@@ -1421,6 +1530,7 @@ function render(){
         .map(function(p){ var w=matApply(pose,p); return [w[0]+part.cell.x, w[1]+part.cell.y, w[2]+part.cell.z]; });
       var view=pts3.map(function(p){ return viewPt(p[0],p[1],p[2],cam.az,cam.el); });
       items.push({cellDepth:cellDepth, cellIdx:partIdx, onActive:onActive, selected:isSelected(partIdx),
+        streamKey:partIdx+":"+st.from+">"+st.to,
         depth:view.reduce(function(a,p){return a+p.y;},0)/view.length, kind:"chan", pts:view});
     });
     part.ports.forEach(function(p){
@@ -1430,10 +1540,19 @@ function render(){
       var view=viewPt(world[0],world[1],world[2],cam.az,cam.el);
       var sp=proj(view);
       var worldDir=DMAPS[part.poseIdx][p.dir];
-      items.push({cellDepth:cellDepth, cellIdx:partIdx, onActive:onActive, depth:view.y, kind:"port", view:view, role:p.role});
+      items.push({cellDepth:cellDepth, cellIdx:partIdx, onActive:onActive, depth:view.y, kind:"port",
+        view:view, role:p.role, portKey:partIdx+":"+p.dir});
       visiblePorts.push({partIdx:partIdx, dir:p.dir, role:p.role, worldDir:worldDir, sx:sp.sx, sy:sp.sy});
     });
   });
+
+  /* One pass over the board per render, not per item. Null while the mode is off, so nothing
+     below costs anything when you are just building. */
+  var flow = traceMode ? flowOf() : null;
+  lastFlow = flow;
+  var faultSet={};
+  if(flow) flow.faults.forEach(function(ft){ faultSet[ft.part+":"+ft.dir]=ft.why; });
+  traceDots.length=0; tracePulses.length=0;
 
   // rotPt's returned .y is camera-space depth, but SMALLER values are nearer the
   // viewer (proven via an unambiguous overhead case: el=90 deg, a physically-higher
@@ -1479,7 +1598,12 @@ function render(){
       }
       var path=svgNS("path");
       path.setAttribute("d",dStr);
-      path.setAttribute("fill","none"); path.setAttribute("stroke","var(--text)");
+      path.setAttribute("fill","none");
+      // In trace, pipe that carries nothing drops back to a structural grey so the lit run
+      // reads against it. This is the whole point of the mode: what is NOT moving is what you
+      // are looking for.
+      var carrying = flow && flow.live[it.streamKey];
+      path.setAttribute("stroke", flow && !carrying ? "var(--out)" : "var(--text)");
       path.setAttribute("stroke-width", wpx(W_CHANNEL).toFixed(2)); path.setAttribute("stroke-linecap","round");
       // Owner's fix for the sharp spike artifact at acute viewing angles: an elbow arc's
       // screen-space projection can fold back on itself when viewed near edge-on (its
@@ -1500,9 +1624,46 @@ function render(){
       // those parts are context rather than something meant to occlude cleanly.
       if(!it.onActive) path.setAttribute("opacity", OFF_LAYER_OPACITY);
       sceneG.appendChild(path);
+      /* Flow itself: dots stepping along inside the bore, drawn thinner than the pipe so the
+         pipe keeps its own weight, each with a dark rim so it stays distinct against the pipe
+         rather than dissolving into it (owner's note on the board). Two paths rather than one,
+         sharing an offset, so the rim marches with the dot.
+         Offsets are stepped from a clock in traceTick rather than by a CSS animation: the
+         scene is rebuilt on every frame of an orbit, and a CSS animation restarts each time,
+         so the flow would freeze exactly while you were turning the board to look at it. */
+      if(carrying){
+        var w=wpx(W_CHANNEL), dotW=Math.max(1.4, w*0.46), rimW=dotW+Math.max(1.4, w*0.22);
+        var period=Math.max(9, w*2.6);
+        [["rim", rimW, "var(--bg)"], ["dot", dotW, "var(--flow)"]].forEach(function(spec){
+          var d=svgNS("path");
+          d.setAttribute("d", dStr);
+          d.setAttribute("fill","none");
+          d.setAttribute("stroke", spec[2]);
+          d.setAttribute("stroke-width", spec[1].toFixed(2));
+          d.setAttribute("stroke-linecap","round");
+          d.setAttribute("stroke-dasharray", "0 "+period.toFixed(2));
+          if(!it.onActive) d.setAttribute("opacity", OFF_LAYER_OPACITY);
+          sceneG.appendChild(d);
+          traceDots.push({el:d, period:period});
+        });
+      }
     } else {
       var sp=proj(it.view);
       var pr=wpx(W_PORT);
+      /* Every port that is not properly joined - nothing across it, or an outlet facing an
+         outlet - pulses slowly in red. The owner's call that both get the same mark: on a
+         finished piece the only loose ends should be the one it pours into and the one it
+         pours out of, so anything else lighting up is the answer to "is it all connected". */
+      if(flow && faultSet[it.portKey]){
+        var ring=svgNS("circle");
+        ring.setAttribute("cx",sp.sx); ring.setAttribute("cy",sp.sy);
+        ring.setAttribute("r",(pr*2.1).toFixed(2));
+        ring.setAttribute("fill","none");
+        ring.setAttribute("stroke","var(--danger)");
+        ring.setAttribute("stroke-width", Math.max(1.4, pr*0.42).toFixed(2));
+        sceneG.appendChild(ring);
+        tracePulses.push(ring);
+      }
       var c=svgNS("circle");
       c.setAttribute("cx",sp.sx); c.setAttribute("cy",sp.sy); c.setAttribute("r",pr.toFixed(2));
       c.setAttribute("fill", it.role==="in" ? "var(--acc)" : "var(--out)");
@@ -1760,6 +1921,8 @@ function syncDeleteButton(){
   document.getElementById("deletebtn").disabled = (gizmoPartIdx==null && !selection.length);
   var selEl=document.getElementById("selectbtn");
   if(selEl) selEl.classList.toggle("on", selectMode);
+  var trEl=document.getElementById("tracebtn");
+  if(trEl) trEl.classList.toggle("on", traceMode);
   // COPY appears while you are gathering; PASTE stays as long as you are holding a copy,
   // so you can leave SELECT, move to another layer and drop it there.
   var copyEl=document.getElementById("copybtn"), pasteEl=document.getElementById("pastebtn");
@@ -3763,6 +3926,7 @@ document.getElementById("sheetAngleBtn").addEventListener("click", function(e){
   // Tapping away puts it back, which is the whole point of it not being on screen always.
   document.addEventListener("pointerdown", function(){ if(anglePopFor) closeAnglePop(); });
 })();
+document.getElementById("tracebtn").addEventListener("click", function(){ setTrace(!traceMode); });
 document.getElementById("transformbtn").addEventListener("click", function(){
   if(!selection.length) return;
   transformMode=!transformMode;
@@ -4002,6 +4166,10 @@ window.__pgSlice={get parts(){return parts;}, get gizmoPartIdx(){return gizmoPar
   render:function(){ render(); },
   svgPointFromClient:svgPointFromClient, serializeBoard:serializeBoard, loadBoard:loadBoard,
   doUndo:doUndo, doRedo:doRedo, snapshot:snapshot, clearAll:clearAll, LS_KEY:LS_KEY,
+  get traceMode(){return traceMode;}, get lastFlow(){return lastFlow;},
+  setTrace:setTrace, flowOf:flowOf,
+  // the flow clock, so it can be stepped by hand in a test rather than only by the browser
+  traceTick:function(ms){ traceStep(ms); },
   get selectMode(){return selectMode;}, get selection(){return selection;},
   setSelectMode:function(on){ selectMode=!!on; if(!selectMode) clearSelection(); render(); },
   toggleSelected:function(i){ toggleSelected(i); render(); },

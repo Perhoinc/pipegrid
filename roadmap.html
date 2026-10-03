@@ -289,7 +289,7 @@
   that are still waiting on a decision from you.</p>
   <div class="meta">
     <span><b>Updated</b> 3 Oct 2026</span>
-    <span><b>Build</b> vertical slice &middot; 4,150 lines</span>
+    <span><b>Build</b> vertical slice &middot; 4,318 lines</span>
     <span><b>Catalogue</b> 39 of 39 parts</span>
     <span><b>Live</b> perhoinc.github.io/pipegrid</span>
   </div>
@@ -348,25 +348,16 @@
 
   <ol class="road">
     <li>
-      <span class="num">01<span class="when">added<br>31 Aug</span></span>
+      <span class="num">01<span class="when">added<br>21 Aug</span></span>
       <div class="item">
-        <h3>Trace mode<span class="tag next">recommended next</span></h3>
-        <p>Follow the flow through a finished layout and see where it actually goes. Your
-        old app has this and the slice has none of it. It sits on top of the existing model
-        rather than changing it, which is why it waits until the editing tools settle.</p>
-      </div>
-    </li>
-    <li>
-      <span class="num">02<span class="when">added<br>21 Aug</span></span>
-      <div class="item">
-        <h3>Valves, and what flow does at a junction<span class="tag blocked">needs 01</span></h3>
+        <h3>Valves, and what flow does at a junction<span class="tag next">recommended next</span></h3>
         <p>A valve part, and the logic that goes with it — a merge behaves like an
         <em>or</em>, a valve like a <em>not</em> or an <em>and</em>. Parked since before
         the catalogue work, and it needs trace mode underneath it.</p>
       </div>
     </li>
     <li>
-      <span class="num">03<span class="when">added<br>27 Sep</span></span>
+      <span class="num">02<span class="when">added<br>27 Sep</span></span>
       <div class="item">
         <h3>Colour for runs and sections</h3>
         <p>Two separate things wearing one word. <b>Colouring a run</b>, or a section of
@@ -382,7 +373,7 @@
       </div>
     </li>
     <li>
-      <span class="num">04<span class="when">added<br>27 Sep</span></span>
+      <span class="num">03<span class="when">added<br>27 Sep</span></span>
       <div class="item">
         <h3>A render view</h3>
         <p>A third worksurface alongside the 3D rig and the 2D sheet: the whole build at
@@ -395,7 +386,7 @@
       </div>
     </li>
     <li>
-      <span class="num">05<span class="when">added<br>21 Aug</span></span>
+      <span class="num">04<span class="when">added<br>21 Aug</span></span>
       <div class="item">
         <h3>Exploded stack view<span class="tag parked">parked</span></h3>
         <p>The whole stack pulled apart along its vertical axis, so you can see every floor
@@ -403,7 +394,7 @@
       </div>
     </li>
     <li>
-      <span class="num">06<span class="when">added<br>25 Aug</span></span>
+      <span class="num">05<span class="when">added<br>25 Aug</span></span>
       <div class="item">
         <h3>Pipe treatment in 3D<span class="tag parked">after mechanics</span></h3>
         <p>See the open question above. Deliberately behind the mechanics work, per your
@@ -420,6 +411,28 @@
   </div>
 
   <div class="resolved">
+    <h3>Trace: is the whole stack joined up?</h3>
+    <span class="when"><b>settled</b> 3 Oct</span>
+    <p>TRACE lights the flow through the build. <b>Flow starts</b> at every inlet with nothing
+    attached, <b>crosses a joint</b> only where an outlet meets an inlet, and <b>ends</b> at
+    every outlet with nothing attached. Pipe carrying nothing drops back to grey, so what is
+    <i>not</i> moving is what you see &mdash; which is the question you set it: is the stack
+    connected inlet to outlet all the way through.</p>
+    <p>Chosen off <a href="boards/pipegrid-trace-mockups.html" style="color:var(--acc);">the
+    board</a>: marching dots inside the bore, each with a dark rim so it stays distinct against
+    the pipe rather than dissolving into it. Everything moves at once. Every port that is not
+    properly joined &mdash; loose, or butted against its own kind &mdash; carries a slow red
+    pulse. The readout counts it for you: <i>&ldquo;12 of 14 parts carrying flow &middot; 3
+    ports not joined&rdquo;</i>.</p>
+    <p>3D only, and it never edits. The old app let you flip a part&rsquo;s direction from
+    inside trace; that cannot carry over, because port configuration <b>is</b> the part here,
+    so the tap would swap one cast piece for another and change the casting list while you
+    were reading the drawing.</p>
+    <p>One thing to watch in use: the rule you chose marks <b>every</b> unjoined port, so the
+    source and the drain pulse red along with the mistakes. On a finished piece those should be
+    the only two, which is the point &mdash; but on a board mid-build it is a lot of red.</p>
+  </div>
+  <div class="resolved" style="margin-top:14px;">
     <h3>Which way a connector faces decides what it hides</h3>
     <span class="when"><b>settled</b> 3 Oct</span>
     <p>Your rule, in your words: looking at a part from the east, you see the pipe entering
@@ -724,6 +737,8 @@
   <p class="sblurb">All live on the iPad build.</p>
 
   <ul class="shipped">
+    <li><span class="dot"></span><div>Trace mode<span class="when">3 Oct</span>
+      <small>Flow through the build, dark where nothing moves, red where it is not joined</small></div></li>
     <li><span class="dot"></span><div>Connectors hide the pipe only when they face you<span class="when">3 Oct</span>
       <small>Port over pipe on the near side, pipe into port on the far side</small></div></li>
     <li><span class="dot"></span><div>Exact viewing angles<span class="when">2 Oct</span>
