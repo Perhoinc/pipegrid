@@ -2216,7 +2216,11 @@ function drawIsoPanel(svg,x,y,w,h,label,layerParts){
   // it existed to survive steep elevation, and this panel is fixed at REF_EL_DEG, so the
   // case it guarded against cannot arise here.
   var items=[], chanW=s*0.091, portR=s*0.12;
+  // Just enough to put a port on one side of its own pipe or the other. Small, so it cannot
+  // reorder the port against anything belonging to a different part.
+  var PORT_SIDE=0.0005;
   layerParts.forEach(function(part,partIdx){
+    var ownStreams=[];   // this part's pipes, so each port can be placed either side of its own
     // Cells are centred on the grid's own middle so the drawing sits in the panel
     // regardless of where the board's bounds happen to fall.
     // Z is measured RELATIVE to the floor being drawn, so a part that climbs into this
@@ -2237,15 +2241,46 @@ function drawIsoPanel(svg,x,y,w,h,label,layerParts){
         .map(place);
       // Depth stays measured on the WHOLE stream, so the draw order is exactly what it was
       // before the trim - only what gets painted changes, never where it lands in the order.
-      items.push({cellIdx:partIdx, faded:faded,
+      var seg={cellIdx:partIdx, faded:faded,
         depth:pts.reduce(function(acc,p){return acc+p.depth;},0)/pts.length, kind:"chan",
-        pts:trimStreamToPorts(pts, portR*PORT_BITE)});
+        ends:[pts[0], pts[pts.length-1]],
+        pts:trimStreamToPorts(pts, portR*PORT_BITE)};
+      items.push(seg); ownStreams.push(seg);
     });
+    /* Whether a connector hides the pipe or the pipe is seen going into it depends on which
+       side of the part that connector is on, which is the owner's rule and the physical one:
+       the near one sits between you and the pipe, the far one sits behind it.
+
+       Depth of the port's centre cannot answer that, because it gets compared against the
+       AVERAGE depth of the whole pipe. On an E-D elbow at 50/20 both mouths point away, so
+       both should show the pipe entering - E does, because it happens to be further than the
+       average, and D does not, because it happens to be nearer. Same part, same drawing, two
+       different answers from a number that is not about facing at all. That is the fault the
+       owner caught, in all four of his elbows.
+
+       So the test is the mouth's own direction against the view: project the port's world
+       direction as a VECTOR and read its depth component. Positive means it points away from
+       you - you are looking into the far side of the joint, so the pipe is drawn over the
+       port. Negative means it points at you, and the port covers the pipe.
+       The port is then placed either side of its OWN pipe rather than at its own depth, so
+       the two can never be separated by anything else in between. */
     part.ports.forEach(function(p){
       var wv=matApply(pose,portLocal(part,p));
       var pt=place([wv[0]+off[0],wv[1]+off[1],wv[2]+off[2]]);
+      var worldDir=DMAPS[part.poseIdx][p.dir];
+      var facing=refIsoProject(DIRVEC[worldDir]).vy;   // >0 points away from the viewer
+      // the stream that actually arrives at this port, found the same way the trim finds it
+      var host=null, hostD=1e9;
+      ownStreams.forEach(function(sg){
+        sg.ends.forEach(function(e){
+          var d=Math.hypot(e.x-pt.x, e.y-pt.y);
+          if(d<hostD){ hostD=d; host=sg; }
+        });
+      });
+      var depth=pt.depth;
+      if(host && hostD<portR*1.5) depth = host.depth + (facing>0 ? PORT_SIDE : -PORT_SIDE);
       items.push({cellIdx:partIdx, faded:faded,
-        depth:pt.depth, kind:"port", pt:pt, role:p.role});
+        depth:depth, kind:"port", pt:pt, role:p.role});
     });
   });
   items.sort(function(p,q){ return (q.depth-p.depth)||(p.cellIdx-q.cellIdx); });

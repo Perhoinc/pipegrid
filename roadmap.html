@@ -288,8 +288,8 @@
   <p class="standfirst">Where the build stands, what comes next, and the two things
   that are still waiting on a decision from you.</p>
   <div class="meta">
-    <span><b>Updated</b> 2 Oct 2026</span>
-    <span><b>Build</b> vertical slice &middot; 4,115 lines</span>
+    <span><b>Updated</b> 3 Oct 2026</span>
+    <span><b>Build</b> vertical slice &middot; 4,150 lines</span>
     <span><b>Catalogue</b> 39 of 39 parts</span>
     <span><b>Live</b> perhoinc.github.io/pipegrid</span>
   </div>
@@ -420,6 +420,24 @@
   </div>
 
   <div class="resolved">
+    <h3>Which way a connector faces decides what it hides</h3>
+    <span class="when"><b>settled</b> 3 Oct</span>
+    <p>Your rule, in your words: looking at a part from the east, you see the pipe entering
+    the W port and the E port hides it. <b>The near connector sits between you and the pipe;
+    the far one sits behind it.</b></p>
+    <p>The sheet was not asking that question. It compared the port&rsquo;s centre depth
+    against the <b>average</b> depth of the whole pipe &mdash; which is not about facing at
+    all. On an E&ndash;D elbow at 50&deg;/20&deg; both mouths point away from you, so both
+    should show the pipe going in: E did, because it happens to sit further than that average,
+    and D did not, because it happens to sit nearer. Same part, same drawing, two different
+    answers. That was the fault in all four of your elbows.</p>
+    <p>A port is now placed either side of <b>its own pipe</b> according to the direction its
+    mouth points, measured against the view. Checked on your arrangement: twelve of sixteen
+    ports show the pipe entering, and the four that hide it are exactly the W-facing ones
+    &mdash; the only direction there that points at you. Holds at every angle tried, including
+    the ones the angle control now allows.</p>
+  </div>
+  <div class="resolved" style="margin-top:14px;">
     <h3>Exact viewing angles</h3>
     <span class="when"><b>settled</b> 2 Oct</span>
     <p>Tap the camera readout and a small panel opens under it: azimuth and elevation, by
@@ -706,6 +724,8 @@
   <p class="sblurb">All live on the iPad build.</p>
 
   <ul class="shipped">
+    <li><span class="dot"></span><div>Connectors hide the pipe only when they face you<span class="when">3 Oct</span>
+      <small>Port over pipe on the near side, pipe into port on the far side</small></div></li>
     <li><span class="dot"></span><div>Exact viewing angles<span class="when">2 Oct</span>
       <small>Slider or typed degrees, from the readout; the sheet remembers its own</small></div></li>
     <li><span class="dot"></span><div>The app speaks up<span class="when">2 Oct</span>
